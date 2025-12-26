@@ -10,11 +10,15 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/sst/sidecar/internal/adapter"
+	"github.com/sst/sidecar/internal/adapter/claudecode"
 	"github.com/sst/sidecar/internal/app"
 	"github.com/sst/sidecar/internal/config"
 	"github.com/sst/sidecar/internal/event"
 	"github.com/sst/sidecar/internal/keymap"
 	"github.com/sst/sidecar/internal/plugin"
+	"github.com/sst/sidecar/internal/plugins/conversations"
+	"github.com/sst/sidecar/internal/plugins/gitstatus"
+	"github.com/sst/sidecar/internal/plugins/tdmonitor"
 )
 
 // Version is set at build time via ldflags
@@ -66,13 +70,17 @@ func main() {
 		Logger:    logger,
 	}
 
+	// Register adapters
+	ccAdapter := claudecode.New()
+	pluginCtx.Adapters["claude-code"] = ccAdapter
+
 	// Create plugin registry
 	registry := plugin.NewRegistry(pluginCtx)
 
-	// TODO: Register plugins when they're implemented
-	// registry.Register(gitstatus.New(cfg.Plugins.GitStatus))
-	// registry.Register(tdmonitor.New(cfg.Plugins.TDMonitor))
-	// registry.Register(conversations.New(cfg.Plugins.Conversations))
+	// Register plugins
+	registry.Register(gitstatus.New())
+	registry.Register(tdmonitor.New())
+	registry.Register(conversations.New())
 
 	// Create keymap registry
 	km := keymap.NewRegistry()
