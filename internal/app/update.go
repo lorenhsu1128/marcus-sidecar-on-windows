@@ -103,9 +103,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.PrevPlugin()
 		return m, nil
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		idx := int(msg.Runes[0] - '1')
-		m.SetActivePlugin(idx)
-		return m, nil
+		// Only switch plugins in global context; forward to plugin otherwise
+		// (e.g., td-monitor uses 1,2,3 for pane switching)
+		if m.activeContext == "global" || m.activeContext == "" {
+			idx := int(msg.Runes[0] - '1')
+			m.SetActivePlugin(idx)
+			return m, nil
+		}
+		// Fall through to forward to plugin
 	case "g":
 		m.FocusPluginByID("git-status")
 		return m, nil
