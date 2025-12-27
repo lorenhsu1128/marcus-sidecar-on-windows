@@ -648,40 +648,40 @@ func (p *Plugin) SetFocused(f bool) { p.focused = f }
 func (p *Plugin) Commands() []plugin.Command {
 	if p.searchMode {
 		return []plugin.Command{
-			{ID: "select", Name: "Select", Context: "conversations-search"},
-			{ID: "cancel", Name: "Cancel", Context: "conversations-search"},
+			{ID: "select", Name: "Select", Description: "Select search result", Category: plugin.CategoryActions, Context: "conversations-search"},
+			{ID: "cancel", Name: "Cancel", Description: "Cancel search", Category: plugin.CategoryActions, Context: "conversations-search"},
 		}
 	}
 	if p.filterMode {
 		return []plugin.Command{
-			{ID: "select", Name: "Select", Context: "conversations-filter"},
-			{ID: "cancel", Name: "Cancel", Context: "conversations-filter"},
+			{ID: "select", Name: "Select", Description: "Apply filter", Category: plugin.CategoryActions, Context: "conversations-filter"},
+			{ID: "cancel", Name: "Cancel", Description: "Cancel filter", Category: plugin.CategoryActions, Context: "conversations-filter"},
 		}
 	}
 	if p.view == ViewMessageDetail {
 		return []plugin.Command{
-			{ID: "back", Name: "Back", Context: "message-detail"},
-			{ID: "scroll", Name: "Scroll", Context: "message-detail"},
+			{ID: "back", Name: "Back", Description: "Return to messages", Category: plugin.CategoryNavigation, Context: "message-detail"},
+			{ID: "scroll", Name: "Scroll", Description: "Scroll message", Category: plugin.CategoryNavigation, Context: "message-detail"},
 		}
 	}
 	if p.view == ViewMessages || (p.twoPane && p.activePane == PaneMessages) {
 		return []plugin.Command{
-			{ID: "back", Name: "Back", Context: "conversation-detail"},
-			{ID: "copy", Name: "Copy", Context: "conversation-detail"},
-			{ID: "export", Name: "Export", Context: "conversation-detail"},
-			{ID: "detail", Name: "Detail", Context: "conversation-detail"},
+			{ID: "back", Name: "Back", Description: "Return to session list", Category: plugin.CategoryNavigation, Context: "conversation-detail"},
+			{ID: "copy", Name: "Copy", Description: "Copy message to clipboard", Category: plugin.CategoryActions, Context: "conversation-detail"},
+			{ID: "export", Name: "Export", Description: "Export conversation", Category: plugin.CategoryActions, Context: "conversation-detail"},
+			{ID: "detail", Name: "Detail", Description: "View message details", Category: plugin.CategoryView, Context: "conversation-detail"},
 		}
 	}
 	if p.view == ViewAnalytics {
 		return []plugin.Command{
-			{ID: "back", Name: "Back", Context: "analytics"},
+			{ID: "back", Name: "Back", Description: "Return to conversations", Category: plugin.CategoryNavigation, Context: "analytics"},
 		}
 	}
 	return []plugin.Command{
-		{ID: "view-session", Name: "View", Context: "conversations"},
-		{ID: "analytics", Name: "Analytics", Context: "conversations"},
-		{ID: "search", Name: "Search", Context: "conversations"},
-		{ID: "filter", Name: "Filter", Context: "conversations"},
+		{ID: "view-session", Name: "View", Description: "View session messages", Category: plugin.CategoryView, Context: "conversations"},
+		{ID: "analytics", Name: "Analytics", Description: "View usage analytics", Category: plugin.CategoryView, Context: "conversations"},
+		{ID: "search", Name: "Search", Description: "Search conversations", Category: plugin.CategorySearch, Context: "conversations"},
+		{ID: "filter", Name: "Filter", Description: "Filter by project", Category: plugin.CategorySearch, Context: "conversations"},
 	}
 }
 

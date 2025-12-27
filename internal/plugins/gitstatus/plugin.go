@@ -759,23 +759,28 @@ func (p *Plugin) SetFocused(f bool) { p.focused = f }
 // Commands returns the available commands.
 func (p *Plugin) Commands() []plugin.Command {
 	return []plugin.Command{
-		{ID: "stage-file", Name: "Stage", Context: "git-status"},
-		{ID: "unstage-file", Name: "Unstage", Context: "git-status"},
-		{ID: "stage-all", Name: "Stage all", Context: "git-status"},
-		{ID: "commit", Name: "Commit", Context: "git-status"},
-		{ID: "push", Name: "Push", Context: "git-status"},
-		{ID: "show-diff", Name: "Diff", Context: "git-status"},
-		{ID: "show-history", Name: "History", Context: "git-status"},
-		{ID: "open-file", Name: "Open", Context: "git-status"},
-		{ID: "back", Name: "Back", Context: "git-history"},
-		{ID: "view-commit", Name: "View", Context: "git-history"},
-		{ID: "push", Name: "Push", Context: "git-history"},
-		{ID: "back", Name: "Back", Context: "git-commit-detail"},
-		{ID: "view-diff", Name: "Diff", Context: "git-commit-detail"},
-		{ID: "close-diff", Name: "Close", Context: "git-diff"},
-		{ID: "scroll", Name: "Scroll", Context: "git-diff"},
-		{ID: "cancel", Name: "Cancel", Context: "git-commit"},
-		{ID: "execute-commit", Name: "Commit", Context: "git-commit"},
+		// git-status context
+		{ID: "stage-file", Name: "Stage", Description: "Stage selected file for commit", Category: plugin.CategoryGit, Context: "git-status"},
+		{ID: "unstage-file", Name: "Unstage", Description: "Remove file from staging area", Category: plugin.CategoryGit, Context: "git-status"},
+		{ID: "stage-all", Name: "Stage all", Description: "Stage all modified files", Category: plugin.CategoryGit, Context: "git-status"},
+		{ID: "commit", Name: "Commit", Description: "Open commit message editor", Category: plugin.CategoryGit, Context: "git-status"},
+		{ID: "push", Name: "Push", Description: "Push commits to remote", Category: plugin.CategoryGit, Context: "git-status"},
+		{ID: "show-diff", Name: "Diff", Description: "View file changes", Category: plugin.CategoryView, Context: "git-status"},
+		{ID: "show-history", Name: "History", Description: "View commit history", Category: plugin.CategoryView, Context: "git-status"},
+		{ID: "open-file", Name: "Open", Description: "Open file in editor", Category: plugin.CategoryActions, Context: "git-status"},
+		// git-history context
+		{ID: "back", Name: "Back", Description: "Return to file list", Category: plugin.CategoryNavigation, Context: "git-history"},
+		{ID: "view-commit", Name: "View", Description: "View commit details", Category: plugin.CategoryView, Context: "git-history"},
+		{ID: "push", Name: "Push", Description: "Push commits to remote", Category: plugin.CategoryGit, Context: "git-history"},
+		// git-commit-detail context
+		{ID: "back", Name: "Back", Description: "Return to history", Category: plugin.CategoryNavigation, Context: "git-commit-detail"},
+		{ID: "view-diff", Name: "Diff", Description: "View file diff", Category: plugin.CategoryView, Context: "git-commit-detail"},
+		// git-diff context
+		{ID: "close-diff", Name: "Close", Description: "Close diff view", Category: plugin.CategoryView, Context: "git-diff"},
+		{ID: "scroll", Name: "Scroll", Description: "Scroll diff content", Category: plugin.CategoryNavigation, Context: "git-diff"},
+		// git-commit context
+		{ID: "cancel", Name: "Cancel", Description: "Cancel commit", Category: plugin.CategoryActions, Context: "git-commit"},
+		{ID: "execute-commit", Name: "Commit", Description: "Create commit with message", Category: plugin.CategoryGit, Context: "git-commit"},
 	}
 }
 

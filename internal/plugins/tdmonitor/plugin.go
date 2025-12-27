@@ -149,15 +149,15 @@ func (p *Plugin) Commands() []plugin.Command {
 
 	// Expose td monitor's key commands
 	return []plugin.Command{
-		{ID: "open-details", Name: "Open details", Context: "td-monitor"},
-		{ID: "search", Name: "Search", Context: "td-monitor"},
-		{ID: "toggle-closed", Name: "Toggle closed", Context: "td-monitor"},
-		{ID: "approve", Name: "Approve", Context: "td-monitor"},
-		{ID: "mark-review", Name: "Review", Context: "td-monitor"},
-		{ID: "delete", Name: "Delete", Context: "td-monitor"},
-		{ID: "stats", Name: "Stats", Context: "td-monitor"},
-		{ID: "help", Name: "Help", Context: "td-monitor"},
-		{ID: "close-modal", Name: "Close", Context: "td-modal"},
+		{ID: "open-details", Name: "Details", Description: "View task details", Category: plugin.CategoryView, Context: "td-monitor"},
+		{ID: "search", Name: "Search", Description: "Filter tasks", Category: plugin.CategorySearch, Context: "td-monitor"},
+		{ID: "toggle-closed", Name: "Closed", Description: "Show/hide closed tasks", Category: plugin.CategoryView, Context: "td-monitor"},
+		{ID: "approve", Name: "Approve", Description: "Approve task for completion", Category: plugin.CategoryActions, Context: "td-monitor"},
+		{ID: "mark-review", Name: "Review", Description: "Mark task for review", Category: plugin.CategoryActions, Context: "td-monitor"},
+		{ID: "delete", Name: "Delete", Description: "Delete task", Category: plugin.CategoryActions, Context: "td-monitor"},
+		{ID: "stats", Name: "Stats", Description: "Show session statistics", Category: plugin.CategoryView, Context: "td-monitor"},
+		{ID: "help", Name: "Help", Description: "Show help", Category: plugin.CategorySystem, Context: "td-monitor"},
+		{ID: "close-modal", Name: "Close", Description: "Close modal", Category: plugin.CategoryNavigation, Context: "td-modal"},
 	}
 }
 

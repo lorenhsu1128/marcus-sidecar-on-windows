@@ -1007,22 +1007,22 @@ func (p *Plugin) SetFocused(f bool) { p.focused = f }
 func (p *Plugin) Commands() []plugin.Command {
 	return []plugin.Command{
 		// Tree pane commands
-		{ID: "quick-open", Name: "Open", Context: "file-browser-tree"},
-		{ID: "search", Name: "Search", Context: "file-browser-tree"},
-		{ID: "refresh", Name: "Refresh", Context: "file-browser-tree"},
+		{ID: "quick-open", Name: "Open", Description: "Quick open file by name", Category: plugin.CategorySearch, Context: "file-browser-tree"},
+		{ID: "search", Name: "Search", Description: "Search for files", Category: plugin.CategorySearch, Context: "file-browser-tree"},
+		{ID: "refresh", Name: "Refresh", Description: "Refresh file tree", Category: plugin.CategoryActions, Context: "file-browser-tree"},
 		// Preview pane commands
-		{ID: "quick-open", Name: "Open", Context: "file-browser-preview"},
-		{ID: "search-content", Name: "Search", Context: "file-browser-preview"},
-		{ID: "back", Name: "Back", Context: "file-browser-preview"},
+		{ID: "quick-open", Name: "Open", Description: "Quick open file by name", Category: plugin.CategorySearch, Context: "file-browser-preview"},
+		{ID: "search-content", Name: "Search", Description: "Search file content", Category: plugin.CategorySearch, Context: "file-browser-preview"},
+		{ID: "back", Name: "Back", Description: "Return to file tree", Category: plugin.CategoryNavigation, Context: "file-browser-preview"},
 		// Tree search commands
-		{ID: "confirm", Name: "Go", Context: "file-browser-search"},
-		{ID: "cancel", Name: "Cancel", Context: "file-browser-search"},
+		{ID: "confirm", Name: "Go", Description: "Jump to match", Category: plugin.CategoryNavigation, Context: "file-browser-search"},
+		{ID: "cancel", Name: "Cancel", Description: "Cancel search", Category: plugin.CategoryActions, Context: "file-browser-search"},
 		// Content search commands
-		{ID: "confirm", Name: "Go", Context: "file-browser-content-search"},
-		{ID: "cancel", Name: "Cancel", Context: "file-browser-content-search"},
+		{ID: "confirm", Name: "Go", Description: "Jump to match", Category: plugin.CategoryNavigation, Context: "file-browser-content-search"},
+		{ID: "cancel", Name: "Cancel", Description: "Cancel search", Category: plugin.CategoryActions, Context: "file-browser-content-search"},
 		// Quick open commands
-		{ID: "select", Name: "Open", Context: "file-browser-quick-open"},
-		{ID: "cancel", Name: "Cancel", Context: "file-browser-quick-open"},
+		{ID: "select", Name: "Open", Description: "Open selected file", Category: plugin.CategoryActions, Context: "file-browser-quick-open"},
+		{ID: "cancel", Name: "Cancel", Description: "Cancel quick open", Category: plugin.CategoryActions, Context: "file-browser-quick-open"},
 	}
 }
 
