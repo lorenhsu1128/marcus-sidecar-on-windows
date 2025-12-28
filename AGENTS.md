@@ -58,3 +58,24 @@ Keep command names short (1 word preferred) to prevent footer wrapping:
 - "History" not "Show history"
 
 The footer auto-truncates hints that exceed available width.
+
+## Inter-Plugin Communication
+
+Plugins communicate via tea.Msg broadcast - all plugins receive all messages.
+
+**App-level messages** (`internal/app/commands.go`):
+- `FocusPluginByIDMsg{PluginID}` - switch focus to a plugin by ID
+- `app.FocusPlugin(id)` - helper to create the above
+
+**File browser messages** (`internal/plugins/filebrowser/plugin.go`):
+- `NavigateToFileMsg{Path}` - navigate to and preview a file (relative path)
+
+**Usage pattern** (e.g., git → file browser):
+```go
+func (p *Plugin) openInFileBrowser(path string) tea.Cmd {
+    return tea.Batch(
+        app.FocusPlugin("file-browser"),
+        func() tea.Msg { return filebrowser.NavigateToFileMsg{Path: path} },
+    )
+}
+```

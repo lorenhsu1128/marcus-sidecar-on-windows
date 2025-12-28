@@ -60,6 +60,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ShowToast("Error: "+msg.Err.Error(), 5*time.Second)
 		return m, nil
 
+	case FocusPluginByIDMsg:
+		// Switch to requested plugin
+		return m, m.FocusPluginByID(msg.PluginID)
+
 	case filebrowser.OpenFileMsg:
 		// Open file in editor using tea.ExecProcess
 		c := exec.Command(msg.Editor, msg.Path)

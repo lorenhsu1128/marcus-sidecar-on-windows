@@ -80,3 +80,16 @@ func PluginFocused() tea.Cmd {
 		return PluginFocusedMsg{}
 	}
 }
+
+// FocusPluginByIDMsg requests focusing a specific plugin by ID.
+// Used for cross-plugin navigation (e.g., opening file in file browser from git).
+type FocusPluginByIDMsg struct {
+	PluginID string
+}
+
+// FocusPlugin returns a command that requests focusing a plugin by ID.
+func FocusPlugin(pluginID string) tea.Cmd {
+	return func() tea.Msg {
+		return FocusPluginByIDMsg{PluginID: pluginID}
+	}
+}

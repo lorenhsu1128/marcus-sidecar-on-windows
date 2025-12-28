@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sst/sidecar/internal/app"
 	"github.com/sst/sidecar/internal/plugin"
+	"github.com/sst/sidecar/internal/plugins/filebrowser"
 	"github.com/sst/sidecar/internal/state"
 )
 
@@ -69,15 +70,16 @@ type Plugin struct {
 	previewCommitScroll int     // Scroll offset for preview content
 
 	// Diff state (for full-screen diff view)
-	showDiff     bool
-	diffContent  string
-	diffFile     string
-	diffScroll   int
-	diffRaw      string       // Raw diff before delta processing
-	diffCommit   string       // Commit hash if viewing commit diff
-	diffViewMode DiffViewMode // Line or side-by-side
-	diffHorizOff int          // Horizontal scroll for side-by-side
-	parsedDiff   *ParsedDiff  // Parsed diff for enhanced rendering
+	showDiff       bool
+	diffContent    string
+	diffFile       string
+	diffScroll     int
+	diffRaw        string       // Raw diff before delta processing
+	diffCommit     string       // Commit hash if viewing commit diff
+	diffViewMode   DiffViewMode // Line or side-by-side
+	diffHorizOff   int          // Horizontal scroll for side-by-side
+	parsedDiff     *ParsedDiff  // Parsed diff for enhanced rendering
+	diffReturnMode ViewMode     // View mode to return to on esc
 
 	// History state
 	commits            []*Commit
@@ -421,6 +423,7 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		// Open full-screen diff view for files
 		if !p.cursorOnCommit() && len(entries) > 0 && p.cursor < len(entries) {
 			entry := entries[p.cursor]
+			p.diffReturnMode = p.viewMode
 			p.viewMode = ViewModeDiff
 			p.diffFile = entry.Path
 			p.diffCommit = ""
@@ -459,6 +462,13 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		// Stage all files
 		if err := p.tree.StageAll(); err == nil {
 			return p, tea.Batch(p.refresh(), p.loadRecentCommits())
+		}
+
+	case "O":
+		// Open file in file browser (for files only, not commits)
+		if !p.cursorOnCommit() && len(entries) > 0 && p.cursor < len(entries) {
+			entry := entries[p.cursor]
+			return p, p.openInFileBrowser(entry.Path)
 		}
 
 	case "c":
@@ -582,6 +592,7 @@ func (p *Plugin) updateStatusDiffPane(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		entries := p.tree.AllEntries()
 		if len(entries) > 0 && p.cursor < len(entries) {
 			entry := entries[p.cursor]
+			p.diffReturnMode = p.viewMode
 			p.viewMode = ViewModeDiff
 			p.diffFile = entry.Path
 			p.diffCommit = ""
@@ -632,6 +643,7 @@ func (p *Plugin) updateCommitPreviewPane(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd
 		// Open full-screen diff for selected file in commit
 		if p.previewCommitCursor < len(c.Files) {
 			file := c.Files[p.previewCommitCursor]
+			p.diffReturnMode = p.viewMode
 			p.viewMode = ViewModeDiff
 			p.diffFile = file.Path
 			p.diffCommit = c.Hash
@@ -826,6 +838,7 @@ func (p *Plugin) updateCommitDetail(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	case "enter", "d":
 		if p.selectedCommit != nil && p.commitDetailCursor < len(p.selectedCommit.Files) {
 			file := p.selectedCommit.Files[p.commitDetailCursor]
+			p.diffReturnMode = p.viewMode
 			p.viewMode = ViewModeDiff
 			p.diffFile = file.Path
 			p.diffCommit = p.selectedCommit.Hash
@@ -841,20 +854,18 @@ func (p *Plugin) updateCommitDetail(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 func (p *Plugin) updateDiff(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
-		// Return to previous view based on context
+		// Return to previous view
 		p.diffContent = ""
 		p.diffRaw = ""
 		p.parsedDiff = nil
 		p.diffHorizOff = 0
-		if p.diffCommit != "" {
-			// Came from commit detail
-			p.viewMode = ViewModeCommitDetail
-			p.diffCommit = ""
-		} else {
-			// Came from status
-			p.viewMode = ViewModeStatus
-		}
+		p.diffCommit = ""
 		p.diffFile = ""
+		p.viewMode = p.diffReturnMode
+		// If returning to status view with commit preview, focus the preview pane
+		if p.diffReturnMode == ViewModeStatus && p.previewCommit != nil {
+			p.activePane = PaneDiff
+		}
 
 	case "j", "down":
 		p.diffScroll++
@@ -920,6 +931,12 @@ func (p *Plugin) updateDiff(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		if p.diffScroll < 0 {
 			p.diffScroll = 0
 		}
+
+	case "O":
+		// Open file in file browser
+		if p.diffFile != "" {
+			return p, p.openInFileBrowser(p.diffFile)
+		}
 	}
 
 	return p, nil
@@ -968,6 +985,7 @@ func (p *Plugin) Commands() []plugin.Command {
 		{ID: "show-diff", Name: "Diff", Description: "View file changes", Category: plugin.CategoryView, Context: "git-status"},
 		{ID: "show-history", Name: "History", Description: "View commit history", Category: plugin.CategoryView, Context: "git-status"},
 		{ID: "open-file", Name: "Open", Description: "Open file in editor", Category: plugin.CategoryActions, Context: "git-status"},
+		{ID: "open-in-file-browser", Name: "Browse", Description: "Open file in file browser", Category: plugin.CategoryNavigation, Context: "git-status"},
 		// git-status-commits context (recent commits in sidebar)
 		{ID: "view-commit", Name: "View", Description: "View commit details", Category: plugin.CategoryView, Context: "git-status-commits"},
 		{ID: "show-history", Name: "History", Description: "View commit history", Category: plugin.CategoryView, Context: "git-status-commits"},
@@ -985,6 +1003,7 @@ func (p *Plugin) Commands() []plugin.Command {
 		// git-diff context
 		{ID: "close-diff", Name: "Close", Description: "Close diff view", Category: plugin.CategoryView, Context: "git-diff"},
 		{ID: "scroll", Name: "Scroll", Description: "Scroll diff content", Category: plugin.CategoryNavigation, Context: "git-diff"},
+		{ID: "open-in-file-browser", Name: "Browse", Description: "Open file in file browser", Category: plugin.CategoryNavigation, Context: "git-diff"},
 		// git-commit context
 		{ID: "cancel", Name: "Cancel", Description: "Cancel commit", Category: plugin.CategoryActions, Context: "git-commit"},
 		{ID: "execute-commit", Name: "Commit", Description: "Create commit with message", Category: plugin.CategoryGit, Context: "git-commit"},
@@ -1105,6 +1124,16 @@ func (p *Plugin) openFile(path string) tea.Cmd {
 		fullPath := filepath.Join(p.ctx.WorkDir, path)
 		return OpenFileMsg{Editor: editor, Path: fullPath}
 	}
+}
+
+// openInFileBrowser returns commands to switch to file browser and navigate to the file.
+func (p *Plugin) openInFileBrowser(path string) tea.Cmd {
+	return tea.Batch(
+		app.FocusPlugin("file-browser"),
+		func() tea.Msg {
+			return filebrowser.NavigateToFileMsg{Path: path}
+		},
+	)
 }
 
 // ensureCursorVisible adjusts scroll to keep cursor visible.

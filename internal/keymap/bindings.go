@@ -38,6 +38,7 @@ func DefaultBindings() []Binding {
 		{Key: "v", Command: "toggle-diff-mode", Context: "git-status"},
 		{Key: "h", Command: "show-history", Context: "git-status"},
 		{Key: "o", Command: "open-file", Context: "git-status"},
+		{Key: "O", Command: "open-in-file-browser", Context: "git-status"},
 		{Key: "enter", Command: "show-diff", Context: "git-status"},
 
 		// Git Status commits context (recent commits in sidebar)
@@ -55,6 +56,7 @@ func DefaultBindings() []Binding {
 		{Key: "esc", Command: "close-diff", Context: "git-diff"},
 		{Key: "j", Command: "scroll", Context: "git-diff"},
 		{Key: "k", Command: "scroll", Context: "git-diff"},
+		{Key: "O", Command: "open-in-file-browser", Context: "git-diff"},
 
 		// TD Monitor context
 		{Key: "a", Command: "approve-issue", Context: "td-monitor"},

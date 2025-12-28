@@ -35,6 +35,10 @@ type (
 		Editor string
 		Path   string
 	}
+	// NavigateToFileMsg requests navigation to a specific file (from other plugins).
+	NavigateToFileMsg struct {
+		Path string // Relative path from workdir
+	}
 )
 
 // ContentMatch represents a match position within file content.
@@ -217,6 +221,9 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.refresh(),
 			p.listenForWatchEvents(),
 		)
+
+	case NavigateToFileMsg:
+		return p.navigateToFile(msg.Path)
 
 	case tea.KeyMsg:
 		return p.handleKey(msg)
@@ -985,6 +992,44 @@ func (p *Plugin) expandParents(node *FileNode) {
 	if node.Parent.IsDir && !node.Parent.IsExpanded {
 		node.Parent.IsExpanded = true
 	}
+}
+
+// navigateToFile navigates the file browser to a specific file path.
+// Used when other plugins request navigation (e.g., git plugin opening file in browser).
+func (p *Plugin) navigateToFile(path string) (plugin.Plugin, tea.Cmd) {
+	// Find the file node in tree
+	var targetNode *FileNode
+	p.walkTree(p.tree.Root, func(node *FileNode) {
+		if node.Path == path {
+			targetNode = node
+		}
+	})
+
+	if targetNode == nil {
+		// File not found in tree, maybe it's new or ignored
+		return p, nil
+	}
+
+	// Expand parents to make the file visible
+	p.expandParents(targetNode)
+	p.tree.Flatten()
+
+	// Move tree cursor to file
+	if idx := p.tree.IndexOf(targetNode); idx >= 0 {
+		p.treeCursor = idx
+		p.ensureTreeCursorVisible()
+	}
+
+	// Load preview
+	p.previewFile = path
+	p.previewScroll = 0
+	p.previewLines = nil
+	p.previewError = nil
+	p.isBinary = false
+	p.isTruncated = false
+	p.activePane = PanePreview
+
+	return p, LoadPreview(p.ctx.WorkDir, path)
 }
 
 // View renders the plugin.
