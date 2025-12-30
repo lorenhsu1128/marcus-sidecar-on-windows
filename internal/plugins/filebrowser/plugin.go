@@ -2,9 +2,12 @@ package filebrowser
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +28,15 @@ const (
 	quickOpenTimeout    = 2 * time.Second // Max time to spend scanning
 )
 
+// FileOpMode represents the current file operation mode.
+type FileOpMode int
+
+const (
+	FileOpNone FileOpMode = iota
+	FileOpMove
+	FileOpRename
+)
+
 // Message types
 type (
 	RefreshMsg      struct{}
@@ -38,6 +50,19 @@ type (
 	// NavigateToFileMsg requests navigation to a specific file (from other plugins).
 	NavigateToFileMsg struct {
 		Path string // Relative path from workdir
+	}
+	// RevealErrorMsg is sent when reveal in file manager fails.
+	RevealErrorMsg struct {
+		Err error
+	}
+	// FileOpErrorMsg is sent when a file operation fails.
+	FileOpErrorMsg struct {
+		Err error
+	}
+	// FileOpSuccessMsg is sent when a file operation succeeds.
+	FileOpSuccessMsg struct {
+		Src string
+		Dst string
 	}
 )
 
@@ -95,6 +120,12 @@ type Plugin struct {
 	quickOpenCursor  int
 	quickOpenFiles   []string // Cached file paths (relative)
 	quickOpenError   string   // Error message if scan failed/limited
+
+	// File operation state (move/rename)
+	fileOpMode   FileOpMode
+	fileOpTarget *FileNode // The file being operated on
+	fileOpInput  string    // Current input value
+	fileOpError  string    // Error message if operation failed
 
 	// File watcher
 	watcher *Watcher
@@ -182,6 +213,85 @@ func (p *Plugin) openFile(path string) tea.Cmd {
 	}
 }
 
+// revealInFileManager reveals the file/directory in the system file manager.
+func (p *Plugin) revealInFileManager(path string) tea.Cmd {
+	return func() tea.Msg {
+		fullPath := filepath.Join(p.ctx.WorkDir, path)
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			// macOS: open -R reveals in Finder with file selected
+			cmd = exec.Command("open", "-R", fullPath)
+		case "windows":
+			// Windows: explorer /select, reveals in Explorer with file selected
+			cmd = exec.Command("explorer", "/select,", fullPath)
+		case "linux":
+			// Linux: xdg-open opens the parent directory
+			cmd = exec.Command("xdg-open", filepath.Dir(fullPath))
+		default:
+			return RevealErrorMsg{Err: fmt.Errorf("reveal not supported on %s", runtime.GOOS)}
+		}
+		if err := cmd.Start(); err != nil {
+			return RevealErrorMsg{Err: err}
+		}
+		return nil
+	}
+}
+
+// executeFileOp performs the pending file operation.
+func (p *Plugin) executeFileOp() (plugin.Plugin, tea.Cmd) {
+	if p.fileOpTarget == nil || p.fileOpInput == "" {
+		p.fileOpMode = FileOpNone
+		return p, nil
+	}
+
+	srcPath := filepath.Join(p.ctx.WorkDir, p.fileOpTarget.Path)
+	var dstPath string
+
+	switch p.fileOpMode {
+	case FileOpRename:
+		// Rename: new name in same directory
+		dstPath = filepath.Join(filepath.Dir(srcPath), p.fileOpInput)
+	case FileOpMove:
+		// Move: full relative path from workdir
+		if filepath.IsAbs(p.fileOpInput) {
+			dstPath = p.fileOpInput
+		} else {
+			dstPath = filepath.Join(p.ctx.WorkDir, p.fileOpInput)
+		}
+	}
+
+	return p, p.doFileOp(srcPath, dstPath)
+}
+
+// doFileOp performs the actual file move/rename operation.
+func (p *Plugin) doFileOp(src, dst string) tea.Cmd {
+	return func() tea.Msg {
+		// Create parent directories if needed (for move)
+		dstDir := filepath.Dir(dst)
+		if err := os.MkdirAll(dstDir, 0755); err != nil {
+			return FileOpErrorMsg{Err: err}
+		}
+
+		// Check if destination exists
+		if _, err := os.Stat(dst); err == nil {
+			return FileOpErrorMsg{Err: fmt.Errorf("destination already exists: %s", filepath.Base(dst))}
+		}
+
+		// Check if source and destination are the same
+		if src == dst {
+			return FileOpErrorMsg{Err: fmt.Errorf("source and destination are the same")}
+		}
+
+		// Perform the move/rename
+		if err := os.Rename(src, dst); err != nil {
+			return FileOpErrorMsg{Err: err}
+		}
+
+		return FileOpSuccessMsg{Src: src, Dst: dst}
+	}
+}
+
 // Update handles messages.
 func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -225,6 +335,20 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 	case NavigateToFileMsg:
 		return p.navigateToFile(msg.Path)
 
+	case RevealErrorMsg:
+		p.ctx.Logger.Error("file browser: reveal failed", "error", msg.Err)
+
+	case FileOpErrorMsg:
+		p.fileOpError = msg.Err.Error()
+
+	case FileOpSuccessMsg:
+		// Clear file operation state and refresh
+		p.fileOpMode = FileOpNone
+		p.fileOpTarget = nil
+		p.fileOpInput = ""
+		p.fileOpError = ""
+		return p, p.refresh()
+
 	case tea.KeyMsg:
 		return p.handleKey(msg)
 	}
@@ -243,6 +367,11 @@ func (p *Plugin) handleKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	// Handle quick open mode
 	if p.quickOpenMode {
 		return p.handleQuickOpenKey(msg)
+	}
+
+	// Handle file operation mode (move/rename input)
+	if p.fileOpMode != FileOpNone {
+		return p.handleFileOpKey(msg)
 	}
 
 	// Handle content search mode input (preview pane search)
@@ -368,13 +497,37 @@ func (p *Plugin) handleTreeKey(key string) (plugin.Plugin, tea.Cmd) {
 		}
 		p.ensureTreeCursorVisible()
 
-	case "r":
-		return p, p.refresh()
-
 	case "e", "o":
 		node := p.tree.GetNode(p.treeCursor)
 		if node != nil && !node.IsDir {
 			return p, p.openFile(node.Path)
+		}
+
+	case "R":
+		// Reveal in file manager (Finder/Explorer/etc.)
+		node := p.tree.GetNode(p.treeCursor)
+		if node != nil {
+			return p, p.revealInFileManager(node.Path)
+		}
+
+	case "r":
+		// Rename file/directory
+		node := p.tree.GetNode(p.treeCursor)
+		if node != nil && node != p.tree.Root {
+			p.fileOpMode = FileOpRename
+			p.fileOpTarget = node
+			p.fileOpInput = node.Name // Pre-fill with current name
+			p.fileOpError = ""
+		}
+
+	case "m":
+		// Move file/directory
+		node := p.tree.GetNode(p.treeCursor)
+		if node != nil && node != p.tree.Root {
+			p.fileOpMode = FileOpMove
+			p.fileOpTarget = node
+			p.fileOpInput = node.Path // Pre-fill with current path
+			p.fileOpError = ""
 		}
 
 	case "/":
@@ -474,6 +627,45 @@ func (p *Plugin) handlePreviewKey(key string) (plugin.Plugin, tea.Cmd) {
 			p.contentSearchQuery = ""
 			p.contentSearchMatches = nil
 			p.contentSearchCursor = 0
+		}
+
+	case "R":
+		// Reveal in file manager (Finder/Explorer/etc.)
+		if p.previewFile != "" {
+			return p, p.revealInFileManager(p.previewFile)
+		}
+	}
+
+	return p, nil
+}
+
+// handleFileOpKey handles key input during file operation mode (move/rename).
+func (p *Plugin) handleFileOpKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
+	key := msg.String()
+
+	switch key {
+	case "esc":
+		// Cancel file operation
+		p.fileOpMode = FileOpNone
+		p.fileOpTarget = nil
+		p.fileOpInput = ""
+		p.fileOpError = ""
+
+	case "enter":
+		// Execute file operation
+		return p.executeFileOp()
+
+	case "backspace":
+		if len(p.fileOpInput) > 0 {
+			p.fileOpInput = p.fileOpInput[:len(p.fileOpInput)-1]
+			p.fileOpError = "" // Clear error on input change
+		}
+
+	default:
+		// Append printable characters
+		if len(key) == 1 && key[0] >= 32 && key[0] <= 126 {
+			p.fileOpInput += key
+			p.fileOpError = "" // Clear error on input change
 		}
 	}
 
@@ -1054,10 +1246,13 @@ func (p *Plugin) Commands() []plugin.Command {
 		// Tree pane commands
 		{ID: "quick-open", Name: "Open", Description: "Quick open file by name", Category: plugin.CategorySearch, Context: "file-browser-tree"},
 		{ID: "search", Name: "Search", Description: "Search for files", Category: plugin.CategorySearch, Context: "file-browser-tree"},
-		{ID: "refresh", Name: "Refresh", Description: "Refresh file tree", Category: plugin.CategoryActions, Context: "file-browser-tree"},
+		{ID: "rename", Name: "Rename", Description: "Rename file or directory", Category: plugin.CategoryActions, Context: "file-browser-tree"},
+		{ID: "move", Name: "Move", Description: "Move file or directory", Category: plugin.CategoryActions, Context: "file-browser-tree"},
+		{ID: "reveal", Name: "Reveal", Description: "Reveal in file manager", Category: plugin.CategoryActions, Context: "file-browser-tree"},
 		// Preview pane commands
 		{ID: "quick-open", Name: "Open", Description: "Quick open file by name", Category: plugin.CategorySearch, Context: "file-browser-preview"},
 		{ID: "search-content", Name: "Search", Description: "Search file content", Category: plugin.CategorySearch, Context: "file-browser-preview"},
+		{ID: "reveal", Name: "Reveal", Description: "Reveal in file manager", Category: plugin.CategoryActions, Context: "file-browser-preview"},
 		{ID: "back", Name: "Back", Description: "Return to file tree", Category: plugin.CategoryNavigation, Context: "file-browser-preview"},
 		// Tree search commands
 		{ID: "confirm", Name: "Go", Description: "Jump to match", Category: plugin.CategoryNavigation, Context: "file-browser-search"},
@@ -1068,6 +1263,9 @@ func (p *Plugin) Commands() []plugin.Command {
 		// Quick open commands
 		{ID: "select", Name: "Open", Description: "Open selected file", Category: plugin.CategoryActions, Context: "file-browser-quick-open"},
 		{ID: "cancel", Name: "Cancel", Description: "Cancel quick open", Category: plugin.CategoryActions, Context: "file-browser-quick-open"},
+		// File operation commands (move/rename)
+		{ID: "confirm", Name: "Confirm", Description: "Confirm operation", Category: plugin.CategoryActions, Context: "file-browser-file-op"},
+		{ID: "cancel", Name: "Cancel", Description: "Cancel operation", Category: plugin.CategoryActions, Context: "file-browser-file-op"},
 	}
 }
 
@@ -1075,6 +1273,9 @@ func (p *Plugin) Commands() []plugin.Command {
 func (p *Plugin) FocusContext() string {
 	if p.quickOpenMode {
 		return "file-browser-quick-open"
+	}
+	if p.fileOpMode != FileOpNone {
+		return "file-browser-file-op"
 	}
 	if p.contentSearchMode {
 		return "file-browser-content-search"

@@ -48,15 +48,19 @@ func (p *Plugin) renderView() string {
 		previewBorder = styles.PanelActive
 	}
 
-	// Account for search bar if active
-	searchBarHeight := 0
-	if p.searchMode || p.contentSearchMode {
-		searchBarHeight = 1
+	// Account for input bar if active (search or file op)
+	inputBarHeight := 0
+	if p.searchMode || p.contentSearchMode || p.fileOpMode != FileOpNone {
+		inputBarHeight = 1
+		// Add extra line for error message if present
+		if p.fileOpMode != FileOpNone && p.fileOpError != "" {
+			inputBarHeight = 2
+		}
 	}
 
-	// Calculate pane height: total - search bar - pane border (2 lines)
+	// Calculate pane height: total - input bar - pane border (2 lines)
 	// Note: footer is rendered by the app, not by the plugin
-	paneHeight := p.height - searchBarHeight - 2
+	paneHeight := p.height - inputBarHeight - 2
 	if paneHeight < 4 {
 		paneHeight = 4
 	}
@@ -95,6 +99,11 @@ func (p *Plugin) renderView() string {
 	// Add content search bar if in content search mode
 	if p.contentSearchMode {
 		parts = append(parts, p.renderContentSearchBar())
+	}
+
+	// Add file operation bar if in file operation mode
+	if p.fileOpMode != FileOpNone {
+		parts = append(parts, p.renderFileOpBar())
 	}
 
 	parts = append(parts, panes)
@@ -136,6 +145,31 @@ func (p *Plugin) renderSearchBar() string {
 
 	searchLine := fmt.Sprintf(" / %s%s%s", p.searchQuery, cursor, matchInfo)
 	return styles.ModalTitle.Render(searchLine)
+}
+
+// renderFileOpBar renders the file operation input bar (move/rename).
+func (p *Plugin) renderFileOpBar() string {
+	var prompt string
+	switch p.fileOpMode {
+	case FileOpRename:
+		prompt = "Rename: "
+	case FileOpMove:
+		prompt = "Move to: "
+	default:
+		return ""
+	}
+
+	cursor := "█"
+	inputLine := fmt.Sprintf(" %s%s%s", prompt, p.fileOpInput, cursor)
+
+	if p.fileOpError != "" {
+		errorLine := styles.StatusDeleted.Render(" " + p.fileOpError)
+		return lipgloss.JoinVertical(lipgloss.Left,
+			styles.ModalTitle.Render(inputLine),
+			errorLine,
+		)
+	}
+	return styles.ModalTitle.Render(inputLine)
 }
 
 // renderTreePane renders the file tree in the left pane.

@@ -253,8 +253,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "r":
 		// In td-monitor context, 'r' is for mark-review - forward to plugin
+		// In file-browser-tree context, 'r' is for rename - forward to plugin
 		// In other contexts, 'r' triggers global refresh
-		if m.activeContext != "td-monitor" {
+		if m.activeContext != "td-monitor" && m.activeContext != "file-browser-tree" {
 			return m, Refresh()
 		}
 		// Fall through to forward to plugin

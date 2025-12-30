@@ -127,9 +127,13 @@ func DefaultBindings() []Binding {
 
 		// File browser tree context
 		{Key: "/", Command: "search", Context: "file-browser-tree"},
+		{Key: "r", Command: "rename", Context: "file-browser-tree"},
+		{Key: "m", Command: "move", Context: "file-browser-tree"},
+		{Key: "R", Command: "reveal", Context: "file-browser-tree"},
 
 		// File browser preview context
 		{Key: "/", Command: "search-content", Context: "file-browser-preview"},
+		{Key: "R", Command: "reveal", Context: "file-browser-preview"},
 		{Key: "esc", Command: "back", Context: "file-browser-preview"},
 		{Key: "h", Command: "back", Context: "file-browser-preview"},
 
@@ -154,6 +158,10 @@ func DefaultBindings() []Binding {
 		{Key: "down", Command: "cursor-down", Context: "file-browser-quick-open"},
 		{Key: "ctrl+n", Command: "cursor-down", Context: "file-browser-quick-open"},
 		{Key: "ctrl+p", Command: "cursor-up", Context: "file-browser-quick-open"},
+
+		// File browser file operation context (move/rename)
+		{Key: "esc", Command: "cancel", Context: "file-browser-file-op"},
+		{Key: "enter", Command: "confirm", Context: "file-browser-file-op"},
 
 		// Git Commit context (commit message editor)
 		{Key: "esc", Command: "cancel", Context: "git-commit"},
