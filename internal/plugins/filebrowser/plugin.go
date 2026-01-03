@@ -798,10 +798,20 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.previewSize = msg.Result.TotalSize
 			p.previewModTime = msg.Result.ModTime
 			p.previewMode = msg.Result.Mode
-			p.previewScroll = 0
+
+			// Preserve scroll position when coming from project search with target line
+			targetScroll := p.previewScroll
+			if !p.contentSearchMode {
+				p.previewScroll = 0
+			}
+
 			// Re-run search if still in search mode (e.g., navigating files with j/k)
 			if p.contentSearchMode && p.contentSearchQuery != "" {
 				p.updateContentMatches()
+				// Jump to match nearest the target line from project search
+				if targetScroll > 0 && len(p.contentSearchMatches) > 0 {
+					p.scrollToNearestMatch(targetScroll)
+				}
 			}
 		}
 
@@ -1455,6 +1465,37 @@ func (p *Plugin) scrollToContentMatch() {
 	p.previewScroll = targetScroll
 }
 
+// scrollToNearestMatch finds and jumps to the match nearest to the target line.
+// Used when opening a file from project search to jump to the selected match.
+func (p *Plugin) scrollToNearestMatch(targetLine int) {
+	if len(p.contentSearchMatches) == 0 {
+		return
+	}
+
+	// Find match closest to target line
+	bestIdx := 0
+	bestDist := intAbs(p.contentSearchMatches[0].LineNo - targetLine)
+
+	for i, match := range p.contentSearchMatches {
+		dist := intAbs(match.LineNo - targetLine)
+		if dist < bestDist {
+			bestDist = dist
+			bestIdx = i
+		}
+	}
+
+	p.contentSearchCursor = bestIdx
+	p.scrollToContentMatch()
+}
+
+// intAbs returns the absolute value of x.
+func intAbs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 // openQuickOpen enters quick open mode.
 func (p *Plugin) openQuickOpen() (plugin.Plugin, tea.Cmd) {
 	// Build file cache if empty
@@ -1723,6 +1764,9 @@ func (p *Plugin) openProjectSearchResult() (plugin.Plugin, tea.Cmd) {
 		return p, nil
 	}
 
+	// Capture search query before closing project search
+	searchQuery := state.Query
+
 	// Close project search
 	p.projectSearchMode = false
 	p.projectSearchState = nil
@@ -1762,6 +1806,15 @@ func (p *Plugin) openProjectSearchResult() (plugin.Plugin, tea.Cmd) {
 		if p.previewScroll < 0 {
 			p.previewScroll = 0
 		}
+	}
+
+	// Set up content search for highlighting the matched term
+	if searchQuery != "" {
+		p.contentSearchMode = true
+		p.contentSearchCommitted = true // Skip input phase, enable n/N navigation
+		p.contentSearchQuery = searchQuery
+		p.contentSearchMatches = nil // Will be populated after preview loads
+		p.contentSearchCursor = 0
 	}
 
 	return p, LoadPreview(p.ctx.WorkDir, path)
