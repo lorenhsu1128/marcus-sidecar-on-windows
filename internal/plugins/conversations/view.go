@@ -507,36 +507,6 @@ func (p *Plugin) renderMessage(msg adapter.Message, msgIndex int, maxWidth int) 
 	return lines
 }
 
-// wrapText wraps text to fit within maxWidth.
-func wrapText(text string, maxWidth int) []string {
-	if maxWidth <= 0 {
-		return []string{text}
-	}
-
-	// Replace newlines with spaces for simpler wrapping
-	text = strings.ReplaceAll(text, "\n", " ")
-
-	var lines []string
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return lines
-	}
-
-	currentLine := words[0]
-	for _, word := range words[1:] {
-		if len(currentLine)+1+len(word) <= maxWidth {
-			currentLine += " " + word
-		} else {
-			lines = append(lines, currentLine)
-			currentLine = word
-		}
-	}
-	if currentLine != "" {
-		lines = append(lines, currentLine)
-	}
-
-	return lines
-}
 
 // formatDuration formats a duration in human-readable form.
 func formatDuration(d time.Duration) string {

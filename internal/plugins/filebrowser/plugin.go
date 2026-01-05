@@ -17,6 +17,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/marcus/sidecar/internal/markdown"
 	"github.com/marcus/sidecar/internal/mouse"
 	"github.com/marcus/sidecar/internal/msg"
 	"github.com/marcus/sidecar/internal/plugin"
@@ -125,6 +126,11 @@ type Plugin struct {
 	previewModTime     time.Time
 	previewMode        os.FileMode
 
+	// Markdown rendering state
+	markdownRenderer   *markdown.Renderer // Shared Glamour renderer
+	markdownRenderMode bool               // true=rendered, false=raw
+	markdownRendered   []string           // Cached rendered lines
+
 	// Dimensions
 	width, height int
 	treeWidth     int
@@ -204,6 +210,13 @@ func (p *Plugin) Icon() string { return pluginIcon }
 func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.ctx = ctx
 	p.tree = NewFileTree(ctx.WorkDir)
+
+	// Initialize markdown renderer
+	renderer, err := markdown.NewRenderer()
+	if err != nil {
+		ctx.Logger.Warn("markdown renderer init failed", "error", err)
+	}
+	p.markdownRenderer = renderer
 
 	// Load saved pane width from state
 	if saved := state.GetFileBrowserTreeWidth(); saved > 0 {
@@ -806,6 +819,12 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.previewModTime = msg.Result.ModTime
 			p.previewMode = msg.Result.Mode
 
+			// Clear markdown cache when loading new file
+			p.markdownRendered = nil
+			if p.markdownRenderMode && p.isMarkdownFile() {
+				p.renderMarkdownContent()
+			}
+
 			// Preserve scroll position when coming from project search with target line
 			targetScroll := p.previewScroll
 			if !p.contentSearchMode {
@@ -1260,6 +1279,12 @@ func (p *Plugin) handlePreviewKey(key string) (plugin.Plugin, tea.Cmd) {
 		// Copy selected text to clipboard
 		if p.hasTextSelection() {
 			return p, p.copySelectedTextToClipboard()
+		}
+
+	case "m":
+		// Toggle markdown rendering for .md files
+		if p.isMarkdownFile() {
+			p.toggleMarkdownRender()
 		}
 	}
 
@@ -2165,8 +2190,9 @@ func (p *Plugin) Commands() []plugin.Command {
 		{ID: "quick-open", Name: "Open", Description: "Quick open file by name", Category: plugin.CategorySearch, Context: "file-browser-preview", Priority: 1},
 		{ID: "project-search", Name: "Find", Description: "Search in project", Category: plugin.CategorySearch, Context: "file-browser-preview", Priority: 2},
 		{ID: "search-content", Name: "Search", Description: "Search file content", Category: plugin.CategorySearch, Context: "file-browser-preview", Priority: 3},
-		{ID: "back", Name: "Back", Description: "Return to file tree", Category: plugin.CategoryNavigation, Context: "file-browser-preview", Priority: 4},
-		{ID: "reveal", Name: "Reveal", Description: "Reveal in file manager", Category: plugin.CategoryActions, Context: "file-browser-preview", Priority: 5},
+		{ID: "toggle-markdown", Name: "Render", Description: "Toggle markdown rendering", Category: plugin.CategoryActions, Context: "file-browser-preview", Priority: 4},
+		{ID: "back", Name: "Back", Description: "Return to file tree", Category: plugin.CategoryNavigation, Context: "file-browser-preview", Priority: 5},
+		{ID: "reveal", Name: "Reveal", Description: "Reveal in file manager", Category: plugin.CategoryActions, Context: "file-browser-preview", Priority: 6},
 		// Tree search commands
 		{ID: "confirm", Name: "Go", Description: "Jump to match", Category: plugin.CategoryNavigation, Context: "file-browser-search", Priority: 1},
 		{ID: "cancel", Name: "Cancel", Description: "Cancel search", Category: plugin.CategoryActions, Context: "file-browser-search", Priority: 1},
@@ -2268,4 +2294,38 @@ func (p *Plugin) copySelectedTextToClipboard() tea.Cmd {
 		lineCount := end - start + 1
 		return msg.ShowToast(fmt.Sprintf("Copied %d line(s)", lineCount), 2*time.Second)
 	}
+}
+
+// isMarkdownFile returns true if the current preview file is a markdown file.
+func (p *Plugin) isMarkdownFile() bool {
+	if p.previewFile == "" {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(p.previewFile))
+	return ext == ".md" || ext == ".markdown"
+}
+
+// toggleMarkdownRender toggles between rendered and raw markdown view.
+func (p *Plugin) toggleMarkdownRender() {
+	if !p.isMarkdownFile() {
+		return
+	}
+	p.markdownRenderMode = !p.markdownRenderMode
+	if p.markdownRenderMode && len(p.markdownRendered) == 0 {
+		p.renderMarkdownContent()
+	}
+}
+
+// renderMarkdownContent renders the current preview content as markdown.
+func (p *Plugin) renderMarkdownContent() {
+	if p.markdownRenderer == nil || len(p.previewLines) == 0 {
+		return
+	}
+	content := strings.Join(p.previewLines, "\n")
+	// Subtract padding for margins
+	width := p.previewWidth - 6
+	if width < 30 {
+		width = 30
+	}
+	p.markdownRendered = p.markdownRenderer.RenderContent(content, width)
 }

@@ -164,6 +164,7 @@ func DefaultBindings() []Binding {
 		{Key: "ctrl+p", Command: "quick-open", Context: "file-browser-preview"},
 		{Key: "ctrl+s", Command: "project-search", Context: "file-browser-preview"},
 		{Key: "R", Command: "reveal", Context: "file-browser-preview"},
+		{Key: "m", Command: "toggle-markdown", Context: "file-browser-preview"},
 		{Key: "esc", Command: "back", Context: "file-browser-preview"},
 		{Key: "h", Command: "back", Context: "file-browser-preview"},
 

@@ -425,6 +425,10 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 	header := "Preview"
 	if p.previewFile != "" {
 		header = truncatePath(p.previewFile, p.previewWidth-4)
+		// Add markdown render indicator
+		if p.isMarkdownFile() && p.markdownRenderMode {
+			header += " [rendered]"
+		}
 	}
 	sb.WriteString(styles.Title.Render(header))
 
@@ -455,9 +459,17 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 		return sb.String()
 	}
 
-	// Use highlighted lines if available
-	lines := p.previewHighlighted
-	if len(lines) == 0 {
+	// Determine which lines to display
+	var lines []string
+	showLineNumbers := true
+
+	// Use markdown-rendered lines if in render mode for markdown files
+	if p.markdownRenderMode && p.isMarkdownFile() && len(p.markdownRendered) > 0 {
+		lines = p.markdownRendered
+		showLineNumbers = false // Glamour output doesn't map 1:1 to source lines
+	} else if len(p.previewHighlighted) > 0 {
+		lines = p.previewHighlighted
+	} else {
 		lines = p.previewLines
 	}
 
@@ -469,6 +481,9 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 
 	// Calculate max line width (pane width - line number - padding)
 	lineNumWidth := 5 // "1234 " = 5 chars
+	if !showLineNumbers {
+		lineNumWidth = 0
+	}
 	maxLineWidth := p.previewWidth - lineNumWidth - 4
 	if maxLineWidth < 10 {
 		maxLineWidth = 10
@@ -485,7 +500,7 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 
 	for i := start; i < contentEnd; i++ {
 		// Check if this line is selected for text selection highlighting
-		if p.isLineSelected(i) {
+		if p.isLineSelected(i) && showLineNumbers {
 			// Line number with selection background
 			lineNumStr := fmt.Sprintf("%4d ", i+1)
 			sb.WriteString(injectSelectionBackground(lineNumStr))
@@ -506,11 +521,9 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 				sb.WriteString(injectSelectionBackground(padding))
 			}
 		} else {
-			lineNum := styles.FileBrowserLineNumber.Render(fmt.Sprintf("%4d ", i+1))
-
-			// Get line content - apply match highlighting if in content search mode
+			// Get line content
 			var lineContent string
-			if p.contentSearchMode && len(p.contentSearchMatches) > 0 {
+			if p.contentSearchMode && len(p.contentSearchMatches) > 0 && showLineNumbers {
 				// Use raw lines for highlighting (loses syntax highlighting on matched lines)
 				lineContent = p.highlightLineMatches(i)
 			} else if i < len(lines) {
@@ -518,7 +531,12 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 			}
 
 			line := lineStyle.Render(lineContent)
-			sb.WriteString(lineNum)
+
+			// Render with or without line numbers
+			if showLineNumbers {
+				lineNum := styles.FileBrowserLineNumber.Render(fmt.Sprintf("%4d ", i+1))
+				sb.WriteString(lineNum)
+			}
 			sb.WriteString(line)
 		}
 
