@@ -16,8 +16,8 @@ type State struct {
 	GitStatusSidebarWidth  int `json:"gitStatusSidebarWidth,omitempty"`
 	ConversationsSideWidth int `json:"conversationsSideWidth,omitempty"`
 
-	// Plugin-specific state
-	FileBrowser FileBrowserState `json:"fileBrowser,omitempty"`
+	// Plugin-specific state (keyed by working directory path)
+	FileBrowser map[string]FileBrowserState `json:"fileBrowser,omitempty"`
 }
 
 // FileBrowserState holds persistent file browser state.
@@ -183,23 +183,26 @@ func SetConversationsSideWidth(width int) error {
 	return Save()
 }
 
-// GetFileBrowserState returns the saved file browser state.
-func GetFileBrowserState() FileBrowserState {
+// GetFileBrowserState returns the saved file browser state for a given working directory.
+func GetFileBrowserState(workdir string) FileBrowserState {
 	mu.RLock()
 	defer mu.RUnlock()
-	if current == nil {
+	if current == nil || current.FileBrowser == nil {
 		return FileBrowserState{}
 	}
-	return current.FileBrowser
+	return current.FileBrowser[workdir]
 }
 
-// SetFileBrowserState saves the file browser state.
-func SetFileBrowserState(state FileBrowserState) error {
+// SetFileBrowserState saves the file browser state for a given working directory.
+func SetFileBrowserState(workdir string, fbState FileBrowserState) error {
 	mu.Lock()
 	if current == nil {
 		current = &State{}
 	}
-	current.FileBrowser = state
+	if current.FileBrowser == nil {
+		current.FileBrowser = make(map[string]FileBrowserState)
+	}
+	current.FileBrowser[workdir] = fbState
 	mu.Unlock()
 	return Save()
 }

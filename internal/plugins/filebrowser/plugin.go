@@ -277,15 +277,16 @@ func (p *Plugin) saveState() {
 		TreeCursor:    p.treeCursor,
 	}
 
-	if err := state.SetFileBrowserState(fbState); err != nil {
+	if err := state.SetFileBrowserState(p.ctx.WorkDir, fbState); err != nil {
 		p.ctx.Logger.Error("file browser: failed to save state", "error", err)
 	}
 }
 
 // restoreState loads saved file browser state from disk.
 func (p *Plugin) restoreState() tea.Cmd {
+	workDir := p.ctx.WorkDir
 	return func() tea.Msg {
-		fbState := state.GetFileBrowserState()
+		fbState := state.GetFileBrowserState(workDir)
 		return StateRestoredMsg{State: fbState}
 	}
 }
