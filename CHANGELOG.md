@@ -2,6 +2,28 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.10.0] - 2026-01-07
+
+### Features
+- **Git History Search**: Search commits with `/` key, regex support, case-sensitive toggle
+- **Author Filter**: Filter commits by author with `f` key
+- **Path Filter**: Filter commits by file path with `p` key
+- **Inline Commit Stats**: Display +/- stats next to selected commits
+
+### Improvements
+- Removed delta external tool fallback (built-in diff viewer only)
+- Moved tree search bar inside pane for consistent UX
+- Consolidated horizontal scroll bindings (h, left, <, H)
+
+### Refactoring
+- Removed single-pane mode from conversations plugin (~400 lines)
+- Updated adapter-creator-guide with Icon() requirement
+
+### Bug Fixes
+- Fixed duplicate horizontal scroll bindings in git diff view
+- Added unknown adapter fallback ("?") in badge rendering
+- Added explicit .git exclusion in file search
+
 ## [v0.9.0] - 2026-01-07
 
 ### Features
