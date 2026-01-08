@@ -29,6 +29,11 @@ const (
 
 	// Divider width for pane separator
 	dividerWidth = 1
+
+	// Hybrid content display thresholds
+	ShortMessageCharLimit = 200 // Messages shorter than this display inline
+	ShortMessageLineLimit = 3   // Messages with fewer lines display inline
+	CollapsedPreviewChars = 150 // Preview length for collapsed messages
 )
 
 // Mouse hit region identifiers
@@ -36,8 +41,11 @@ const (
 	regionSidebar     = "sidebar"
 	regionMainPane    = "main-pane"
 	regionPaneDivider = "pane-divider"
-	regionSessionItem = "session-item" // Individual session row (Data: session index)
-	regionTurnItem    = "turn-item"    // Individual turn row (Data: turn index)
+	regionSessionItem = "session-item"  // Individual session row (Data: session index)
+	regionTurnItem    = "turn-item"     // Individual turn row (Data: turn index)
+	regionMessageItem = "message-item"  // Conversation flow: click to select (Data: msg index)
+	regionToolExpand  = "tool-expand"   // Conversation flow: toggle tool output (Data: tool_use_id)
+	regionShowMore    = "show-more"     // Conversation flow: expand long message (Data: msg ID)
 )
 
 // View represents the current view mode.
@@ -87,6 +95,7 @@ type Plugin struct {
 	expandedThinking map[string]bool // message ID -> thinking expanded
 	sessionSummary   *SessionSummary // computed summary for current session
 	showToolSummary  bool            // toggle for tool impact view
+	turnViewMode     bool            // false = conversation flow (default), true = turn view
 
 	// Message detail view state
 	detailMode   bool  // true when showing detail in right pane (two-pane mode)
@@ -121,6 +130,12 @@ type Plugin struct {
 
 	// Markdown rendering
 	contentRenderer *GlamourRenderer
+
+	// Conversation flow view state (Claude Code web UI style)
+	expandedMessages    map[string]bool // message ID -> content expanded (for long messages)
+	expandedToolResults map[string]bool // tool_use_id -> result expanded
+	messageScroll       int             // global scroll offset for conversation view
+	messageCursor       int             // selected message index in conversation view
 }
 
 // New creates a new conversations plugin.
@@ -130,10 +145,12 @@ func New() *Plugin {
 		log.Printf("warn: glamour init failed: %v", err)
 	}
 	return &Plugin{
-		pageSize:         defaultPageSize,
-		expandedThinking: make(map[string]bool),
-		mouseHandler:     mouse.NewHandler(),
-		contentRenderer:  renderer,
+		pageSize:            defaultPageSize,
+		expandedThinking:    make(map[string]bool),
+		expandedMessages:    make(map[string]bool),
+		expandedToolResults: make(map[string]bool),
+		mouseHandler:        mouse.NewHandler(),
+		contentRenderer:     renderer,
 	}
 }
 
@@ -340,6 +357,12 @@ func (p *Plugin) setSelectedSession(sessionID string) {
 	p.detailTurn = nil
 	p.detailScroll = 0
 	p.expandedThinking = make(map[string]bool)
+	// Reset conversation flow view state
+	p.expandedMessages = make(map[string]bool)
+	p.expandedToolResults = make(map[string]bool)
+	p.messageScroll = 0
+	p.messageCursor = 0
+	p.turnViewMode = false // Start in conversation flow mode
 }
 
 func (p *Plugin) schedulePreviewLoad(sessionID string) tea.Cmd {
@@ -731,44 +754,75 @@ func (p *Plugin) updateMessages(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		return p, nil
 
 	case "j", "down":
-		if p.turnCursor < len(p.turns)-1 {
-			p.turnCursor++
-			p.ensureTurnCursorVisible()
+		if p.turnViewMode {
+			// Turn view navigation
+			if p.turnCursor < len(p.turns)-1 {
+				p.turnCursor++
+				p.ensureTurnCursorVisible()
+			}
+		} else {
+			// Conversation flow scroll
+			p.messageScroll++
 		}
 
 	case "k", "up":
-		if p.turnCursor > 0 {
-			p.turnCursor--
-			p.ensureTurnCursorVisible()
+		if p.turnViewMode {
+			if p.turnCursor > 0 {
+				p.turnCursor--
+				p.ensureTurnCursorVisible()
+			}
+		} else {
+			if p.messageScroll > 0 {
+				p.messageScroll--
+			}
 		}
 
 	case "g":
-		p.turnCursor = 0
-		p.turnScrollOff = 0
+		if p.turnViewMode {
+			p.turnCursor = 0
+			p.turnScrollOff = 0
+		} else {
+			p.messageScroll = 0
+		}
 
 	case "G":
-		if len(p.turns) > 0 {
-			p.turnCursor = len(p.turns) - 1
-			p.ensureTurnCursorVisible()
+		if p.turnViewMode {
+			if len(p.turns) > 0 {
+				p.turnCursor = len(p.turns) - 1
+				p.ensureTurnCursorVisible()
+			}
+		} else {
+			p.messageScroll = 999999 // Will be clamped in renderer
 		}
 
 	case "ctrl+d":
 		pageSize := 10
-		if p.turnCursor+pageSize < len(p.turns) {
-			p.turnCursor += pageSize
-		} else if len(p.turns) > 0 {
-			p.turnCursor = len(p.turns) - 1
+		if p.turnViewMode {
+			if p.turnCursor+pageSize < len(p.turns) {
+				p.turnCursor += pageSize
+			} else if len(p.turns) > 0 {
+				p.turnCursor = len(p.turns) - 1
+			}
+			p.ensureTurnCursorVisible()
+		} else {
+			p.messageScroll += pageSize
 		}
-		p.ensureTurnCursorVisible()
 
 	case "ctrl+u":
 		pageSize := 10
-		if p.turnCursor-pageSize >= 0 {
-			p.turnCursor -= pageSize
+		if p.turnViewMode {
+			if p.turnCursor-pageSize >= 0 {
+				p.turnCursor -= pageSize
+			} else {
+				p.turnCursor = 0
+			}
+			p.ensureTurnCursorVisible()
 		} else {
-			p.turnCursor = 0
+			p.messageScroll -= pageSize
+			if p.messageScroll < 0 {
+				p.messageScroll = 0
+			}
 		}
-		p.ensureTurnCursorVisible()
 
 	case "T":
 		// Toggle thinking block expansion for current turn's messages
@@ -784,6 +838,32 @@ func (p *Plugin) updateMessages(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	case "t":
 		// Toggle tool impact summary
 		p.showToolSummary = !p.showToolSummary
+
+	case "v":
+		// Toggle between conversation flow and turn view
+		p.turnViewMode = !p.turnViewMode
+		return p, nil
+
+	case "E":
+		// Toggle message content expand for current turn's first message
+		if p.turnCursor < len(p.turns) {
+			turn := &p.turns[p.turnCursor]
+			if len(turn.Messages) > 0 {
+				msg := &turn.Messages[0]
+				p.expandedMessages[msg.ID] = !p.expandedMessages[msg.ID]
+			}
+		}
+
+	case "O":
+		// Toggle tool output expand for current turn's tools
+		if p.turnCursor < len(p.turns) {
+			turn := &p.turns[p.turnCursor]
+			for _, msg := range turn.Messages {
+				for _, tu := range msg.ToolUses {
+					p.expandedToolResults[tu.ID] = !p.expandedToolResults[tu.ID]
+				}
+			}
+		}
 
 	case "enter":
 		// Open turn detail view in right pane
@@ -1400,6 +1480,21 @@ func (p *Plugin) adapterForSession(sessionID string) adapter.Adapter {
 		}
 	}
 	return nil
+}
+
+// getSelectedMessage returns the message at the current messageCursor position.
+func (p *Plugin) getSelectedMessage() *adapter.Message {
+	if len(p.messages) == 0 {
+		return nil
+	}
+	idx := p.messageCursor
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(p.messages) {
+		idx = len(p.messages) - 1
+	}
+	return &p.messages[idx]
 }
 
 // Message types

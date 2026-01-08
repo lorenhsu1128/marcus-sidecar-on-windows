@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -147,11 +148,11 @@ func CalculateModelCost(model string, usage ModelUsage) float64 {
 
 	// Determine rates based on model
 	switch {
-	case contains(model, "opus"):
+	case strings.Contains(model, "opus"):
 		inRate, outRate = 15.0, 75.0
-	case contains(model, "sonnet"):
+	case strings.Contains(model, "sonnet"):
 		inRate, outRate = 3.0, 15.0
-	case contains(model, "haiku"):
+	case strings.Contains(model, "haiku"):
 		inRate, outRate = 0.25, 1.25
 	default:
 		inRate, outRate = 3.0, 15.0
@@ -164,13 +165,4 @@ func CalculateModelCost(model string, usage ModelUsage) float64 {
 	outCost := float64(usage.OutputTokens) * outRate / 1_000_000
 
 	return cacheInCost + regularInCost + outCost
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

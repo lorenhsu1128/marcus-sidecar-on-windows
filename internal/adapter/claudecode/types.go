@@ -45,12 +45,15 @@ type CacheCreation struct {
 
 // ContentBlock represents a single block in the content array.
 type ContentBlock struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	Thinking string `json:"thinking,omitempty"`
-	ID       string `json:"id,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Input    any    `json:"input,omitempty"`
+	Type      string `json:"type"`
+	Text      string `json:"text,omitempty"`
+	Thinking  string `json:"thinking,omitempty"`
+	ID        string `json:"id,omitempty"`        // tool_use ID
+	Name      string `json:"name,omitempty"`      // tool name
+	Input     any    `json:"input,omitempty"`     // tool input
+	ToolUseID string `json:"tool_use_id,omitempty"` // for tool_result linking
+	Content   any    `json:"content,omitempty"`     // tool_result content (string or array)
+	IsError   bool   `json:"is_error,omitempty"`    // tool_result error flag
 }
 
 // ToolResult represents the result of a tool call.

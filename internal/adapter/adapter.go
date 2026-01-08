@@ -52,6 +52,18 @@ type ThinkingBlock struct {
 	TokenCount int // Estimated from len(Content)/4
 }
 
+// ContentBlock represents a single block in structured message content.
+type ContentBlock struct {
+	Type       string // "text", "tool_use", "tool_result", "thinking"
+	Text       string // For text/thinking blocks
+	ToolUseID  string // For tool_use and tool_result linking
+	ToolName   string // For tool_use
+	ToolInput  string // For tool_use (JSON string)
+	ToolOutput string // For tool_result
+	IsError    bool   // For tool_result errors
+	TokenCount int    // For thinking blocks
+}
+
 // Message represents a message in a session.
 type Message struct {
 	ID        string
@@ -62,6 +74,7 @@ type Message struct {
 	TokenUsage
 	ToolUses       []ToolUse
 	ThinkingBlocks []ThinkingBlock
+	ContentBlocks  []ContentBlock // Structured content for rich display
 }
 
 // TokenUsage tracks token counts for a message or session.

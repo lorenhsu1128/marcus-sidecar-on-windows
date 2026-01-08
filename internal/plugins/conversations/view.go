@@ -964,9 +964,13 @@ func (p *Plugin) renderMainPane(paneWidth, height int) string {
 	sb.WriteString(styles.Muted.Render(strings.Repeat("─", sepWidth)))
 	sb.WriteString("\n")
 
-	// Turns (grouped messages)
-	if len(p.turns) == 0 {
-		// Check if this is an empty session (metadata only)
+	contentHeight := height - 4 // Account for header lines
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	// Check for empty/loading state
+	if len(p.messages) == 0 && len(p.turns) == 0 {
 		if session != nil && session.MessageCount == 0 {
 			sb.WriteString(styles.Muted.Render("No messages (metadata only)"))
 		} else {
@@ -975,23 +979,31 @@ func (p *Plugin) renderMainPane(paneWidth, height int) string {
 		return sb.String()
 	}
 
-	contentHeight := height - 4 // Account for header lines
-	if contentHeight < 1 {
-		contentHeight = 1
-	}
-
-	// Render turns
-	lineCount := 0
-	for i := p.turnScrollOff; i < len(p.turns) && lineCount < contentHeight; i++ {
-		turn := p.turns[i]
-		lines := p.renderCompactTurn(turn, i, contentWidth)
-		for _, line := range lines {
-			if lineCount >= contentHeight {
-				break
+	if p.turnViewMode {
+		// Turn-based view (metadata-focused)
+		if len(p.turns) == 0 {
+			sb.WriteString(styles.Muted.Render("No turns"))
+			return sb.String()
+		}
+		lineCount := 0
+		for i := p.turnScrollOff; i < len(p.turns) && lineCount < contentHeight; i++ {
+			turn := p.turns[i]
+			lines := p.renderCompactTurn(turn, i, contentWidth)
+			for _, line := range lines {
+				if lineCount >= contentHeight {
+					break
+				}
+				sb.WriteString(line)
+				sb.WriteString("\n")
+				lineCount++
 			}
+		}
+	} else {
+		// Conversation flow view (content-focused, default)
+		lines := p.renderConversationFlow(contentWidth, contentHeight)
+		for _, line := range lines {
 			sb.WriteString(line)
 			sb.WriteString("\n")
-			lineCount++
 		}
 	}
 
@@ -1316,6 +1328,261 @@ func (p *Plugin) renderCompactMessage(msg adapter.Message, msgIndex int, maxWidt
 	if len(msg.ToolUses) > 0 {
 		toolLine := fmt.Sprintf("  └─ %d tools", len(msg.ToolUses))
 		lines = append(lines, styles.Code.Render(toolLine))
+	}
+
+	return lines
+}
+
+// renderConversationFlow renders messages as a scrollable chat thread (Claude Code web UI style).
+func (p *Plugin) renderConversationFlow(contentWidth, height int) []string {
+	if len(p.messages) == 0 {
+		return []string{styles.Muted.Render("No messages")}
+	}
+
+	var allLines []string
+
+	for msgIdx, msg := range p.messages {
+		// Skip user messages that are just tool results (they'll be shown inline with tool_use)
+		if p.isToolResultOnlyMessage(msg) {
+			continue
+		}
+
+		// Render message bubble
+		msgLines := p.renderMessageBubble(msg, msgIdx, contentWidth)
+		allLines = append(allLines, msgLines...)
+		allLines = append(allLines, "") // Gap between messages
+	}
+
+	// Apply scroll offset
+	maxScroll := len(allLines) - height
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if p.messageScroll > maxScroll {
+		p.messageScroll = maxScroll
+	}
+	if p.messageScroll < 0 {
+		p.messageScroll = 0
+	}
+
+	start := p.messageScroll
+	end := start + height
+	if end > len(allLines) {
+		end = len(allLines)
+	}
+
+	if start >= len(allLines) {
+		return []string{}
+	}
+
+	return allLines[start:end]
+}
+
+// isToolResultOnlyMessage checks if a message contains only tool_result blocks.
+func (p *Plugin) isToolResultOnlyMessage(msg adapter.Message) bool {
+	if len(msg.ContentBlocks) == 0 {
+		return false
+	}
+	for _, block := range msg.ContentBlocks {
+		if block.Type != "tool_result" {
+			return false
+		}
+	}
+	return true
+}
+
+// renderMessageBubble renders a single message as a chat bubble with content blocks.
+func (p *Plugin) renderMessageBubble(msg adapter.Message, msgIndex int, maxWidth int) []string {
+	var lines []string
+	selected := msgIndex == p.messageCursor
+
+	// Header: timestamp + role
+	ts := msg.Timestamp.Local().Format("15:04")
+	var roleStyle lipgloss.Style
+	roleLabel := msg.Role
+	if msg.Role == "user" {
+		roleStyle = styles.StatusInProgress
+	} else {
+		roleStyle = styles.StatusStaged
+		roleLabel = "assistant"
+	}
+
+	// Cursor indicator for selected message
+	cursorPrefix := "  "
+	if selected {
+		cursorPrefix = "> "
+	}
+
+	headerLine := fmt.Sprintf("%s[%s] %s", cursorPrefix, ts, roleStyle.Render(roleLabel))
+	if msg.Model != "" {
+		shortModel := modelShortName(msg.Model)
+		if shortModel != "" {
+			headerLine += styles.Muted.Render(" (" + shortModel + ")")
+		}
+	}
+	lines = append(lines, headerLine)
+
+	// Render content blocks if available, otherwise fall back to Content string
+	if len(msg.ContentBlocks) > 0 {
+		blockLines := p.renderContentBlocks(msg, maxWidth-4) // Indent content under header
+		for _, line := range blockLines {
+			lines = append(lines, "    "+line) // Indent
+		}
+	} else if msg.Content != "" {
+		// Fallback: render plain content
+		contentLines := p.renderMessageContent(msg.Content, msg.ID, maxWidth-4)
+		for _, line := range contentLines {
+			lines = append(lines, "    "+line)
+		}
+	}
+
+	// Apply selection highlighting if needed
+	if selected {
+		var styledLines []string
+		for _, line := range lines {
+			// Pad to width for proper background
+			if len(line) < maxWidth {
+				line += strings.Repeat(" ", maxWidth-len(line))
+			}
+			styledLines = append(styledLines, styles.ListItemSelected.Render(line))
+		}
+		return styledLines
+	}
+
+	return lines
+}
+
+// renderContentBlocks renders the structured content blocks for a message.
+func (p *Plugin) renderContentBlocks(msg adapter.Message, maxWidth int) []string {
+	var lines []string
+
+	for _, block := range msg.ContentBlocks {
+		switch block.Type {
+		case "text":
+			textLines := p.renderMessageContent(block.Text, msg.ID, maxWidth)
+			lines = append(lines, textLines...)
+
+		case "thinking":
+			thinkingLines := p.renderThinkingBlock(block, msg.ID, maxWidth)
+			lines = append(lines, thinkingLines...)
+
+		case "tool_use":
+			toolLines := p.renderToolUseBlock(block, maxWidth)
+			lines = append(lines, toolLines...)
+
+		case "tool_result":
+			// Tool results are rendered inline with tool_use via ToolOutput
+			// Skip standalone tool_result blocks in the flow
+			continue
+		}
+	}
+
+	return lines
+}
+
+// renderMessageContent renders text content with expand/collapse for long messages.
+func (p *Plugin) renderMessageContent(content string, msgID string, maxWidth int) []string {
+	if content == "" {
+		return nil
+	}
+
+	// Check if content is "short" (can display inline)
+	lineCount := strings.Count(content, "\n") + 1
+	isShort := len(content) <= ShortMessageCharLimit && lineCount <= ShortMessageLineLimit
+
+	expanded := p.expandedMessages[msgID]
+
+	if isShort || expanded {
+		// Show full content
+		return p.renderContent(content, maxWidth)
+	}
+
+	// Collapsed: show preview with toggle hint
+	preview := content
+	if len(preview) > CollapsedPreviewChars {
+		preview = preview[:CollapsedPreviewChars]
+	}
+	// Clean up preview (no partial lines)
+	preview = strings.ReplaceAll(preview, "\n", " ")
+	preview = strings.TrimSpace(preview)
+	if len(preview) < len(content) {
+		preview += "..."
+	}
+
+	lines := wrapText(preview, maxWidth)
+	lines = append(lines, styles.Muted.Render("[press 'e' to expand]"))
+	return lines
+}
+
+// renderThinkingBlock renders a thinking block (collapsed by default).
+func (p *Plugin) renderThinkingBlock(block adapter.ContentBlock, msgID string, maxWidth int) []string {
+	var lines []string
+
+	expanded := p.expandedThinking[msgID]
+
+	// Header with token count
+	headerText := fmt.Sprintf("[thinking] %s tokens", formatK(block.TokenCount))
+	if expanded {
+		headerText += " [collapse: T]"
+	} else {
+		headerText += " [expand: T]"
+	}
+	lines = append(lines, styles.Code.Render(headerText))
+
+	if expanded {
+		// Show thinking content
+		thinkingLines := wrapText(block.Text, maxWidth-2)
+		for _, line := range thinkingLines {
+			lines = append(lines, styles.Muted.Render("  "+line))
+		}
+	}
+
+	return lines
+}
+
+// renderToolUseBlock renders a tool use block with its result (expand/collapse).
+func (p *Plugin) renderToolUseBlock(block adapter.ContentBlock, maxWidth int) []string {
+	var lines []string
+
+	// Tool header: name and file path if available
+	toolHeader := "⚙ " + block.ToolName
+	if filePath := extractFilePath(block.ToolInput); filePath != "" {
+		toolHeader += ": " + filePath
+	}
+	if len(toolHeader) > maxWidth-2 {
+		toolHeader = toolHeader[:maxWidth-5] + "..."
+	}
+
+	expanded := p.expandedToolResults[block.ToolUseID]
+
+	// Error indicator
+	if block.IsError {
+		toolHeader = styles.StatusUntracked.Render(toolHeader + " [error]")
+	} else {
+		toolHeader = styles.Code.Render(toolHeader)
+	}
+
+	lines = append(lines, toolHeader)
+
+	// Show result if expanded or if there's an error
+	if block.ToolOutput != "" && (expanded || block.IsError) {
+		// Truncate output for display
+		output := block.ToolOutput
+		maxOutputLines := 10
+		outputLines := strings.Split(output, "\n")
+		if len(outputLines) > maxOutputLines {
+			outputLines = outputLines[:maxOutputLines]
+			outputLines = append(outputLines, fmt.Sprintf("... (%d more lines)", len(strings.Split(output, "\n"))-maxOutputLines))
+		}
+		for _, line := range outputLines {
+			if len(line) > maxWidth-4 {
+				line = line[:maxWidth-7] + "..."
+			}
+			lines = append(lines, styles.Muted.Render("  "+line))
+		}
+	} else if block.ToolOutput != "" {
+		// Collapsed: show toggle hint
+		lines = append(lines, styles.Muted.Render("  [press 'o' to show output]"))
 	}
 
 	return lines

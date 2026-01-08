@@ -69,6 +69,30 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) (*Plugin, tea.Cmd) {
 		p.activePane = PaneMessages
 		return p, nil
 
+	case regionMessageItem:
+		// Click on a message in conversation flow - select it
+		if idx, ok := action.Region.Data.(int); ok {
+			if idx >= 0 && idx < len(p.messages) {
+				p.messageCursor = idx
+				p.activePane = PaneMessages
+			}
+		}
+		return p, nil
+
+	case regionToolExpand:
+		// Click to toggle tool output expand/collapse
+		if toolID, ok := action.Region.Data.(string); ok {
+			p.expandedToolResults[toolID] = !p.expandedToolResults[toolID]
+		}
+		return p, nil
+
+	case regionShowMore:
+		// Click to expand collapsed message content
+		if msgID, ok := action.Region.Data.(string); ok {
+			p.expandedMessages[msgID] = !p.expandedMessages[msgID]
+		}
+		return p, nil
+
 	case regionPaneDivider:
 		// Start drag for pane resizing
 		p.mouseHandler.StartDrag(action.X, action.Y, regionPaneDivider, p.sidebarWidth)

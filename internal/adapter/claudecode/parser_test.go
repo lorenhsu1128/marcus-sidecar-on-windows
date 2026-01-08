@@ -333,6 +333,193 @@ type testMessage struct {
 	CacheRead    int
 }
 
+// TestParseContentWithResults tests the new ContentBlocks parsing.
+func TestParseContentWithResults_TextBlock(t *testing.T) {
+	a := &Adapter{}
+	raw := json.RawMessage(`[{"type":"text","text":"Hello world"}]`)
+
+	content, toolUses, thinkingBlocks, blocks := a.parseContentWithResults(raw, nil)
+
+	if content != "Hello world" {
+		t.Errorf("got content %q, want %q", content, "Hello world")
+	}
+	if len(toolUses) != 0 {
+		t.Errorf("got %d tool uses, want 0", len(toolUses))
+	}
+	if len(thinkingBlocks) != 0 {
+		t.Errorf("got %d thinking blocks, want 0", len(thinkingBlocks))
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("got %d content blocks, want 1", len(blocks))
+	}
+	if blocks[0].Type != "text" {
+		t.Errorf("got block type %q, want %q", blocks[0].Type, "text")
+	}
+	if blocks[0].Text != "Hello world" {
+		t.Errorf("got block text %q, want %q", blocks[0].Text, "Hello world")
+	}
+}
+
+func TestParseContentWithResults_ToolUseLinked(t *testing.T) {
+	a := &Adapter{}
+	toolResults := map[string]toolResultInfo{
+		"toolu_123": {content: "file contents here", isError: false},
+	}
+	raw := json.RawMessage(`[{"type":"tool_use","id":"toolu_123","name":"Read","input":{"file_path":"/test.go"}}]`)
+
+	content, toolUses, _, blocks := a.parseContentWithResults(raw, toolResults)
+
+	if content != "" {
+		t.Errorf("got content %q, want empty", content)
+	}
+	if len(toolUses) != 1 {
+		t.Fatalf("got %d tool uses, want 1", len(toolUses))
+	}
+	if toolUses[0].Output != "file contents here" {
+		t.Errorf("got tool output %q, want %q", toolUses[0].Output, "file contents here")
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("got %d content blocks, want 1", len(blocks))
+	}
+	if blocks[0].Type != "tool_use" {
+		t.Errorf("got block type %q, want %q", blocks[0].Type, "tool_use")
+	}
+	if blocks[0].ToolUseID != "toolu_123" {
+		t.Errorf("got ToolUseID %q, want %q", blocks[0].ToolUseID, "toolu_123")
+	}
+	if blocks[0].ToolOutput != "file contents here" {
+		t.Errorf("got ToolOutput %q, want %q", blocks[0].ToolOutput, "file contents here")
+	}
+}
+
+func TestParseContentWithResults_ThinkingBlock(t *testing.T) {
+	a := &Adapter{}
+	raw := json.RawMessage(`[{"type":"thinking","thinking":"Let me analyze this problem carefully..."}]`)
+
+	_, _, thinkingBlocks, blocks := a.parseContentWithResults(raw, nil)
+
+	if len(thinkingBlocks) != 1 {
+		t.Fatalf("got %d thinking blocks, want 1", len(thinkingBlocks))
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("got %d content blocks, want 1", len(blocks))
+	}
+	if blocks[0].Type != "thinking" {
+		t.Errorf("got block type %q, want %q", blocks[0].Type, "thinking")
+	}
+	if blocks[0].Text != "Let me analyze this problem carefully..." {
+		t.Errorf("got block text %q, want %q", blocks[0].Text, "Let me analyze this problem carefully...")
+	}
+	if blocks[0].TokenCount <= 0 {
+		t.Error("expected positive token count")
+	}
+}
+
+func TestParseContentWithResults_InterleavedBlocks(t *testing.T) {
+	a := &Adapter{}
+	raw := json.RawMessage(`[
+		{"type":"text","text":"First"},
+		{"type":"tool_use","id":"t1","name":"Read","input":{}},
+		{"type":"text","text":"Second"}
+	]`)
+
+	_, _, _, blocks := a.parseContentWithResults(raw, nil)
+
+	if len(blocks) != 3 {
+		t.Fatalf("got %d content blocks, want 3", len(blocks))
+	}
+	if blocks[0].Type != "text" {
+		t.Errorf("blocks[0].Type = %q, want text", blocks[0].Type)
+	}
+	if blocks[1].Type != "tool_use" {
+		t.Errorf("blocks[1].Type = %q, want tool_use", blocks[1].Type)
+	}
+	if blocks[2].Type != "text" {
+		t.Errorf("blocks[2].Type = %q, want text", blocks[2].Type)
+	}
+}
+
+func TestParseContentWithResults_StringContent(t *testing.T) {
+	a := &Adapter{}
+	raw := json.RawMessage(`"Plain string content"`)
+
+	content, _, _, blocks := a.parseContentWithResults(raw, nil)
+
+	if content != "Plain string content" {
+		t.Errorf("got content %q, want %q", content, "Plain string content")
+	}
+	if len(blocks) != 1 {
+		t.Fatalf("got %d content blocks, want 1", len(blocks))
+	}
+	if blocks[0].Type != "text" {
+		t.Errorf("got block type %q, want text", blocks[0].Type)
+	}
+}
+
+func TestCollectToolResults_StringContent(t *testing.T) {
+	a := &Adapter{}
+	results := make(map[string]toolResultInfo)
+	raw := json.RawMessage(`[{"type":"tool_result","tool_use_id":"toolu_abc","content":"result data"}]`)
+
+	a.collectToolResults(raw, results)
+
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	if results["toolu_abc"].content != "result data" {
+		t.Errorf("got result %q, want %q", results["toolu_abc"].content, "result data")
+	}
+}
+
+func TestCollectToolResults_ArrayContent(t *testing.T) {
+	a := &Adapter{}
+	results := make(map[string]toolResultInfo)
+	raw := json.RawMessage(`[{"type":"tool_result","tool_use_id":"toolu_xyz","content":[{"type":"text","text":"nested"}]}]`)
+
+	a.collectToolResults(raw, results)
+
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1", len(results))
+	}
+	// Content should be JSON marshaled
+	if results["toolu_xyz"].content == "" {
+		t.Error("expected non-empty result content")
+	}
+}
+
+func TestCollectToolResults_ErrorFlag(t *testing.T) {
+	a := &Adapter{}
+	results := make(map[string]toolResultInfo)
+	raw := json.RawMessage(`[{"type":"tool_result","tool_use_id":"toolu_err","content":"error message","is_error":true}]`)
+
+	a.collectToolResults(raw, results)
+
+	if !results["toolu_err"].isError {
+		t.Error("expected isError=true")
+	}
+}
+
+func TestParseContentWithResults_ToolResultInContentBlocks(t *testing.T) {
+	// Test that tool_result blocks appear in ContentBlocks for user messages
+	a := &Adapter{}
+	raw := json.RawMessage(`[{"type":"tool_result","tool_use_id":"t123","content":"output here"}]`)
+
+	_, _, _, blocks := a.parseContentWithResults(raw, nil)
+
+	if len(blocks) != 1 {
+		t.Fatalf("got %d content blocks, want 1", len(blocks))
+	}
+	if blocks[0].Type != "tool_result" {
+		t.Errorf("got block type %q, want tool_result", blocks[0].Type)
+	}
+	if blocks[0].ToolUseID != "t123" {
+		t.Errorf("got ToolUseID %q, want t123", blocks[0].ToolUseID)
+	}
+	if blocks[0].ToolOutput != "output here" {
+		t.Errorf("got ToolOutput %q, want 'output here'", blocks[0].ToolOutput)
+	}
+}
+
 // parseMessagesFromFile is a helper that mimics Messages() but for local files.
 func parseMessagesFromFile(t *testing.T, a *Adapter, path string) []testMessage {
 	t.Helper()
