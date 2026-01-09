@@ -58,6 +58,7 @@ Refreshes and background loads often cause disappearing rows or cursor jumps. Av
 - Preserve selection by stable ID (hash), not index.
 - If a refresh only affects metadata (like push status), update in place instead of replacing the list.
 - After any merge/replace, clamp scroll offsets and cursor ranges.
+- If the viewport is taller than the initial page size, auto-load additional pages until the list fills or history is exhausted.
 
 ## Empty Rows at the Bottom
 
@@ -69,6 +70,7 @@ Avoid this by:
 - Accounting for optional rows (status lines, “empty” placeholders).
 - Not double-counting panel headers or borders.
 - Clamping `scrollOff` to `len(items) - visibleCount` (minimum 0).
+- Loading more data when the list is shorter than the visible window (and more data exists).
 
 ## Mouse Hit Regions
 

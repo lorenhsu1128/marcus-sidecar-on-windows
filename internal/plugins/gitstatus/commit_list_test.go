@@ -1,6 +1,10 @@
 package gitstatus
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/marcus/sidecar/internal/plugin"
+)
 
 func makeCommits(prefix string, count int) []*Commit {
 	commits := make([]*Commit, count)
@@ -57,5 +61,24 @@ func TestClampCommitScroll(t *testing.T) {
 
 	if p.commitScrollOff != 3 {
 		t.Fatalf("commitScrollOff = %d, want %d", p.commitScrollOff, 3)
+	}
+}
+
+func TestEnsureCommitListFilled(t *testing.T) {
+	p := &Plugin{
+		ctx:                  &plugin.Context{WorkDir: "/tmp"},
+		tree:                 &FileTree{},
+		height:               10,
+		recentCommits:        makeCommits("c", 1),
+		moreCommitsAvailable: true,
+	}
+
+	if cmd := p.ensureCommitListFilled(); cmd == nil {
+		t.Fatal("expected loadMoreCommits cmd, got nil")
+	}
+
+	p.loadingMoreCommits = true
+	if cmd := p.ensureCommitListFilled(); cmd != nil {
+		t.Fatal("expected nil cmd while loading more commits")
 	}
 }

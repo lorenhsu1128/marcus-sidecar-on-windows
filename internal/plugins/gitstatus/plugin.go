@@ -45,6 +45,8 @@ const (
 	PaneDiff
 )
 
+const commitHistoryPageSize = 50
+
 // Plugin implements the git status plugin.
 type Plugin struct {
 	ctx       *plugin.Context
@@ -64,6 +66,7 @@ type Plugin struct {
 	recentCommits      []*Commit // Cached recent commits for sidebar
 	commitScrollOff    int       // Scroll offset for commits section in sidebar
 	loadingMoreCommits bool      // Prevents duplicate load-more requests
+	moreCommitsAvailable bool    // Whether more commits are available to load
 
 	// Inline diff state (for three-pane view)
 	selectedDiffFile    string       // File being previewed in diff pane
@@ -343,6 +346,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			return p, nil
 		}
 
+		p.moreCommitsAvailable = len(msg.Commits) >= commitHistoryPageSize
 		prevCommitHash := ""
 		if !p.historyFilterActive && p.cursorOnCommit() {
 			commits := p.activeCommits()
@@ -375,18 +379,23 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if p.cursor > maxCursor {
 			p.cursor = maxCursor
 		}
-		return p, nil
+		return p, p.ensureCommitListFilled()
 
 	case MoreCommitsLoadedMsg:
 		p.loadingMoreCommits = false
 		if msg.Commits != nil && len(msg.Commits) > 0 {
+			if len(msg.Commits) < commitHistoryPageSize {
+				p.moreCommitsAvailable = false
+			}
 			p.recentCommits = append(p.recentCommits, msg.Commits...)
 			// Recompute entire graph when commits are added
 			if p.showCommitGraph {
 				commits := p.activeCommits()
 				p.commitGraphLines = ComputeGraphForCommits(commits)
 			}
+			return p, p.ensureCommitListFilled()
 		}
+		p.moreCommitsAvailable = false
 		return p, nil
 
 	case FilteredCommitsLoadedMsg:
@@ -549,6 +558,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
 		p.height = msg.Height
+		return p, p.ensureCommitListFilled()
 	}
 
 	return p, nil
@@ -604,7 +614,7 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 				// Trigger load-more when within 3 commits of end (only for unfiltered view)
 				var loadMoreCmd tea.Cmd
 				commits := p.activeCommits()
-				if !p.historyFilterActive && commitIdx >= len(commits)-3 && !p.loadingMoreCommits {
+				if !p.historyFilterActive && p.moreCommitsAvailable && commitIdx >= len(commits)-3 && !p.loadingMoreCommits {
 					loadMoreCmd = p.loadMoreCommits()
 				}
 				return p, tea.Batch(p.autoLoadCommitPreview(), loadMoreCmd)
@@ -643,7 +653,7 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 				p.ensureCommitVisible(commitIdx)
 				// Trigger load-more when jumping to end
 				var loadMoreCmd tea.Cmd
-				if commitIdx >= len(p.recentCommits)-3 && !p.loadingMoreCommits {
+				if p.moreCommitsAvailable && commitIdx >= len(p.recentCommits)-3 && !p.loadingMoreCommits {
 					loadMoreCmd = p.loadMoreCommits()
 				}
 				return p, tea.Batch(p.autoLoadCommitPreview(), loadMoreCmd)
@@ -1591,6 +1601,17 @@ func (p *Plugin) clampCommitScroll() {
 	}
 }
 
+func (p *Plugin) ensureCommitListFilled() tea.Cmd {
+	if p.historyFilterActive || p.loadingMoreCommits || !p.moreCommitsAvailable {
+		return nil
+	}
+	visibleCommits := p.visibleCommitCount()
+	if visibleCommits < 1 || len(p.recentCommits) >= visibleCommits {
+		return nil
+	}
+	return p.loadMoreCommits()
+}
+
 // commitSectionCapacity returns how many commits can display in the sidebar
 // given the current layout and inner height.
 func (p *Plugin) commitSectionCapacity(visibleHeight int) int {
@@ -1876,7 +1897,7 @@ func (p *Plugin) loadInlineDiff(path string, staged bool, status FileStatus) tea
 func (p *Plugin) loadRecentCommits() tea.Cmd {
 	workDir := p.ctx.WorkDir
 	return func() tea.Msg {
-		commits, pushStatus, err := GetCommitHistoryWithPushStatus(workDir, 50)
+		commits, pushStatus, err := GetCommitHistoryWithPushStatus(workDir, commitHistoryPageSize)
 		if err != nil {
 			return RecentCommitsLoadedMsg{Commits: nil, PushStatus: nil}
 		}
@@ -1894,7 +1915,7 @@ func (p *Plugin) loadMoreCommits() tea.Cmd {
 	workDir := p.ctx.WorkDir
 	skip := len(p.recentCommits)
 	return func() tea.Msg {
-		commits, pushStatus, err := GetCommitHistoryWithPushStatusOffset(workDir, 50, skip)
+		commits, pushStatus, err := GetCommitHistoryWithPushStatusOffset(workDir, commitHistoryPageSize, skip)
 		if err != nil {
 			return MoreCommitsLoadedMsg{Commits: nil, PushStatus: nil}
 		}

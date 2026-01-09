@@ -227,7 +227,7 @@ func (p *Plugin) scrollSidebar(delta int) (*Plugin, tea.Cmd) {
 			p.ensureCommitVisible(commitIdx)
 			// Trigger load-more when within 3 commits of end
 			var loadMoreCmd tea.Cmd
-			if commitIdx >= len(p.recentCommits)-3 && !p.loadingMoreCommits {
+			if !p.historyFilterActive && p.moreCommitsAvailable && commitIdx >= len(p.recentCommits)-3 && !p.loadingMoreCommits {
 				loadMoreCmd = p.loadMoreCommits()
 			}
 			return p, tea.Batch(p.autoLoadCommitPreview(), loadMoreCmd)
