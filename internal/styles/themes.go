@@ -11,8 +11,8 @@ import (
 // themeMu protects access to themeRegistry and currentTheme for thread safety
 var themeMu sync.RWMutex
 
-// hexColorRegex validates hex color codes
-var hexColorRegex = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+// hexColorRegex validates hex color codes (#RRGGBB or #RRGGBBAA with alpha)
+var hexColorRegex = regexp.MustCompile(`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`)
 
 // ColorPalette holds all theme colors
 type ColorPalette struct {

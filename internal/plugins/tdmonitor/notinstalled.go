@@ -51,7 +51,10 @@ type RGB struct {
 func hexToRGB(hex string) RGB {
 	hex = strings.TrimPrefix(hex, "#")
 	var r, g, b uint8
-	fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+	if _, err := fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b); err != nil {
+		// Fallback to default dark gray on parse failure
+		r, g, b = 55, 65, 81
+	}
 	return RGB{float64(r), float64(g), float64(b)}
 }
 
