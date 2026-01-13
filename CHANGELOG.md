@@ -2,6 +2,11 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.14.2] - 2026-01-13
+
+### Bug Fixes
+- Fixed installation failure due to missing td types (updated td v0.10.0 → v0.11.0)
+
 ## [v0.14.1] - 2026-01-13
 
 ### Bug Fixes
