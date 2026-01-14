@@ -2,6 +2,14 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.14.3] - 2026-01-14
+
+### Bug Fixes
+- Fixed horizontal scroll to preserve syntax highlighting in diffs and worktree views
+
+### Dependencies
+- Updated embedded td to v0.12.0 (from v0.11.0)
+
 ## [v0.14.2] - 2026-01-13
 
 ### Bug Fixes
