@@ -543,7 +543,7 @@ func (p *Plugin) renderCreateModal(width, height int) string {
 	sb.WriteString(nameStyle.Render(p.createNameInput.View()))
 	sb.WriteString("\n\n")
 
-	// Base branch field
+	// Base branch field with autocomplete
 	baseLabel := "Base Branch (default: current):"
 	baseStyle := inputStyle
 	if p.createFocus == 1 {
@@ -552,6 +552,37 @@ func (p *Plugin) renderCreateModal(width, height int) string {
 	sb.WriteString(baseLabel)
 	sb.WriteString("\n")
 	sb.WriteString(baseStyle.Render(p.createBaseBranchInput.View()))
+
+	// Show branch dropdown when focused and has branches
+	if p.createFocus == 1 && len(p.branchFiltered) > 0 {
+		maxDropdown := 5
+		dropdownCount := min(maxDropdown, len(p.branchFiltered))
+		for i := 0; i < dropdownCount; i++ {
+			branch := p.branchFiltered[i]
+			prefix := "  "
+			if i == p.branchIdx {
+				prefix = "> "
+			}
+			// Truncate branch name if needed
+			if len(branch) > modalW-10 {
+				branch = branch[:modalW-13] + "..."
+			}
+			line := prefix + branch
+			sb.WriteString("\n")
+			if i == p.branchIdx {
+				sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Render(line))
+			} else {
+				sb.WriteString(dimText(line))
+			}
+		}
+		if len(p.branchFiltered) > maxDropdown {
+			sb.WriteString("\n")
+			sb.WriteString(dimText(fmt.Sprintf("  ... and %d more", len(p.branchFiltered)-maxDropdown)))
+		}
+	} else if p.createFocus == 1 && len(p.branchAll) == 0 {
+		sb.WriteString("\n")
+		sb.WriteString(dimText("  Loading branches..."))
+	}
 	sb.WriteString("\n\n")
 
 	// Task ID field with search dropdown

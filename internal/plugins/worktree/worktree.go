@@ -243,6 +243,42 @@ func getCurrentBranch(workdir string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+// loadBranches returns a command to fetch all local branches.
+func (p *Plugin) loadBranches() tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("git", "branch", "--format=%(refname:short)")
+		cmd.Dir = p.ctx.WorkDir
+		output, err := cmd.Output()
+		if err != nil {
+			return BranchListMsg{Err: fmt.Errorf("git branch: %w", err)}
+		}
+
+		var branches []string
+		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+			if line != "" {
+				branches = append(branches, line)
+			}
+		}
+		return BranchListMsg{Branches: branches}
+	}
+}
+
+// filterBranches filters branches based on a search query.
+func filterBranches(query string, allBranches []string) []string {
+	if query == "" {
+		return allBranches
+	}
+
+	query = strings.ToLower(query)
+	var matches []string
+	for _, branch := range allBranches {
+		if strings.Contains(strings.ToLower(branch), query) {
+			matches = append(matches, branch)
+		}
+	}
+	return matches
+}
+
 // setupTDRoot creates a .td-root file in the worktree pointing to the main repo.
 // This allows td commands in the worktree to use the main repo's database.
 func (p *Plugin) setupTDRoot(worktreePath string) error {

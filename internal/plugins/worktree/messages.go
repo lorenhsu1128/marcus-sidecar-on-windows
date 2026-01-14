@@ -111,6 +111,12 @@ type TaskSearchResultsMsg struct {
 	Err   error
 }
 
+// BranchListMsg delivers available branches.
+type BranchListMsg struct {
+	Branches []string
+	Err      error
+}
+
 // TaskLinkedMsg signals a task was linked to a worktree.
 type TaskLinkedMsg struct {
 	WorktreeName string

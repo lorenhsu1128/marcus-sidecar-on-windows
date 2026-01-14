@@ -90,6 +90,11 @@ type Plugin struct {
 	taskSearchIdx      int    // Selected index in dropdown
 	taskSearchLoading  bool
 
+	// Branch autocomplete state for create modal
+	branchAll      []string // All available branches
+	branchFiltered []string // Filtered based on query
+	branchIdx      int      // Selected index in dropdown
+
 	// Task link modal state (for linking to existing worktrees)
 	linkingWorktree *Worktree
 
@@ -367,6 +372,13 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.taskSearchIdx = 0
 		}
 
+	case BranchListMsg:
+		if msg.Err == nil {
+			p.branchAll = msg.Branches
+			p.branchFiltered = filterBranches(p.createBaseBranchInput.Value(), p.branchAll)
+			p.branchIdx = 0
+		}
+
 	case TaskDetailsLoadedMsg:
 		if msg.Err == nil && msg.Details != nil {
 			p.cachedTaskID = msg.TaskID
@@ -466,6 +478,9 @@ func (p *Plugin) clearCreateModal() {
 	p.taskSearchFiltered = nil
 	p.taskSearchIdx = 0
 	p.taskSearchLoading = false
+	p.branchAll = nil
+	p.branchFiltered = nil
+	p.branchIdx = 0
 }
 
 // handleKeyPress processes key input based on current view mode.
@@ -528,7 +543,10 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		p.taskSearchInput.CharLimit = 100
 		p.createFocus = 0
 		p.taskSearchLoading = true
-		return p.loadOpenTasks()
+		p.branchAll = nil
+		p.branchFiltered = nil
+		p.branchIdx = 0
+		return tea.Batch(p.loadOpenTasks(), p.loadBranches())
 	case "D":
 		return p.deleteSelected()
 	case "p":
@@ -662,6 +680,13 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 	case "up":
+		// Navigate branch dropdown
+		if p.createFocus == 1 && len(p.branchFiltered) > 0 {
+			if p.branchIdx > 0 {
+				p.branchIdx--
+			}
+			return nil
+		}
 		// Navigate task dropdown
 		if p.createFocus == 2 && len(p.taskSearchFiltered) > 0 {
 			if p.taskSearchIdx > 0 {
@@ -670,6 +695,13 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 	case "down":
+		// Navigate branch dropdown
+		if p.createFocus == 1 && len(p.branchFiltered) > 0 {
+			if p.branchIdx < len(p.branchFiltered)-1 {
+				p.branchIdx++
+			}
+			return nil
+		}
 		// Navigate task dropdown
 		if p.createFocus == 2 && len(p.taskSearchFiltered) > 0 {
 			if p.taskSearchIdx < len(p.taskSearchFiltered)-1 {
@@ -678,6 +710,15 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			return nil
 		}
 	case "enter":
+		// Select branch from dropdown if in branch field
+		if p.createFocus == 1 && len(p.branchFiltered) > 0 {
+			selectedBranch := p.branchFiltered[p.branchIdx]
+			p.createBaseBranchInput.SetValue(selectedBranch)
+			p.createBaseBranchInput.Blur()
+			p.createFocus = 2 // Move to task field
+			p.focusCreateInput()
+			return nil
+		}
 		// Select task from dropdown if in task field
 		if p.createFocus == 2 && len(p.taskSearchFiltered) > 0 {
 			// Select task and move to next field
@@ -714,6 +755,9 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 		p.createNameInput, cmd = p.createNameInput.Update(msg)
 	case 1:
 		p.createBaseBranchInput, cmd = p.createBaseBranchInput.Update(msg)
+		// Update filtered branches on input change
+		p.branchFiltered = filterBranches(p.createBaseBranchInput.Value(), p.branchAll)
+		p.branchIdx = 0
 	case 2:
 		p.taskSearchInput, cmd = p.taskSearchInput.Update(msg)
 		// Update filtered results on input change
