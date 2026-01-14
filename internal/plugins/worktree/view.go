@@ -67,8 +67,8 @@ func (p *Plugin) renderListView(width, height int) string {
 		previewW = 40
 	}
 
-	// Pane height for panels (including borders)
-	paneHeight := height - 2
+	// Pane height for panels (outer dimensions including borders)
+	paneHeight := height
 	if paneHeight < 4 {
 		paneHeight = 4
 	}
