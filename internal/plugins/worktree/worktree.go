@@ -85,6 +85,8 @@ func (p *Plugin) createWorktree() tea.Cmd {
 	name := p.createNameInput.Value()
 	baseBranch := p.createBaseBranchInput.Value()
 	taskID := p.createTaskID
+	agentType := p.createAgentType
+	skipPerms := p.createSkipPermissions
 
 	if name == "" {
 		return func() tea.Msg {
@@ -93,13 +95,13 @@ func (p *Plugin) createWorktree() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		wt, err := p.doCreateWorktree(name, baseBranch, taskID)
-		return CreateDoneMsg{Worktree: wt, Err: err}
+		wt, err := p.doCreateWorktree(name, baseBranch, taskID, agentType)
+		return CreateDoneMsg{Worktree: wt, AgentType: agentType, SkipPerms: skipPerms, Err: err}
 	}
 }
 
 // doCreateWorktree performs the actual worktree creation.
-func (p *Plugin) doCreateWorktree(name, baseBranch, taskID string) (*Worktree, error) {
+func (p *Plugin) doCreateWorktree(name, baseBranch, taskID string, agentType AgentType) (*Worktree, error) {
 	// Default base branch to current branch if not specified
 	if baseBranch == "" {
 		baseBranch = "HEAD"
@@ -147,14 +149,20 @@ func (p *Plugin) doCreateWorktree(name, baseBranch, taskID string) (*Worktree, e
 	}
 
 	wt := &Worktree{
-		Name:       name,
-		Path:       wtPath,
-		Branch:     name,
-		BaseBranch: actualBase,
-		TaskID:     taskID,
-		Status:     StatusPaused,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		Name:            name,
+		Path:            wtPath,
+		Branch:          name,
+		BaseBranch:      actualBase,
+		TaskID:          taskID,
+		ChosenAgentType: agentType,
+		Status:          StatusPaused,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	// Persist agent type to .sidecar-agent file
+	if err := saveAgentType(wtPath, agentType); err != nil {
+		p.ctx.Logger.Warn("failed to save agent type", "path", wtPath, "error", err)
 	}
 
 	// Run post-creation setup (env files, symlinks, setup script)
@@ -287,6 +295,7 @@ func (p *Plugin) setupTDRoot(worktreePath string) error {
 }
 
 const sidecarTaskFile = ".sidecar-task"
+const sidecarAgentFile = ".sidecar-agent"
 
 // loadTaskLink reads the linked task ID from the .sidecar-task file.
 func loadTaskLink(worktreePath string) string {
@@ -296,6 +305,28 @@ func loadTaskLink(worktreePath string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(content))
+}
+
+// saveAgentType persists the chosen agent type to the worktree.
+func saveAgentType(worktreePath string, agentType AgentType) error {
+	if agentType == AgentNone || agentType == "" {
+		// Remove file if None selected
+		agentPath := filepath.Join(worktreePath, sidecarAgentFile)
+		os.Remove(agentPath) // Ignore error
+		return nil
+	}
+	agentPath := filepath.Join(worktreePath, sidecarAgentFile)
+	return os.WriteFile(agentPath, []byte(string(agentType)+"\n"), 0644)
+}
+
+// loadAgentType reads the chosen agent type from the worktree.
+func loadAgentType(worktreePath string) AgentType {
+	agentPath := filepath.Join(worktreePath, sidecarAgentFile)
+	content, err := os.ReadFile(agentPath)
+	if err != nil {
+		return AgentNone
+	}
+	return AgentType(strings.TrimSpace(string(content)))
 }
 
 // linkTask returns a command to link a td task to a worktree.

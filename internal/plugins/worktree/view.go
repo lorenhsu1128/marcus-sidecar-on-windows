@@ -237,6 +237,9 @@ func (p *Plugin) renderWorktreeItem(wt *Worktree, selected bool, width int) stri
 	var parts []string
 	if wt.Agent != nil {
 		parts = append(parts, string(wt.Agent.Type))
+	} else if wt.ChosenAgentType != "" && wt.ChosenAgentType != AgentNone {
+		// Show chosen agent type even when not running (dimmed)
+		parts = append(parts, dimText(string(wt.ChosenAgentType)))
 	} else {
 		parts = append(parts, "—")
 	}
@@ -673,6 +676,54 @@ func (p *Plugin) renderCreateModal(width, height int) string {
 	}
 	sb.WriteString("\n\n")
 
+	// Agent Selection (radio buttons)
+	sb.WriteString("Agent:")
+	sb.WriteString("\n")
+	for _, at := range AgentTypeOrder {
+		prefix := "  ○ "
+		if at == p.createAgentType {
+			prefix = "  ● "
+		}
+		name := AgentDisplayNames[at]
+		line := prefix + name
+
+		if p.createFocus == 3 && at == p.createAgentType {
+			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Render(line))
+		} else if at == p.createAgentType {
+			sb.WriteString(line)
+		} else {
+			sb.WriteString(dimText(line))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Skip Permissions Checkbox (only show when agent is selected and supports it)
+	if p.createAgentType != AgentNone {
+		flag := SkipPermissionsFlags[p.createAgentType]
+		if flag != "" {
+			sb.WriteString("\n")
+			checkBox := "[ ]"
+			if p.createSkipPermissions {
+				checkBox = "[x]"
+			}
+			skipLine := fmt.Sprintf("  %s Auto-approve all actions", checkBox)
+
+			if p.createFocus == 4 {
+				sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Render(skipLine))
+			} else {
+				sb.WriteString(skipLine)
+			}
+			sb.WriteString("\n")
+			sb.WriteString(dimText(fmt.Sprintf("      (Adds %s)", flag)))
+			sb.WriteString("\n")
+		} else {
+			sb.WriteString("\n")
+			sb.WriteString(dimText("  Skip permissions not available for this agent"))
+			sb.WriteString("\n")
+		}
+	}
+	sb.WriteString("\n")
+
 	// Display error if present
 	if p.createError != "" {
 		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
@@ -683,10 +734,10 @@ func (p *Plugin) renderCreateModal(width, height int) string {
 	// Buttons - Create and Cancel
 	createBtnStyle := styles.Button
 	cancelBtnStyle := styles.Button
-	if p.createFocus == 3 {
+	if p.createFocus == 5 {
 		createBtnStyle = styles.ButtonFocused
 	}
-	if p.createFocus == 4 {
+	if p.createFocus == 6 {
 		cancelBtnStyle = styles.ButtonFocused
 	}
 	sb.WriteString(createBtnStyle.Render(" Create "))

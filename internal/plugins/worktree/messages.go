@@ -76,8 +76,10 @@ type CreateWorktreeMsg struct {
 
 // CreateDoneMsg signals worktree creation completed.
 type CreateDoneMsg struct {
-	Worktree *Worktree
-	Err      error
+	Worktree  *Worktree
+	AgentType AgentType // Agent selected at creation
+	SkipPerms bool      // Whether to skip permissions
+	Err       error
 }
 
 // DeleteWorktreeMsg requests worktree deletion.

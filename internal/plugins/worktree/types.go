@@ -85,25 +85,68 @@ func (s WorktreeStatus) Icon() string {
 type AgentType string
 
 const (
-	AgentClaude AgentType = "claude"
-	AgentCodex  AgentType = "codex"
-	AgentAider  AgentType = "aider"
-	AgentGemini AgentType = "gemini"
-	AgentCustom AgentType = "custom"
+	AgentNone     AgentType = ""         // No agent (attach only)
+	AgentClaude   AgentType = "claude"   // Claude Code
+	AgentCodex    AgentType = "codex"    // Codex CLI
+	AgentAider    AgentType = "aider"    // Aider
+	AgentGemini   AgentType = "gemini"   // Gemini CLI
+	AgentCursor   AgentType = "cursor"   // Cursor Agent
+	AgentOpenCode AgentType = "opencode" // OpenCode
+	AgentCustom   AgentType = "custom"   // Custom command
 )
+
+// SkipPermissionsFlags maps agent types to their skip-permissions CLI flags.
+var SkipPermissionsFlags = map[AgentType]string{
+	AgentClaude:   "--dangerously-skip-permissions",
+	AgentCodex:    "--dangerously-bypass-approvals-and-sandbox",
+	AgentGemini:   "--yolo",
+	AgentCursor:   "", // No known flag
+	AgentOpenCode: "", // No known flag
+}
+
+// AgentDisplayNames provides human-readable names for agent types.
+var AgentDisplayNames = map[AgentType]string{
+	AgentNone:     "None (attach only)",
+	AgentClaude:   "Claude Code",
+	AgentCodex:    "Codex CLI",
+	AgentGemini:   "Gemini CLI",
+	AgentCursor:   "Cursor Agent",
+	AgentOpenCode: "OpenCode",
+}
+
+// AgentCommands maps agent types to their CLI commands.
+var AgentCommands = map[AgentType]string{
+	AgentClaude:   "claude",
+	AgentCodex:    "codex",
+	AgentAider:    "aider", // Not in UI, but supported for backward compat
+	AgentGemini:   "gemini",
+	AgentCursor:   "cursor-agent",
+	AgentOpenCode: "opencode",
+}
+
+// AgentTypeOrder defines the order of agents in selection UI.
+var AgentTypeOrder = []AgentType{
+	AgentClaude,
+	AgentCodex,
+	AgentGemini,
+	AgentCursor,
+	AgentOpenCode,
+	AgentNone,
+}
 
 // Worktree represents a git worktree with optional agent.
 type Worktree struct {
-	Name       string         // e.g., "auth-oauth-flow"
-	Path       string         // Absolute path
-	Branch     string         // Git branch name
-	BaseBranch string         // Branch worktree was created from
-	TaskID     string         // Linked td task (e.g., "td-a1b2")
-	Agent      *Agent         // nil if no agent running
-	Status     WorktreeStatus // Derived from agent state
-	Stats      *GitStats      // +/- line counts
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	Name            string         // e.g., "auth-oauth-flow"
+	Path            string         // Absolute path
+	Branch          string         // Git branch name
+	BaseBranch      string         // Branch worktree was created from
+	TaskID          string         // Linked td task (e.g., "td-a1b2")
+	ChosenAgentType AgentType      // Agent selected at creation (persists even when agent not running)
+	Agent           *Agent         // nil if no agent running
+	Status          WorktreeStatus // Derived from agent state
+	Stats           *GitStats      // +/- line counts
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // Agent represents an AI coding agent process.

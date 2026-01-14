@@ -122,23 +122,22 @@ func (p *Plugin) StartAgent(wt *Worktree, agentType AgentType) tea.Cmd {
 
 // getAgentCommand returns the command to start an agent.
 func getAgentCommand(agentType AgentType) string {
-	switch agentType {
-	case AgentClaude:
-		return "claude"
-	case AgentCodex:
-		return "codex"
-	case AgentAider:
-		return "aider"
-	case AgentGemini:
-		return "gemini"
-	default:
-		return "claude" // Default to claude
+	if cmd, ok := AgentCommands[agentType]; ok {
+		return cmd
 	}
+	return "claude" // Default to claude
 }
 
-// getAgentCommandWithContext returns the agent command with optional task context.
-func (p *Plugin) getAgentCommandWithContext(agentType AgentType, wt *Worktree) string {
+// buildAgentCommand builds the agent command with optional skip permissions and task context.
+func (p *Plugin) buildAgentCommand(agentType AgentType, wt *Worktree, skipPerms bool) string {
 	baseCmd := getAgentCommand(agentType)
+
+	// Add skip permissions flag if enabled and supported
+	if skipPerms {
+		if flag := SkipPermissionsFlags[agentType]; flag != "" {
+			baseCmd = baseCmd + " " + flag
+		}
+	}
 
 	// Only add context for Claude if we have a linked task
 	if agentType != AgentClaude || wt.TaskID == "" {
@@ -155,6 +154,106 @@ func (p *Plugin) getAgentCommandWithContext(agentType AgentType, wt *Worktree) s
 	// Escape quotes for shell safety
 	escapedCtx := strings.ReplaceAll(ctx, "'", "'\"'\"'")
 	return fmt.Sprintf("%s '%s'", baseCmd, escapedCtx)
+}
+
+// getAgentCommandWithContext returns the agent command with optional task context (legacy, no skip perms).
+func (p *Plugin) getAgentCommandWithContext(agentType AgentType, wt *Worktree) string {
+	return p.buildAgentCommand(agentType, wt, false)
+}
+
+// StartAgentWithOptions creates a tmux session and starts an agent with options.
+func (p *Plugin) StartAgentWithOptions(wt *Worktree, agentType AgentType, skipPerms bool) tea.Cmd {
+	return func() tea.Msg {
+		sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
+
+		// Check if session already exists
+		checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
+		if checkCmd.Run() == nil {
+			return AgentStartedMsg{Err: fmt.Errorf("session %s already exists", sessionName)}
+		}
+
+		// Create new detached session with working directory
+		args := []string{
+			"new-session",
+			"-d",              // Detached
+			"-s", sessionName, // Session name
+			"-c", wt.Path,     // Working directory
+		}
+
+		cmd := exec.Command("tmux", args...)
+		if err := cmd.Run(); err != nil {
+			return AgentStartedMsg{Err: fmt.Errorf("create session: %w", err)}
+		}
+
+		// Set history limit for scrollback capture
+		exec.Command("tmux", "set-option", "-t", sessionName, "history-limit",
+			strconv.Itoa(tmuxHistoryLimit)).Run()
+
+		// Set TD_SESSION_ID environment variable for td session tracking
+		envCmd := fmt.Sprintf("export TD_SESSION_ID=%s", sessionName)
+		exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
+
+		// If worktree has a linked task, start it in td
+		if wt.TaskID != "" {
+			tdStartCmd := fmt.Sprintf("td start %s", wt.TaskID)
+			exec.Command("tmux", "send-keys", "-t", sessionName, tdStartCmd, "Enter").Run()
+		}
+
+		// Small delay to ensure env is set
+		time.Sleep(100 * time.Millisecond)
+
+		// Build the agent command with skip permissions if enabled
+		agentCmd := p.buildAgentCommand(agentType, wt, skipPerms)
+
+		// Send the agent command to start it
+		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName, agentCmd, "Enter")
+		if err := sendCmd.Run(); err != nil {
+			// Try to kill the session if we failed to start the agent
+			exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+			return AgentStartedMsg{Err: fmt.Errorf("start agent: %w", err)}
+		}
+
+		return AgentStartedMsg{
+			WorktreeName: wt.Name,
+			SessionName:  sessionName,
+			AgentType:    agentType,
+		}
+	}
+}
+
+// AttachToWorktreeDir creates a tmux session in the worktree directory and attaches to it.
+func (p *Plugin) AttachToWorktreeDir(wt *Worktree) tea.Cmd {
+	sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
+
+	// Check if session already exists
+	checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
+	if checkCmd.Run() != nil {
+		// Session doesn't exist, create it
+		args := []string{
+			"new-session",
+			"-d",              // Detached
+			"-s", sessionName, // Session name
+			"-c", wt.Path,     // Working directory
+		}
+		cmd := exec.Command("tmux", args...)
+		if err := cmd.Run(); err != nil {
+			return func() tea.Msg {
+				return TmuxAttachFinishedMsg{WorktreeName: wt.Name, Err: fmt.Errorf("create session: %w", err)}
+			}
+		}
+
+		// Track as managed session
+		p.managedSessions[sessionName] = true
+	}
+
+	// Attach to the session
+	c := exec.Command("tmux", "attach-session", "-t", sessionName)
+	return tea.Sequence(
+		tea.Printf("\nAttaching to %s. Press Ctrl-b d to return to sidecar.\n", wt.Name),
+		tea.ExecProcess(c, func(err error) tea.Msg {
+			return TmuxAttachFinishedMsg{WorktreeName: wt.Name, Err: err}
+		}),
+	)
 }
 
 // getTaskContext fetches task title and description for agent context.

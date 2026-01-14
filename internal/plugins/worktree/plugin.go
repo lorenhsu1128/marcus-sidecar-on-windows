@@ -80,9 +80,11 @@ type Plugin struct {
 	createNameInput       textinput.Model
 	createBaseBranchInput textinput.Model
 	createTaskID          string
-	createTaskTitle       string // Title of selected task for display
-	createFocus           int    // 0=name, 1=base, 2=task, 3=confirm, 4=cancel
-	createError           string // Error message to display in create modal
+	createTaskTitle       string    // Title of selected task for display
+	createAgentType       AgentType // Selected agent type (default: AgentClaude)
+	createSkipPermissions bool      // Skip permissions checkbox
+	createFocus           int       // 0=name, 1=base, 2=task, 3=agent, 4=skipPerms, 5=create, 6=cancel
+	createError           string    // Error message to display in create modal
 
 	// Task search state for create modal
 	taskSearchInput    textinput.Model
@@ -234,11 +236,13 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 					wt.Agent = agent
 				}
 			}
-			// Load stats and task links for each worktree
+			// Load stats, task links, and agent types for each worktree
 			for _, wt := range p.worktrees {
 				cmds = append(cmds, p.loadStats(wt.Path))
 				// Load linked task ID from .sidecar-task file
 				wt.TaskID = loadTaskLink(wt.Path)
+				// Load chosen agent type from .sidecar-agent file
+				wt.ChosenAgentType = loadAgentType(wt.Path)
 			}
 			// Detect conflicts across worktrees
 			cmds = append(cmds, p.loadConflicts())
@@ -272,6 +276,14 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.worktrees = append(p.worktrees, msg.Worktree)
 			p.selectedIdx = len(p.worktrees) - 1
 			p.clearCreateModal()
+
+			// Start agent or attach based on selection
+			if msg.AgentType != AgentNone && msg.AgentType != "" {
+				cmds = append(cmds, p.StartAgentWithOptions(msg.Worktree, msg.AgentType, msg.SkipPerms))
+			} else {
+				// "None" selected - attach to worktree directory
+				cmds = append(cmds, p.AttachToWorktreeDir(msg.Worktree))
+			}
 		}
 
 	case DeleteDoneMsg:
@@ -482,6 +494,8 @@ func (p *Plugin) clearCreateModal() {
 	p.createBaseBranchInput = textinput.Model{}
 	p.createTaskID = ""
 	p.createTaskTitle = ""
+	p.createAgentType = AgentClaude // Default to Claude
+	p.createSkipPermissions = false
 	p.createFocus = 0
 	p.createError = ""
 	p.taskSearchInput = textinput.Model{}
@@ -552,6 +566,8 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		p.taskSearchInput = textinput.New()
 		p.taskSearchInput.Placeholder = "Search tasks..."
 		p.taskSearchInput.CharLimit = 100
+		p.createAgentType = AgentClaude // Default to Claude
+		p.createSkipPermissions = false
 		p.createFocus = 0
 		p.taskSearchLoading = true
 		p.branchAll = nil
@@ -661,7 +677,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 }
 
 // handleCreateKeys handles keys in create modal.
-// createFocus: 0=name, 1=base, 2=task, 3=create button, 4=cancel button
+// createFocus: 0=name, 1=base, 2=task, 3=agent, 4=skipPerms, 5=create button, 6=cancel button
 func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
 	case "esc":
@@ -671,12 +687,12 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 	case "tab":
 		// Blur current, move focus, focus new
 		p.blurCreateInputs()
-		p.createFocus = (p.createFocus + 1) % 5
+		p.createFocus = (p.createFocus + 1) % 7
 		p.focusCreateInput()
 		return nil
 	case "shift+tab":
 		p.blurCreateInputs()
-		p.createFocus = (p.createFocus + 4) % 5
+		p.createFocus = (p.createFocus + 6) % 7
 		p.focusCreateInput()
 		return nil
 	case "backspace":
@@ -688,6 +704,12 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			p.taskSearchInput.Focus()
 			p.taskSearchFiltered = filterTasks("", p.taskSearchAll)
 			p.taskSearchIdx = 0
+			return nil
+		}
+	case " ":
+		// Toggle skip permissions checkbox
+		if p.createFocus == 4 {
+			p.createSkipPermissions = !p.createSkipPermissions
 			return nil
 		}
 	case "up":
@@ -705,6 +727,11 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			}
 			return nil
 		}
+		// Navigate agent selection
+		if p.createFocus == 3 {
+			p.cycleAgentType(false)
+			return nil
+		}
 	case "down":
 		// Navigate branch dropdown
 		if p.createFocus == 1 && len(p.branchFiltered) > 0 {
@@ -718,6 +745,11 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			if p.taskSearchIdx < len(p.taskSearchFiltered)-1 {
 				p.taskSearchIdx++
 			}
+			return nil
+		}
+		// Navigate agent selection
+		if p.createFocus == 3 {
+			p.cycleAgentType(true)
 			return nil
 		}
 	case "enter":
@@ -737,20 +769,20 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 			p.createTaskID = selectedTask.ID
 			p.createTaskTitle = selectedTask.Title
 			p.taskSearchInput.Blur()
-			p.createFocus = 3 // Move to create button
+			p.createFocus = 3 // Move to agent field
 			return nil
 		}
 		// Create button
-		if p.createFocus == 3 {
+		if p.createFocus == 5 {
 			return p.createWorktree()
 		}
 		// Cancel button
-		if p.createFocus == 4 {
+		if p.createFocus == 6 {
 			p.viewMode = ViewModeList
 			p.clearCreateModal()
 			return nil
 		}
-		// From input fields, move to next field
+		// From input fields (0-2), move to next field
 		if p.createFocus < 3 {
 			p.blurCreateInputs()
 			p.createFocus++
@@ -778,6 +810,25 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 		p.taskSearchIdx = 0
 	}
 	return cmd
+}
+
+// cycleAgentType cycles through agent types in the selection.
+func (p *Plugin) cycleAgentType(forward bool) {
+	currentIdx := 0
+	for i, at := range AgentTypeOrder {
+		if at == p.createAgentType {
+			currentIdx = i
+			break
+		}
+	}
+
+	if forward {
+		currentIdx = (currentIdx + 1) % len(AgentTypeOrder)
+	} else {
+		currentIdx = (currentIdx + len(AgentTypeOrder) - 1) % len(AgentTypeOrder)
+	}
+
+	p.createAgentType = AgentTypeOrder[currentIdx]
 }
 
 // blurCreateInputs blurs all create modal textinputs.
@@ -1198,8 +1249,9 @@ func (p *Plugin) Commands() []plugin.Command {
 				)
 				if wt.Status == StatusWaiting {
 					cmds = append(cmds,
-						plugin.Command{ID: "approve", Name: "Approve", Description: "Approve prompt", Context: "worktree-list", Priority: 2},
-						plugin.Command{ID: "reject", Name: "Reject", Description: "Reject prompt", Context: "worktree-list", Priority: 3},
+						plugin.Command{ID: "approve", Name: "Approve", Description: "Send 'y' to approve the agent's pending prompt", Context: "worktree-list", Priority: 2},
+						plugin.Command{ID: "approve-all", Name: "Approve All", Description: "Send 'y' to all agents with pending prompts", Context: "worktree-list", Priority: 4},
+						plugin.Command{ID: "reject", Name: "Reject", Description: "Send 'n' to reject the agent's pending prompt", Context: "worktree-list", Priority: 3},
 					)
 				}
 			}
