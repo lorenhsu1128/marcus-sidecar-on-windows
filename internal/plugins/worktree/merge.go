@@ -185,7 +185,7 @@ func (p *Plugin) createPR(wt *Worktree, title, body string) tea.Cmd {
 func (p *Plugin) checkPRMerged(wt *Worktree) tea.Cmd {
 	return func() tea.Msg {
 		// Use gh pr view to check status
-		cmd := exec.Command("gh", "pr", "view", "--json", "state,merged")
+		cmd := exec.Command("gh", "pr", "view", "--json", "state,mergedAt")
 		cmd.Dir = wt.Path
 		output, err := cmd.Output()
 
@@ -197,15 +197,15 @@ func (p *Plugin) checkPRMerged(wt *Worktree) tea.Cmd {
 			}
 		}
 
-		// Parse JSON response properly
+		// Parse JSON response
 		var prStatus struct {
-			State  string `json:"state"`
-			Merged bool   `json:"merged"`
+			State    string `json:"state"`
+			MergedAt string `json:"mergedAt"`
 		}
 
 		merged := false
 		if err := json.Unmarshal(output, &prStatus); err == nil {
-			merged = prStatus.Merged || prStatus.State == "MERGED"
+			merged = prStatus.MergedAt != "" || prStatus.State == "MERGED"
 		}
 
 		return CheckPRMergedMsg{

@@ -468,8 +468,13 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 				switch msg.Step {
 				case MergeStepReviewDiff:
 					p.mergeState.DiffSummary = msg.Data
+				case MergeStepPush:
+					// Push complete, auto-advance to Create PR
+					cmds = append(cmds, p.advanceMergeStep())
 				case MergeStepCreatePR:
 					p.mergeState.PRURL = msg.Data
+					// PR created, auto-advance to Waiting for Merge
+					cmds = append(cmds, p.advanceMergeStep())
 				case MergeStepCleanup:
 					// Cleanup done, remove from worktree list
 					p.removeWorktreeByName(msg.WorktreeName)
