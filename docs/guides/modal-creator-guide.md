@@ -288,6 +288,14 @@ var DimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 
 4. **Height constraints** - Ensure modal content respects available height to prevent overflow.
 
+5. **`RenderGradientBorder` only handles horizontal padding** - Unlike lipgloss's `Padding(1, 2)` which adds 1 line top/bottom padding, `RenderGradientBorder(..., padding)` only adds horizontal (left/right) padding. If you need vertical padding for consistent mouse hit regions, add blank lines to your content manually:
+   ```go
+   // Add vertical padding manually
+   paddedContent := "\n" + content + "\n"
+   return styles.RenderGradientBorder(paddedContent, width, height, gradient, 1)
+   ```
+   Without this, mouse Y calculations will be off by 1 row compared to lipgloss-styled modals.
+
 ## Hit Region Calculation for Modal Buttons
 
 Calculating mouse hit regions for modal buttons is error-prone. Common issues:
