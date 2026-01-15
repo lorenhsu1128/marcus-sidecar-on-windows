@@ -2,6 +2,17 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.16.2] - 2026-01-14
+
+### Bug Fixes
+- Escape agent messages properly in worktrees plugin
+- Pass task context to all agent types in worktrees plugin
+- Better workspace initial environment handling
+- Minor improvements to Claude Code adapter
+
+### Dependencies
+- Updated embedded td to latest
+
 ## [v0.16.1] - 2026-01-14
 
 ### Bug Fixes
