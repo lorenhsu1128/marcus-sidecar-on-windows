@@ -1332,10 +1332,10 @@ func (p *Plugin) handleMergeKeys(msg tea.KeyMsg) tea.Cmd {
 		}
 
 	case "c":
-		// Skip to cleanup (if PR is merged or user wants to force cleanup)
+		// Skip cleanup - close modal and leave worktree in place
 		if p.mergeState.Step == MergeStepWaitingMerge {
-			p.mergeState.StepStatus[MergeStepWaitingMerge] = "done"
-			return p.advanceMergeStep()
+			p.cancelMergeWorkflow()
+			return nil
 		}
 
 	case "s":
@@ -1742,7 +1742,7 @@ func (p *Plugin) Commands() []plugin.Command {
 				cmds = append(cmds, plugin.Command{ID: "continue", Name: "Push", Description: "Push branch", Context: "worktree-merge", Priority: 2})
 			case MergeStepWaitingMerge:
 				cmds = append(cmds, plugin.Command{ID: "continue", Name: "Check", Description: "Check merge status", Context: "worktree-merge", Priority: 2})
-				cmds = append(cmds, plugin.Command{ID: "cleanup", Name: "Cleanup", Description: "Skip to cleanup", Context: "worktree-merge", Priority: 3})
+				cmds = append(cmds, plugin.Command{ID: "skip-cleanup", Name: "Skip", Description: "Skip cleanup, keep worktree", Context: "worktree-merge", Priority: 3})
 			case MergeStepDone:
 				cmds = append(cmds, plugin.Command{ID: "continue", Name: "Done", Description: "Close modal", Context: "worktree-merge", Priority: 2})
 			}

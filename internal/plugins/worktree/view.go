@@ -1357,7 +1357,7 @@ func (p *Plugin) renderMergeModal(width, height int) string {
 		sb.WriteString("\n")
 		sb.WriteString(dimText("Checking status every 30 seconds"))
 		sb.WriteString("\n\n")
-		sb.WriteString(dimText("Press Enter to check now, 'c' to skip to cleanup"))
+		sb.WriteString(dimText("Press Enter to check now, 'c' to skip cleanup"))
 
 	case MergeStepCleanup:
 		sb.WriteString("Cleaning up worktree and branch...")
