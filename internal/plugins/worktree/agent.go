@@ -152,10 +152,14 @@ func (p *Plugin) buildAgentCommand(agentType AgentType, wt *Worktree, skipPerms 
 		ctx = p.getTaskContext(wt.TaskID)
 	}
 
-	// Escape context for shell safety (single quotes with proper escaping)
+	// Escape context for shell safety
+	// 1. Single quotes: replace ' with '"'"' (end quote, literal quote, start quote)
+	// 2. Newlines/carriage returns: escape so tmux send-keys works (LLMs understand \n)
 	var escapedCtx string
 	if ctx != "" {
 		escapedCtx = strings.ReplaceAll(ctx, "'", "'\"'\"'")
+		escapedCtx = strings.ReplaceAll(escapedCtx, "\r", "\\r")
+		escapedCtx = strings.ReplaceAll(escapedCtx, "\n", "\\n")
 	}
 
 	// Build command with appropriate syntax for each agent type

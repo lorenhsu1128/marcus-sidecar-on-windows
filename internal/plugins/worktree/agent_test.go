@@ -391,3 +391,56 @@ func TestBuildAgentCommandSyntax(t *testing.T) {
 		})
 	}
 }
+
+func TestEscapeContextForShell(t *testing.T) {
+	// Test the escaping logic used in buildAgentCommand
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple text",
+			input:    "Task: fix bug",
+			expected: "Task: fix bug",
+		},
+		{
+			name:     "single quotes",
+			input:    "Task: fix the user's bug",
+			expected: "Task: fix the user'\"'\"'s bug",
+		},
+		{
+			name:     "newlines",
+			input:    "Task: title\n\nDescription here",
+			expected: "Task: title\\n\\nDescription here",
+		},
+		{
+			name:     "multi-line description",
+			input:    "Task: implement feature\n\nLine 1\nLine 2\nLine 3",
+			expected: "Task: implement feature\\n\\nLine 1\\nLine 2\\nLine 3",
+		},
+		{
+			name:     "single quotes and newlines",
+			input:    "Task: fix user's bug\n\nDon't break it",
+			expected: "Task: fix user'\"'\"'s bug\\n\\nDon'\"'\"'t break it",
+		},
+		{
+			name:     "carriage return and newline",
+			input:    "Task: title\r\nDescription",
+			expected: "Task: title\\r\\nDescription",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Apply the same escaping logic as buildAgentCommand (same order)
+			escaped := strings.ReplaceAll(tt.input, "'", "'\"'\"'")
+			escaped = strings.ReplaceAll(escaped, "\r", "\\r")
+			escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+
+			if escaped != tt.expected {
+				t.Errorf("escaping %q:\ngot:  %q\nwant: %q", tt.input, escaped, tt.expected)
+			}
+		})
+	}
+}
