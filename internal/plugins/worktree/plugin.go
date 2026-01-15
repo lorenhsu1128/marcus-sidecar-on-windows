@@ -741,7 +741,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 	case "j", "down":
 		if p.activePane == PaneSidebar {
 			p.moveCursor(1)
-			return p.loadSelectedDiff()
+			return p.loadSelectedContent()
 		}
 		// Scroll down toward newer content (decrease offset from bottom)
 		if p.previewOffset > 0 {
@@ -753,7 +753,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 	case "k", "up":
 		if p.activePane == PaneSidebar {
 			p.moveCursor(-1)
-			return p.loadSelectedDiff()
+			return p.loadSelectedContent()
 		}
 		// Scroll up toward older content (increase offset from bottom)
 		p.autoScrollOutput = false
@@ -762,7 +762,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		if p.activePane == PaneSidebar {
 			p.selectedIdx = 0
 			p.scrollOffset = 0
-			return p.loadSelectedDiff()
+			return p.loadSelectedContent()
 		}
 		// Go to top (oldest content) - pause auto-scroll
 		p.autoScrollOutput = false
@@ -771,7 +771,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		if p.activePane == PaneSidebar {
 			p.selectedIdx = len(p.worktrees) - 1
 			p.ensureVisible()
-			return p.loadSelectedDiff()
+			return p.loadSelectedContent()
 		}
 		// Go to bottom (newest content) - resume auto-scroll
 		p.previewOffset = 0
@@ -1321,6 +1321,17 @@ func (p *Plugin) cyclePreviewTab(delta int) tea.Cmd {
 	return nil
 }
 
+// loadSelectedContent loads content based on the active preview tab.
+// Always loads diff (for preloading), and also loads task if task tab is active.
+func (p *Plugin) loadSelectedContent() tea.Cmd {
+	switch p.previewTab {
+	case PreviewTabTask:
+		return tea.Batch(p.loadSelectedDiff(), p.loadTaskDetailsIfNeeded())
+	default:
+		return p.loadSelectedDiff()
+	}
+}
+
 // loadTaskDetailsIfNeeded loads task details if not cached or stale.
 func (p *Plugin) loadTaskDetailsIfNeeded() tea.Cmd {
 	wt := p.selectedWorktree()
@@ -1418,14 +1429,23 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) tea.Cmd {
 			}
 			p.ensureVisible()
 			p.activePane = PaneSidebar
-			return p.loadSelectedDiff()
+			return p.loadSelectedContent()
 		}
 	case regionPreviewTab:
 		// Click on preview tab
 		if idx, ok := action.Region.Data.(int); ok && idx >= 0 && idx <= 2 {
 			p.previewTab = PreviewTab(idx)
 			p.previewOffset = 0
+			p.previewHorizOffset = 0
 			p.autoScrollOutput = true
+
+			// Load content for the selected tab
+			switch p.previewTab {
+			case PreviewTabDiff:
+				return p.loadSelectedDiff()
+			case PreviewTabTask:
+				return p.loadTaskDetailsIfNeeded()
+			}
 		}
 	case regionAgentChoiceOption:
 		// Click on agent choice option
