@@ -2,6 +2,27 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.16.0] - 2026-01-14
+
+### Features
+- **Conversations UI Overhaul**: Premium experience for viewing Claude Code sessions
+  - Colorful model badges (opus=purple, sonnet=green, haiku=blue)
+  - Token flow indicators showing input→output usage
+  - Tool-specific icons (Read, Edit, Write, Bash, Search, etc.)
+  - Enhanced thinking block styling with expand/collapse
+  - Session list shows adapter icons and token counts
+  - Improved main pane header with model badge, stats, and cost estimate
+
+### Bug Fixes
+- Fixed XML tags appearing in session titles (now properly extracts user queries)
+- Fixed session titles for messages starting with local command caveats
+- Skip trivial commands (/clear, /compact) when finding session title
+- Filter out metadata-only sessions (no messages) from session list
+- Improved extraction of text content from tool inputs in message display
+
+### Dependencies
+- Updated embedded td to v0.12.2 (from v0.12.1)
+
 ## [v0.15.0] - 2026-01-14
 
 ### Features

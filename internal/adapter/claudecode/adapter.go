@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/marcus/sidecar/internal/adapter"
 )
+
+// xmlTagRegex matches XML/HTML-like tags for stripping from session titles
+var xmlTagRegex = regexp.MustCompile(`<[^>]+>`)
 
 // scannerBufPool recycles buffers for bufio.Scanner to reduce allocations.
 // We use 1MB initial buffer (default is 4KB) to reduce resizing, with 10MB max.
@@ -124,10 +128,15 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 		}
 		seenPaths[path] = struct{}{}
 
+		// Skip sessions with no messages (metadata-only files)
+		if meta.MsgCount == 0 {
+			continue
+		}
+
 		// Use first user message as name, with fallbacks
 		name := ""
 		if meta.FirstUserMessage != "" {
-			name = truncateTitle(meta.FirstUserMessage, 50)
+			name = truncateTitle(meta.FirstUserMessage, 120)
 		}
 		if name == "" && meta.Slug != "" {
 			name = meta.Slug
@@ -441,11 +450,16 @@ func (a *Adapter) parseSessionMetadata(path string) (*SessionMetadata, error) {
 		if meta.Slug == "" && raw.Slug != "" {
 			meta.Slug = raw.Slug
 		}
-		// Extract first user message content for title
+		// Extract first meaningful user message content for title
+		// Skip caveat-only messages, /clear commands, and empty messages
 		if meta.FirstUserMessage == "" && raw.Type == "user" && raw.Message != nil {
 			content, _, _ := a.parseContent(raw.Message.Content)
 			if content != "" {
-				meta.FirstUserMessage = content
+				// Use extractUserQuery to check if this has real content
+				extracted := extractUserQuery(content)
+				if extracted != "" && !isTrivialCommand(extracted) {
+					meta.FirstUserMessage = content
+				}
 			}
 		}
 		meta.LastMsg = raw.Timestamp
@@ -606,9 +620,96 @@ func shortID(id string) string {
 	return id
 }
 
+// extractUserQuery extracts the actual user query from text that may contain XML tags.
+// Claude Code messages often contain system context wrapped in XML tags like:
+// <local-command-caveat>, <user_query>, <system-reminder>, etc.
+// This function extracts just the user's actual request.
+func extractUserQuery(s string) string {
+	// First try to extract content from <user_query> tags (common in Claude Code)
+	if start := strings.Index(s, "<user_query>"); start >= 0 {
+		if end := strings.Index(s, "</user_query>"); end > start {
+			extracted := strings.TrimSpace(s[start+len("<user_query>") : end])
+			if extracted != "" {
+				return extracted
+			}
+		}
+	}
+
+	// Handle local command messages (e.g., /clear, /compact, etc.)
+	// These have <command-name> and optionally <command-message> tags
+	if strings.Contains(s, "<local-command-caveat>") || strings.Contains(s, "<command-name>") {
+		// Try to extract command name
+		if start := strings.Index(s, "<command-name>"); start >= 0 {
+			if end := strings.Index(s[start:], "</command-name>"); end > 0 {
+				cmdName := strings.TrimSpace(s[start+len("<command-name>") : start+end])
+				// Try to get command message too
+				cmdMsg := ""
+				if msgStart := strings.Index(s, "<command-message>"); msgStart >= 0 {
+					if msgEnd := strings.Index(s[msgStart:], "</command-message>"); msgEnd > 0 {
+						cmdMsg = strings.TrimSpace(s[msgStart+len("<command-message>") : msgStart+msgEnd])
+					}
+				}
+				if cmdMsg != "" && cmdMsg != cmdName {
+					return cmdName + ": " + cmdMsg
+				}
+				return cmdName
+			}
+		}
+	}
+
+	// Strip all XML tags
+	cleaned := xmlTagRegex.ReplaceAllString(s, " ")
+
+	// Collapse multiple spaces and clean up
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+	cleaned = strings.TrimSpace(cleaned)
+
+	// Skip common caveat/system phrases that aren't useful as titles
+	skipPhrases := []string{
+		"Caveat: The messages below",
+		"Caveat:",
+		"DO NOT respond to these messages",
+	}
+	for _, phrase := range skipPhrases {
+		if strings.HasPrefix(cleaned, phrase) {
+			// This is a system/caveat message with no real user content
+			// Return empty so caller can use fallback (slug, ID, etc.)
+			return ""
+		}
+	}
+
+	// Return the cleaned content (may be empty if input was just XML tags)
+	return cleaned
+}
+
+// isTrivialCommand returns true if the text is a trivial command that shouldn't
+// be used as a session title (like /clear, /compact, empty strings, etc.)
+func isTrivialCommand(s string) bool {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return true
+	}
+	// Skip slash commands
+	trivialCommands := []string{
+		"/clear", "/compact", "/config", "/help", "/init",
+		"/bug", "/cost", "/doctor", "/feedback", "/login", "/logout",
+		"clear", "compact", "help",
+	}
+	for _, cmd := range trivialCommands {
+		if s == cmd || strings.HasPrefix(s, cmd+":") || strings.HasPrefix(s, cmd+" ") {
+			return true
+		}
+	}
+	return false
+}
+
 // truncateTitle truncates text to maxLen, adding "..." if truncated.
-// It also replaces newlines with spaces for display.
+// It first extracts the actual user query (stripping XML tags),
+// then replaces newlines with spaces for display.
 func truncateTitle(s string, maxLen int) string {
+	// Extract actual user query first (strips XML tags)
+	s = extractUserQuery(s)
+
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)

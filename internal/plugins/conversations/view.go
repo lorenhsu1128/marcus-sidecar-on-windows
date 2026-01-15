@@ -13,10 +13,14 @@ import (
 	"github.com/marcus/sidecar/internal/styles"
 )
 
-// ansiBackgroundRegex matches ANSI background color escape sequences
-var ansiBackgroundRegex = regexp.MustCompile(`\x1b\[4[0-9;]*m`)
+// ansiBackgroundRegex matches ANSI background color escape sequences including:
+// - Basic: \x1b[40m through \x1b[49m
+// - 256-color: \x1b[48;5;XXXm
+// - True color: \x1b[48;2;R;G;Bm
+var ansiBackgroundRegex = regexp.MustCompile(`\x1b\[(4[0-9]|48;[0-9;]+)m`)
 
 // stripANSIBackground removes ANSI background color codes from a string
+// to allow selection highlighting to show through consistently.
 func stripANSIBackground(s string) string {
 	return ansiBackgroundRegex.ReplaceAllString(s, "")
 }
@@ -102,6 +106,17 @@ func formatK(n int) string {
 	return fmt.Sprintf("%d", n)
 }
 
+// formatCost formats a cost estimate in dollars.
+func formatCost(cost float64) string {
+	if cost < 0.01 {
+		return "<$0.01"
+	}
+	if cost < 1.0 {
+		return fmt.Sprintf("$%.2f", cost)
+	}
+	return fmt.Sprintf("$%.1f", cost)
+}
+
 func adapterBreakdown(sessions []adapter.Session) string {
 	counts := make(map[string]int)
 	for _, session := range sessions {
@@ -139,6 +154,32 @@ func adapterBadgeText(session adapter.Session) string {
 		return "?" // Unknown adapter fallback
 	}
 	return "●" + abbr
+}
+
+// renderAdapterIcon returns a colorized adapter icon based on the adapter type.
+func renderAdapterIcon(session adapter.Session) string {
+	icon := session.AdapterIcon
+	if icon == "" {
+		icon = "◆"
+	}
+
+	// Color based on adapter
+	switch session.AdapterID {
+	case "claude-code":
+		// Amber for Claude Code (matches existing StatusModified)
+		return styles.StatusModified.Render(icon)
+	case "gemini-cli":
+		// Google blue
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#4285F4")).Render(icon)
+	case "codex":
+		// OpenAI green
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#10A37F")).Render(icon)
+	case "cursor-cli":
+		// Cursor purple
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED")).Render(icon)
+	default:
+		return styles.Muted.Render(icon)
+	}
 }
 
 func adapterAbbrev(session adapter.Session) string {
@@ -343,6 +384,70 @@ func modelShortName(model string) string {
 	}
 }
 
+// renderModelBadge returns a colorful styled badge for the model name.
+// opus=purple, sonnet=green, haiku=blue, others=default code style.
+func renderModelBadge(model string) string {
+	short := modelShortName(model)
+	if short == "" {
+		return ""
+	}
+
+	var badgeStyle lipgloss.Style
+	switch short {
+	case "opus":
+		// Purple/magenta for opus (premium model)
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#C084FC")).
+			Background(lipgloss.Color("#3B1F5B")).
+			Padding(0, 1)
+	case "sonnet", "sonnet4":
+		// Green for sonnet (balanced)
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#86EFAC")).
+			Background(lipgloss.Color("#14532D")).
+			Padding(0, 1)
+	case "haiku":
+		// Blue for haiku (fast/cheap)
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#93C5FD")).
+			Background(lipgloss.Color("#1E3A5F")).
+			Padding(0, 1)
+	case "gpt4", "gpt4o":
+		// Teal for GPT-4
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#5EEAD4")).
+			Background(lipgloss.Color("#134E4A")).
+			Padding(0, 1)
+	case "o1", "o3":
+		// Orange for reasoning models
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FDBA74")).
+			Background(lipgloss.Color("#7C2D12")).
+			Padding(0, 1)
+	case "gemini", "gemini3", "3Pro", "3Flash", "2Flash", "1.5Pro", "1.5Flash":
+		// Google blue for Gemini
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#93C5FD")).
+			Background(lipgloss.Color("#1E3A8A")).
+			Padding(0, 1)
+	default:
+		// Default: amber/code style
+		badgeStyle = lipgloss.NewStyle().
+			Foreground(styles.Accent).
+			Padding(0, 1)
+	}
+
+	return badgeStyle.Render(short)
+}
+
+// renderTokenFlow returns a compact token flow indicator (in→out).
+func renderTokenFlow(in, out int) string {
+	if in == 0 && out == 0 {
+		return ""
+	}
+	return styles.Muted.Render(fmt.Sprintf("%s→%s", formatK(in), formatK(out)))
+}
+
 // formatSessionDuration formats session duration for display.
 func formatSessionDuration(d time.Duration) string {
 	if d < time.Minute {
@@ -443,51 +548,98 @@ func extractToolCommand(toolName, input string, maxLen int) string {
 	if input == "" {
 		return ""
 	}
+
+	// First try to parse as object
 	var data map[string]any
-	if err := json.Unmarshal([]byte(input), &data); err != nil {
-		return ""
+	if err := json.Unmarshal([]byte(input), &data); err == nil {
+		var cmd string
+		switch toolName {
+		case "Bash", "bash", "Shell", "shell":
+			if c, ok := data["command"].(string); ok {
+				cmd = c
+			}
+		case "Read", "read":
+			if fp, ok := data["file_path"].(string); ok {
+				return fp
+			}
+			if fp, ok := data["path"].(string); ok {
+				return fp
+			}
+		case "Edit", "edit", "StrReplace", "str_replace_editor":
+			if fp, ok := data["file_path"].(string); ok {
+				return fp
+			}
+			if fp, ok := data["path"].(string); ok {
+				return fp
+			}
+		case "Write", "write":
+			if fp, ok := data["file_path"].(string); ok {
+				return fp
+			}
+			if fp, ok := data["path"].(string); ok {
+				return fp
+			}
+		case "Glob", "glob":
+			if p, ok := data["pattern"].(string); ok {
+				cmd = p
+			}
+			if p, ok := data["glob_pattern"].(string); ok {
+				cmd = p
+			}
+		case "Grep", "grep":
+			if p, ok := data["pattern"].(string); ok {
+				cmd = p
+			}
+		case "Task", "task", "TodoWrite", "TodoRead":
+			// Task tools often have text content
+			if t, ok := data["text"].(string); ok {
+				cmd = t
+			}
+			if t, ok := data["content"].(string); ok {
+				cmd = t
+			}
+			if t, ok := data["description"].(string); ok {
+				cmd = t
+			}
+		default:
+			// Fallback: try common text fields
+			if t, ok := data["text"].(string); ok {
+				cmd = t
+			} else if t, ok := data["content"].(string); ok {
+				cmd = t
+			} else if t, ok := data["message"].(string); ok {
+				cmd = t
+			} else if t, ok := data["query"].(string); ok {
+				cmd = t
+			}
+		}
+
+		if cmd != "" {
+			// Clean up: remove newlines, collapse whitespace
+			cmd = strings.ReplaceAll(cmd, "\n", " ")
+			cmd = strings.Join(strings.Fields(cmd), " ")
+			if len(cmd) > maxLen {
+				cmd = cmd[:maxLen-3] + "..."
+			}
+			return cmd
+		}
 	}
 
-	var cmd string
-	switch toolName {
-	case "Bash", "bash":
-		if c, ok := data["command"].(string); ok {
-			cmd = c
-		}
-	case "Read", "read":
-		if fp, ok := data["file_path"].(string); ok {
-			return fp // Already shown via extractFilePath
-		}
-	case "Edit", "edit":
-		if fp, ok := data["file_path"].(string); ok {
-			return fp
-		}
-	case "Write", "write":
-		if fp, ok := data["file_path"].(string); ok {
-			return fp
-		}
-	case "Glob", "glob":
-		if p, ok := data["pattern"].(string); ok {
-			cmd = p
-		}
-	case "Grep", "grep":
-		if p, ok := data["pattern"].(string); ok {
-			cmd = p
+	// Try to parse as array (e.g., [{"text": "..."}])
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(input), &arr); err == nil && len(arr) > 0 {
+		// Extract text from first element
+		if t, ok := arr[0]["text"].(string); ok {
+			cmd := strings.ReplaceAll(t, "\n", " ")
+			cmd = strings.Join(strings.Fields(cmd), " ")
+			if len(cmd) > maxLen {
+				cmd = cmd[:maxLen-3] + "..."
+			}
+			return cmd
 		}
 	}
 
-	if cmd == "" {
-		return ""
-	}
-
-	// Clean up command: remove newlines, collapse whitespace
-	cmd = strings.ReplaceAll(cmd, "\n", " ")
-	cmd = strings.Join(strings.Fields(cmd), " ")
-
-	if len(cmd) > maxLen {
-		cmd = cmd[:maxLen-3] + "..."
-	}
-	return cmd
+	return ""
 }
 
 // renderTwoPane renders the two-pane layout with sessions on the left and messages on the right.
@@ -892,17 +1044,30 @@ func (p *Plugin) renderGroupedCompactSessions(sb *strings.Builder, groups []Sess
 }
 
 // renderCompactSessionRow renders a compact session row for the sidebar.
+// Format: [active] [icon] Session title...              12m  45k
 func (p *Plugin) renderCompactSessionRow(session adapter.Session, selected bool, maxWidth int) string {
-	// Calculate prefix length for width calculations
-	// active(1) + subagent indent(2) + badge + space + length(4) + space
+	// Get badge text for width calculations (plain text length)
 	badgeText := adapterBadgeText(session)
+
+	// Format duration
 	length := "--"
 	if session.Duration > 0 {
 		length = formatSessionDuration(session.Duration)
 	}
 	lengthCol := fmt.Sprintf("%4s", length)
 
+	// Format token count (compact)
+	tokenCol := ""
+	if session.TotalTokens > 0 {
+		tokenCol = formatK(session.TotalTokens)
+	}
+
+	// Calculate prefix length for width calculations
+	// active(1) + badge + space + length(4) + space + tokens(~4)
 	prefixLen := 1 + len(badgeText) + 1 + len(lengthCol) + 1
+	if tokenCol != "" {
+		prefixLen += len(tokenCol) + 1
+	}
 	if session.IsSubAgent {
 		prefixLen += 2 // extra indent for sub-agents
 	}
@@ -924,19 +1089,23 @@ func (p *Plugin) renderCompactSessionRow(session adapter.Session, selected bool,
 		name = name[:nameWidth-3] + "..."
 	}
 
-	// Calculate padding for right-aligned time
+	// Calculate padding for right-aligned stats
 	visibleLen := 0
 	if session.IsSubAgent {
 		visibleLen += 2
 	}
 	visibleLen += 1                              // indicator
 	visibleLen += len(badgeText) + 1 + len(name) // badge + space + name
-	padding := maxWidth - visibleLen - len(lengthCol) - 1
+	rightColWidth := len(lengthCol)
+	if tokenCol != "" {
+		rightColWidth += 1 + len(tokenCol)
+	}
+	padding := maxWidth - visibleLen - rightColWidth - 1
 	if padding < 0 {
 		padding = 0
 	}
 
-	// Build the row with styling - differentiate top-level vs sub-agents
+	// Build the row with styling
 	var sb strings.Builder
 
 	// Sub-agent indent
@@ -944,7 +1113,7 @@ func (p *Plugin) renderCompactSessionRow(session adapter.Session, selected bool,
 		sb.WriteString("  ")
 	}
 
-	// Type indicator with colors
+	// Activity indicator with colors
 	if session.IsActive {
 		sb.WriteString(styles.StatusInProgress.Render("●"))
 	} else if session.IsSubAgent {
@@ -953,20 +1122,20 @@ func (p *Plugin) renderCompactSessionRow(session adapter.Session, selected bool,
 		sb.WriteString(" ")
 	}
 
-	// Style based on session type
+	// Colored adapter icon + name based on session type
 	if session.IsSubAgent {
 		// Sub-agents: muted styling
 		sb.WriteString(styles.Muted.Render(badgeText))
 		sb.WriteString(" ")
 		sb.WriteString(styles.Subtitle.Render(name))
 	} else {
-		// Top-level: prominent amber icons, bright text
-		sb.WriteString(styles.StatusModified.Render(badgeText))
+		// Top-level: use colored adapter icon
+		sb.WriteString(renderAdapterIcon(session))
 		sb.WriteString(" ")
 		sb.WriteString(styles.Body.Render(name))
 	}
 
-	// Padding and time
+	// Padding and right-aligned stats (duration + tokens)
 	if padding > 0 {
 		sb.WriteString(strings.Repeat(" ", padding))
 		sb.WriteString(" ")
@@ -975,13 +1144,16 @@ func (p *Plugin) renderCompactSessionRow(session adapter.Session, selected bool,
 		} else {
 			sb.WriteString(styles.Subtitle.Render(lengthCol))
 		}
+		if tokenCol != "" {
+			sb.WriteString(" ")
+			sb.WriteString(styles.Subtle.Render(tokenCol))
+		}
 	}
 
 	row := sb.String()
 
-	// For selected rows, we need plain text with background
+	// For selected rows, build plain text version with background highlight
 	if selected {
-		// Build plain version for selection
 		var plain strings.Builder
 		if session.IsSubAgent {
 			plain.WriteString("  ")
@@ -1000,9 +1172,13 @@ func (p *Plugin) renderCompactSessionRow(session adapter.Session, selected bool,
 			plain.WriteString(strings.Repeat(" ", padding))
 			plain.WriteString(" ")
 			plain.WriteString(lengthCol)
+			if tokenCol != "" {
+				plain.WriteString(" ")
+				plain.WriteString(tokenCol)
+			}
 		}
 		plainRow := plain.String()
-		// Pad to full width
+		// Pad to full width for proper background highlight
 		if len(plainRow) < maxWidth {
 			plainRow += strings.Repeat(" ", maxWidth-len(plainRow))
 		}
@@ -1040,22 +1216,14 @@ func (p *Plugin) renderMainPane(paneWidth, height int) string {
 		}
 	}
 
-	// Header: AdapterName - SessionName (with different colors)
+	// Header Line 1: Adapter icon + Session name
 	sessionName := shortID(p.selectedSession)
 	if session != nil && session.Name != "" {
 		sessionName = session.Name
 	}
-	adapterName := ""
-	if session != nil && session.AdapterName != "" {
-		adapterName = session.AdapterName
-	}
 
-	// Calculate max length for session name
-	prefixLen := 0
-	if adapterName != "" {
-		prefixLen = len(adapterName) + 3 // " - "
-	}
-	maxSessionLen := contentWidth - prefixLen - 2
+	// Calculate max length for session name (leave room for icon)
+	maxSessionLen := contentWidth - 4
 	if maxSessionLen < 10 {
 		maxSessionLen = 10
 	}
@@ -1063,42 +1231,73 @@ func (p *Plugin) renderMainPane(paneWidth, height int) string {
 		sessionName = sessionName[:maxSessionLen-3] + "..."
 	}
 
-	if adapterName != "" {
-		sb.WriteString(styles.Muted.Render(adapterName + " - "))
+	// Build header with colored adapter icon
+	if session != nil {
+		sb.WriteString(renderAdapterIcon(*session))
+		sb.WriteString(" ")
 	}
 	sb.WriteString(styles.Title.Render(sessionName))
 	sb.WriteString("\n")
 
-	// Stats line
+	// Header Line 2: Model badge │ msgs │ tokens │ cost │ date
 	if p.sessionSummary != nil {
 		s := p.sessionSummary
-		modelShort := modelShortName(s.PrimaryModel)
-		if modelShort == "" {
-			modelShort = adapterShortName(session)
+
+		// Build stats with model badge
+		var statsParts []string
+
+		// Model badge (colorful)
+		if s.PrimaryModel != "" {
+			badge := renderModelBadge(s.PrimaryModel)
+			if badge != "" {
+				statsParts = append(statsParts, badge)
+			}
+		} else if session != nil {
+			// Fallback to adapter short name
+			shortName := adapterShortName(session)
+			if shortName != "" {
+				statsParts = append(statsParts, styles.Code.Render(shortName))
+			}
 		}
-		statsLine := fmt.Sprintf("%s │ %d msgs │ %s→%s",
-			modelShort,
-			s.MessageCount,
-			formatK(s.TotalTokensIn),
-			formatK(s.TotalTokensOut))
+
+		// Message count
+		statsParts = append(statsParts, fmt.Sprintf("%d msgs", s.MessageCount))
+
+		// Token flow
+		statsParts = append(statsParts, fmt.Sprintf("%s→%s", formatK(s.TotalTokensIn), formatK(s.TotalTokensOut)))
+
+		// Cost estimate
+		if session != nil && session.EstCost > 0 {
+			statsParts = append(statsParts, formatCost(session.EstCost))
+		}
+
+		// Last updated
 		if session != nil && !session.UpdatedAt.IsZero() {
-			statsLine += fmt.Sprintf(" │ updated %s", session.UpdatedAt.Local().Format("01-02 15:04"))
+			statsParts = append(statsParts, session.UpdatedAt.Local().Format("Jan 02 15:04"))
 		}
-		if len(statsLine) > contentWidth {
-			statsLine = statsLine[:contentWidth-3] + "..."
+
+		statsLine := strings.Join(statsParts, " │ ")
+		// Check if we need to truncate (accounting for ANSI codes in badge)
+		if lipgloss.Width(statsLine) > contentWidth {
+			// Rebuild without badge for narrow widths
+			statsParts = statsParts[1:] // Remove badge
+			statsLine = strings.Join(statsParts, " │ ")
 		}
 		sb.WriteString(styles.Muted.Render(statsLine))
 		sb.WriteString("\n")
 	}
 
-	// Resume command
+	// Header Line 3: Resume command with copy hint
 	if session != nil {
 		resumeCmd := resumeCommand(session)
 		if resumeCmd != "" {
-			if len(resumeCmd) > contentWidth {
-				resumeCmd = resumeCmd[:contentWidth-3] + "..."
+			maxCmdLen := contentWidth - 12 // Leave room for copy hint
+			if len(resumeCmd) > maxCmdLen {
+				resumeCmd = resumeCmd[:maxCmdLen-3] + "..."
 			}
 			sb.WriteString(styles.Code.Render(resumeCmd))
+			sb.WriteString("  ")
+			sb.WriteString(styles.Subtle.Render("[Y:copy]"))
 			sb.WriteString("\n")
 		}
 	}
@@ -1518,12 +1717,25 @@ func (p *Plugin) renderConversationFlow(contentWidth, height int) []string {
 	}
 
 	var allLines []string
+	prevRole := ""
 
 	for msgIdx, msg := range p.messages {
 		// Skip user messages that are just tool results (they'll be shown inline with tool_use)
 		if p.isToolResultOnlyMessage(msg) {
 			continue
 		}
+
+		// Add subtle turn separator when role changes (user ↔ assistant)
+		if prevRole != "" && prevRole != msg.Role {
+			// Create a subtle visual break between turns
+			sepWidth := contentWidth / 3
+			if sepWidth > 20 {
+				sepWidth = 20
+			}
+			separator := strings.Repeat("─", sepWidth)
+			allLines = append(allLines, styles.Subtle.Render("  "+separator))
+		}
+		prevRole = msg.Role
 
 		// Track where this message starts
 		startLine := len(allLines)
@@ -1603,16 +1815,8 @@ func (p *Plugin) renderMessageBubble(msg adapter.Message, msgIndex int, maxWidth
 	var lines []string
 	selected := msgIndex == p.messageCursor
 
-	// Header: timestamp + role
+	// Header: timestamp + role + model badge + token flow
 	ts := msg.Timestamp.Local().Format("15:04")
-	var roleStyle lipgloss.Style
-	roleLabel := msg.Role
-	if msg.Role == "user" {
-		roleStyle = styles.StatusInProgress
-	} else {
-		roleStyle = styles.StatusStaged
-		roleLabel = "assistant"
-	}
 
 	// Cursor indicator for selected message
 	cursorPrefix := "  "
@@ -1620,23 +1824,56 @@ func (p *Plugin) renderMessageBubble(msg adapter.Message, msgIndex int, maxWidth
 		cursorPrefix = "> "
 	}
 
-	headerLine := fmt.Sprintf("%s[%s] %s", cursorPrefix, ts, roleStyle.Render(roleLabel))
-	if msg.Model != "" {
-		shortModel := modelShortName(msg.Model)
-		if shortModel != "" {
-			headerLine += styles.Muted.Render(" (" + shortModel + ")")
+	var headerLine string
+	if selected {
+		// For selected messages, use plain text (no colored backgrounds) for consistent highlighting
+		if msg.Role == "user" {
+			headerLine = fmt.Sprintf("%s[%s] you", cursorPrefix, ts)
+		} else {
+			headerLine = fmt.Sprintf("%s[%s] claude", cursorPrefix, ts)
+			// Add plain model name
+			if msg.Model != "" {
+				short := modelShortName(msg.Model)
+				if short != "" {
+					headerLine += " " + short
+				}
+			}
+			// Add plain token flow
+			if msg.InputTokens > 0 || msg.OutputTokens > 0 {
+				headerLine += " " + fmt.Sprintf("%s→%s", formatK(msg.InputTokens), formatK(msg.OutputTokens))
+			}
+		}
+	} else {
+		// For non-selected messages, use colorful styling
+		if msg.Role == "user" {
+			headerLine = fmt.Sprintf("%s[%s] %s", cursorPrefix, ts, styles.StatusInProgress.Render("you"))
+		} else {
+			headerLine = fmt.Sprintf("%s[%s] %s", cursorPrefix, ts, styles.StatusStaged.Render("claude"))
+
+			// Add colorful model badge
+			if msg.Model != "" {
+				badge := renderModelBadge(msg.Model)
+				if badge != "" {
+					headerLine += " " + badge
+				}
+			}
+
+			// Add token flow indicator
+			tokenFlow := renderTokenFlow(msg.InputTokens, msg.OutputTokens)
+			if tokenFlow != "" {
+				headerLine += " " + tokenFlow
+			}
 		}
 	}
 	lines = append(lines, headerLine)
 
-	// Render content blocks if available, otherwise fall back to Content string
+	// Render content blocks (same for selected and non-selected)
 	if len(msg.ContentBlocks) > 0 {
-		blockLines := p.renderContentBlocks(msg, maxWidth-4) // Indent content under header
+		blockLines := p.renderContentBlocks(msg, maxWidth-4)
 		for _, line := range blockLines {
-			lines = append(lines, "    "+line) // Indent
+			lines = append(lines, "    "+line)
 		}
 	} else if msg.Content != "" {
-		// Fallback: render plain content
 		contentLines := p.renderMessageContent(msg.Content, msg.ID, maxWidth-4)
 		for _, line := range contentLines {
 			lines = append(lines, "    "+line)
@@ -1734,6 +1971,7 @@ func (p *Plugin) renderMessageContent(content string, msgID string, maxWidth int
 
 // renderThinkingBlock renders a thinking block (collapsed by default).
 // Uses render cache (td-8910b218) to avoid re-rendering unchanged content.
+// Shows preview when collapsed, full content with │ prefix when expanded.
 func (p *Plugin) renderThinkingBlock(block adapter.ContentBlock, msgID string, maxWidth int) []string {
 	expanded := p.expandedThinking[msgID]
 
@@ -1745,15 +1983,43 @@ func (p *Plugin) renderThinkingBlock(block adapter.ContentBlock, msgID string, m
 
 	var lines []string
 
-	// Header with token count
-	headerText := fmt.Sprintf("[thinking] %s tokens", formatK(block.TokenCount))
-	lines = append(lines, styles.Code.Render(headerText))
+	// Light purple style for thinking blocks
+	thinkingStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#A78BFA")).
+		Italic(true)
+
+	thinkingIcon := "◈"
+	tokenStr := formatK(block.TokenCount)
 
 	if expanded {
-		// Show thinking content
-		thinkingLines := wrapText(block.Text, maxWidth-2)
+		// Expanded: show ▼ indicator and full content
+		header := fmt.Sprintf("%s thinking (%s tokens) ▼", thinkingIcon, tokenStr)
+		lines = append(lines, thinkingStyle.Render(header))
+
+		// Render thinking content with │ prefix for visual distinction
+		thinkingLines := wrapText(block.Text, maxWidth-4)
 		for _, line := range thinkingLines {
-			lines = append(lines, styles.Muted.Render("  "+line))
+			lines = append(lines, styles.Muted.Render("  │ "+line))
+		}
+	} else {
+		// Collapsed: show ▶ indicator and preview
+		preview := block.Text
+		// Clean up preview (remove newlines, collapse spaces)
+		preview = strings.ReplaceAll(preview, "\n", " ")
+		preview = strings.Join(strings.Fields(preview), " ")
+
+		// Truncate preview to fit
+		maxPreviewLen := 60
+		if len(preview) > maxPreviewLen {
+			preview = preview[:maxPreviewLen-3] + "..."
+		}
+
+		header := fmt.Sprintf("%s thinking (%s tokens) ▶", thinkingIcon, tokenStr)
+		if preview != "" {
+			// Add preview in subtle style
+			lines = append(lines, thinkingStyle.Render(header)+" "+styles.Subtle.Render(preview))
+		} else {
+			lines = append(lines, thinkingStyle.Render(header))
 		}
 	}
 
@@ -1766,8 +2032,28 @@ func (p *Plugin) renderThinkingBlock(block adapter.ContentBlock, msgID string, m
 func (p *Plugin) renderToolUseBlock(block adapter.ContentBlock, maxWidth int) []string {
 	var lines []string
 
-	// Tool header: name and command/file path if available
-	toolHeader := "⚙ " + block.ToolName
+	// Tool-specific icons for visual distinction
+	icon := "⚙"
+	toolName := block.ToolName
+	switch strings.ToLower(toolName) {
+	case "read":
+		icon = "◉" // Filled circle for read
+	case "edit", "str_replace_editor":
+		icon = "◈" // Diamond for edit
+	case "write":
+		icon = "◇" // Empty diamond for write (new file)
+	case "bash", "shell":
+		icon = "$" // Shell prompt
+	case "glob", "grep", "search":
+		icon = "⊙" // Target/search symbol
+	case "list", "ls":
+		icon = "▤" // List symbol
+	case "todoread", "todowrite":
+		icon = "☐" // Checkbox for tasks
+	}
+
+	// Build tool header with icon and name
+	toolHeader := icon + " " + toolName
 
 	// Try to extract a meaningful command preview
 	cmdPreview := extractToolCommand(block.ToolName, block.ToolInput, maxWidth-len(toolHeader)-5)
@@ -1787,14 +2073,15 @@ func (p *Plugin) renderToolUseBlock(block adapter.ContentBlock, maxWidth int) []
 
 	expanded := p.expandedToolResults[block.ToolUseID]
 
-	// Error indicator
+	// Style based on error state
 	if block.IsError {
-		toolHeader = styles.StatusUntracked.Render(toolHeader + " [error]")
+		// Red styling for errors with ✗ indicator
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#F87171")) // Light red
+		lines = append(lines, errorStyle.Render("✗ "+toolHeader[2:])) // Replace icon with ✗
 	} else {
-		toolHeader = styles.Code.Render(toolHeader)
+		lines = append(lines, styles.Code.Render(toolHeader))
 	}
-
-	lines = append(lines, toolHeader)
 
 	// Show result if expanded or if there's an error
 	if block.ToolOutput != "" && (expanded || block.IsError) {

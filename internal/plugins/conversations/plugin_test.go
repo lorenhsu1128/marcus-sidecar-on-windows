@@ -1939,12 +1939,13 @@ func TestRenderConversationFlowSkipsToolResultOnly(t *testing.T) {
 	}
 
 	// The content should contain user and assistant messages but not the tool result
+	// Note: "user" renders as "you" and "assistant" renders as "claude"
 	content := strings.Join(lines, "\n")
-	if !containsSubstring(content, "user") {
-		t.Error("expected 'user' role in output")
+	if !containsSubstring(content, "you") {
+		t.Error("expected 'you' role label in output")
 	}
-	if !containsSubstring(content, "assistant") {
-		t.Error("expected 'assistant' role in output")
+	if !containsSubstring(content, "claude") {
+		t.Error("expected 'claude' role label in output")
 	}
 }
 
@@ -2009,10 +2010,10 @@ func TestRenderMessageBubbleUserRole(t *testing.T) {
 		t.Fatal("expected at least 1 line")
 	}
 
-	// First line should contain timestamp and role
+	// First line should contain timestamp and role label "you"
 	header := lines[0]
-	if !containsSubstring(header, "user") {
-		t.Errorf("expected header to contain 'user', got %q", header)
+	if !containsSubstring(header, "you") {
+		t.Errorf("expected header to contain 'you', got %q", header)
 	}
 	if !containsSubstring(header, ":") {
 		t.Errorf("expected header to contain timestamp with ':', got %q", header)
@@ -2043,10 +2044,11 @@ func TestRenderMessageBubbleAssistantRole(t *testing.T) {
 	}
 
 	header := lines[0]
-	if !containsSubstring(header, "assistant") {
-		t.Errorf("expected header to contain 'assistant', got %q", header)
+	// Role label should be "claude" not "assistant"
+	if !containsSubstring(header, "claude") {
+		t.Errorf("expected header to contain 'claude', got %q", header)
 	}
-	// Model short name should be included
+	// Model short name should be included (as a colored badge)
 	if !containsSubstring(header, "sonnet") {
 		t.Errorf("expected header to contain model short name 'sonnet', got %q", header)
 	}
@@ -2378,9 +2380,9 @@ func TestRenderToolUseBlockError(t *testing.T) {
 	lines := p.renderToolUseBlock(block, 60)
 
 	content := strings.Join(lines, "\n")
-	// Errors should show the error indicator
-	if !containsSubstring(content, "error") {
-		t.Error("expected 'error' indicator for failed tool")
+	// Errors should show the ✗ error indicator
+	if !containsSubstring(content, "✗") {
+		t.Error("expected '✗' error indicator for failed tool")
 	}
 	// Errors should auto-expand to show output
 	if !containsSubstring(content, "command not found") {
@@ -2588,6 +2590,13 @@ func TestExtractToolCommand(t *testing.T) {
 		{"Glob", `{"pattern":"**/*.go"}`, 50, "**/*.go"},
 		{"Grep", `{"pattern":"TODO"}`, 50, "TODO"},
 		{"Read", `{"file_path":"/path/file.txt"}`, 50, "/path/file.txt"},
+		{"Read", `{"path":"/some/file.go"}`, 50, "/some/file.go"},
+		// Task tool with array input containing text
+		{"Task", `[{"text":"Perfect! Now I have a comprehensive understanding"}]`, 50, "Perfect! Now I have a comprehensive understanding"},
+		{"Task", `[{"text":"Very long text that needs to be truncated"}]`, 20, "Very long text th..."},
+		// Fallback text extraction for unknown tools
+		{"Unknown", `{"text":"Some message content"}`, 50, "Some message content"},
+		{"Unknown", `{"content":"Task description"}`, 50, "Task description"},
 		{"Unknown", `{"something":"else"}`, 50, ""},
 	}
 
@@ -2903,5 +2912,54 @@ func TestSidebarRestoreInitialization(t *testing.T) {
 
 	if p.sidebarRestore != PaneSidebar {
 		t.Errorf("sidebarRestore should default to PaneSidebar, got %d", p.sidebarRestore)
+	}
+}
+
+// TestStripANSIBackground verifies background color stripping for selection highlighting.
+func TestStripANSIBackground(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "basic background code 40-47",
+			input:    "\x1b[41mred bg\x1b[0m",
+			expected: "red bg\x1b[0m",
+		},
+		{
+			name:     "256-color background",
+			input:    "\x1b[48;5;196mred 256\x1b[0m",
+			expected: "red 256\x1b[0m",
+		},
+		{
+			name:     "true color background",
+			input:    "\x1b[48;2;255;0;0mtrue red\x1b[0m",
+			expected: "true red\x1b[0m",
+		},
+		{
+			name:     "preserves foreground colors",
+			input:    "\x1b[31m\x1b[44mred on blue\x1b[0m",
+			expected: "\x1b[31mred on blue\x1b[0m",
+		},
+		{
+			name:     "multiple backgrounds stripped",
+			input:    "\x1b[41mone\x1b[42mtwo\x1b[48;5;100mthree\x1b[0m",
+			expected: "onetwothree\x1b[0m",
+		},
+		{
+			name:     "no ANSI codes unchanged",
+			input:    "plain text",
+			expected: "plain text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripANSIBackground(tt.input)
+			if result != tt.expected {
+				t.Errorf("stripANSIBackground(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }
