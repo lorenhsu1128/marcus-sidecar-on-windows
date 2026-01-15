@@ -481,6 +481,22 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 
 		return p, tea.Batch(cmds...)
 
+	case OpenSessionReturnedMsg:
+		// After returning from external session, re-enable mouse and refresh
+		cmds := []tea.Cmd{
+			func() tea.Msg { return tea.EnableMouseAllMotion() },
+			p.loadSessions(), // Refresh sessions in case something changed
+		}
+		if p.selectedSession != "" {
+			cmds = append(cmds, p.loadMessages(p.selectedSession))
+		}
+		if msg.Err != nil {
+			cmds = append(cmds, func() tea.Msg {
+				return app.ToastMsg{Message: "Session exited: " + msg.Err.Error(), Duration: 2 * time.Second, IsError: true}
+			})
+		}
+		return p, tea.Batch(cmds...)
+
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
 		p.height = msg.Height
@@ -686,6 +702,10 @@ func (p *Plugin) updateSessions(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	case "Y":
 		// Yank resume command to clipboard
 		return p, p.yankResumeCommand()
+
+	case "o":
+		// Open session in Claude Code terminal
+		return p, p.openInClaudeCode()
 	}
 
 	return p, nil
@@ -1214,6 +1234,10 @@ func (p *Plugin) updateMessages(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	case "Y":
 		// Yank resume command to clipboard
 		return p, p.yankResumeCommand()
+
+	case "o":
+		// Open session in Claude Code terminal
+		return p, p.openInClaudeCode()
 	}
 
 	return p, nil
@@ -1346,8 +1370,9 @@ func (p *Plugin) Commands() []plugin.Command {
 			{ID: "detail", Name: "Detail", Description: "View turn details", Category: plugin.CategoryView, Context: "conversations-main", Priority: 2},
 			{ID: "expand", Name: "Expand", Description: "Expand selected item", Category: plugin.CategoryView, Context: "conversations-main", Priority: 3},
 			{ID: "back", Name: "Back", Description: "Return to sidebar", Category: plugin.CategoryNavigation, Context: "conversations-main", Priority: 4},
-			{ID: "yank", Name: "Yank", Description: "Yank turn content", Category: plugin.CategoryActions, Context: "conversations-main", Priority: 5},
-			{ID: "toggle-sidebar", Name: "Panel", Description: "Toggle sidebar visibility", Category: plugin.CategoryView, Context: "conversations-main", Priority: 6},
+			{ID: "open", Name: "Open", Description: "Open in CLI", Category: plugin.CategoryActions, Context: "conversations-main", Priority: 5},
+			{ID: "yank", Name: "Yank", Description: "Yank turn content", Category: plugin.CategoryActions, Context: "conversations-main", Priority: 6},
+			{ID: "toggle-sidebar", Name: "Panel", Description: "Toggle sidebar visibility", Category: plugin.CategoryView, Context: "conversations-main", Priority: 7},
 		}
 	}
 	if p.view == ViewAnalytics {
@@ -1359,9 +1384,10 @@ func (p *Plugin) Commands() []plugin.Command {
 		{ID: "view-session", Name: "View", Description: "View session messages", Category: plugin.CategoryView, Context: "conversations-sidebar", Priority: 1},
 		{ID: "search", Name: "Search", Description: "Search conversations", Category: plugin.CategorySearch, Context: "conversations-sidebar", Priority: 2},
 		{ID: "filter", Name: "Filter", Description: "Filter by project", Category: plugin.CategorySearch, Context: "conversations-sidebar", Priority: 2},
-		{ID: "yank", Name: "Yank", Description: "Yank session details", Category: plugin.CategoryActions, Context: "conversations-sidebar", Priority: 3},
-		{ID: "yank-resume", Name: "Resume", Description: "Yank resume command", Category: plugin.CategoryActions, Context: "conversations-sidebar", Priority: 3},
-		{ID: "toggle-sidebar", Name: "Panel", Description: "Toggle sidebar visibility", Category: plugin.CategoryView, Context: "conversations-sidebar", Priority: 4},
+		{ID: "open", Name: "Open", Description: "Open in CLI", Category: plugin.CategoryActions, Context: "conversations-sidebar", Priority: 3},
+		{ID: "yank", Name: "Yank", Description: "Yank session details", Category: plugin.CategoryActions, Context: "conversations-sidebar", Priority: 4},
+		{ID: "yank-resume", Name: "Resume", Description: "Yank resume command", Category: plugin.CategoryActions, Context: "conversations-sidebar", Priority: 4},
+		{ID: "toggle-sidebar", Name: "Panel", Description: "Toggle sidebar visibility", Category: plugin.CategoryView, Context: "conversations-sidebar", Priority: 5},
 	}
 }
 
