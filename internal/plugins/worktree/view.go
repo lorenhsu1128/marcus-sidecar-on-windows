@@ -1801,11 +1801,11 @@ func (p *Plugin) renderKanbanCardLine(wt *Worktree, lineIdx, width int, isSelect
 
 	switch lineIdx {
 	case 0:
-		// Line 0: Status icon + name
+		// Line 0: Status icon + name (rune-safe for Unicode)
 		name := wt.Name
 		maxNameLen := width - 3 // Account for icon and space
-		if len(name) > maxNameLen {
-			name = name[:maxNameLen-3] + "..."
+		if runes := []rune(name); len(runes) > maxNameLen {
+			name = string(runes[:maxNameLen-3]) + "..."
 		}
 		content = fmt.Sprintf(" %s %s", wt.Status.Icon(), name)
 	case 1:
@@ -1818,12 +1818,12 @@ func (p *Plugin) renderKanbanCardLine(wt *Worktree, lineIdx, width int, isSelect
 		}
 		content = agentStr
 	case 2:
-		// Line 2: Task ID
+		// Line 2: Task ID (rune-safe for Unicode)
 		if wt.TaskID != "" {
 			taskStr := wt.TaskID
 			maxLen := width - 2
-			if len(taskStr) > maxLen {
-				taskStr = taskStr[:maxLen-3] + "..."
+			if runes := []rune(taskStr); len(runes) > maxLen {
+				taskStr = string(runes[:maxLen-3]) + "..."
 			}
 			content = "  " + taskStr
 		}

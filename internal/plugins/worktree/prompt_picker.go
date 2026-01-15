@@ -188,14 +188,14 @@ func (pp *PromptPicker) View() string {
 		// Ticket mode
 		ticket := string(p.TicketMode)
 
-		// Preview (truncate)
+		// Preview (truncate, rune-safe for Unicode)
 		preview := strings.ReplaceAll(p.Body, "\n", " ")
 		maxPreview := pp.width - 50
 		if maxPreview < 10 {
 			maxPreview = 10
 		}
-		if len(preview) > maxPreview {
-			preview = preview[:maxPreview-3] + "..."
+		if runes := []rune(preview); len(runes) > maxPreview {
+			preview = string(runes[:maxPreview-3]) + "..."
 		}
 
 		line := fmt.Sprintf("%s%-24s %-7s %-10s %s", prefix, truncateString(p.Name, 24), scope, ticket, preview)
