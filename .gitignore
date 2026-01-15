@@ -49,3 +49,6 @@ config.local.json
 .sidecar-agent
 .sidecar-task
 .td-root
+
+# Sidecar worktree state files
+.sidecar-pr

@@ -144,7 +144,8 @@ func (pp *PromptPicker) View() string {
 	}
 
 	// Filter input
-	sb.WriteString("Filter: ")
+	sb.WriteString("Filter:")
+	sb.WriteString("\n")
 	filterStyle := inputStyle.Width(30)
 	sb.WriteString(filterStyle.Render(pp.filterInput.View()))
 	sb.WriteString("\n\n")

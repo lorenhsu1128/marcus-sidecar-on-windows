@@ -2,6 +2,23 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.17.0] - 2026-01-15
+
+### Features
+- **Worktree prompts**: Create worktrees with custom prompts attached
+- **Auto-generated default prompts**: New users get starter prompts automatically
+- **PR indicator**: Worktrees with open PRs now show visual indicator
+- **Inline tmux guide**: Tmux setup instructions integrated into worktree view
+- **Better waiting/paused visibility**: Clearer distinction between waiting and paused states in worktrees
+
+### Bug Fixes
+- Fixed 20+ Unicode byte-slicing bugs in UI string truncation across multiple components
+- Fixed empty prompt picker UI display
+- Added prompt creation guide for new users
+
+### Dependencies
+- Updated embedded td to v0.12.3 (from v0.12.2)
+
 ## [v0.16.3] - 2026-01-14
 
 ### Improvements
