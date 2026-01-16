@@ -103,8 +103,11 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      // Replace with your project's social card
-      image: 'img/docusaurus-social-card.jpg',
+      image: 'img/sidecar-social-card.jpg',
+      metadata: [
+        {name: 'twitter:card', content: 'summary_large_image'},
+        {name: 'twitter:image:alt', content: 'Sidecar - Run your AI coding team from one terminal'},
+      ],
       colorMode: {
         defaultMode: 'dark',
         disableSwitch: true,

@@ -245,14 +245,51 @@ The site deploys automatically via GitHub Actions when changes to `website/` are
 
 ## Style Guidelines
 
-**No emoji**: Do not use emoji in the site content, components, or documentation. Use icon fonts (Lucide) for visual indicators instead.
+### No Emoji Policy
 
-**Icons**: The site uses [Lucide](https://lucide.dev) icon font. Use CSS classes like `icon-copy`, `icon-check`, `icon-arrow-right`. Example:
+**Never use emoji** in the site content, components, or documentation. This includes:
+- React components (use Lucide icons instead)
+- Markdown documentation
+- Blog posts
+- Code examples
+- Comments
+
+Emoji render inconsistently across platforms and don't match the terminal aesthetic. Always use Lucide icon font for visual indicators.
+
+### Icons (Lucide)
+
+The site uses [Lucide](https://lucide.dev) icon font (imported via CDN in `docusaurus.config.js`).
+
+**Usage in JSX:**
 ```jsx
 <i className="icon-copy" />
+<i className="icon-check" />
+<i className="icon-terminal" />
 ```
 
-**Terminal aesthetic**: Maintain the TUI/terminal visual style. Use monospace fonts, muted colors with bright accents, and clean 1px borders.
+**Common icons for this project:**
+- `icon-eye` - monitoring, viewing
+- `icon-terminal` - terminal, CLI
+- `icon-rocket` - launch, speed
+- `icon-check` - success, done
+- `icon-copy` - clipboard copy
+- `icon-external-link` - external links
+- `icon-git-branch` - git operations
+- `icon-zap` - fast, instant
+- `icon-keyboard` - keyboard shortcuts
+- `icon-layers` - multiple items
+- `icon-code` - code, programming
+
+**Browse all icons:** https://lucide.dev/icons
+
+### Terminal Aesthetic
+
+Maintain the TUI/terminal visual style:
+- Monospace fonts (`JetBrains Mono`, `Google Sans Code`)
+- Dark backgrounds with muted colors
+- Bright accents for highlights (green, blue, pink, yellow from the Monokai palette)
+- Clean 1px borders
+- Subtle gradients and glows
 
 ## Common Tasks
 

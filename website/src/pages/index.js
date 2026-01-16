@@ -656,17 +656,16 @@ export default function Home() {
 
   return (
     <Layout
-      title="Terminal UI for AI coding sessions"
-      description="Sidecar is a unified terminal interface for monitoring AI coding agent sessions: tasks, git status, files, conversations."
+      title="Run your AI coding team from one terminal"
+      description="Sidecar lets you orchestrate AI coding agents from a single terminal: assign tasks, monitor progress, review work, and ship code in parallel."
     >
       <header className="sc-hero">
         <div className="container">
           <div className="sc-heroInner">
             <div>
               <h1 className="sc-title">
-                Sidecar
-                <span className="sc-lineDim"> | </span>
-                a terminal cockpit for AI coding
+                <span className="sc-titleBrand">Sidecar</span>
+                <span className="sc-titleTagline">Run your AI coding team from one terminal</span>
               </h1>
 
               <p className="sc-subtitle">
@@ -674,7 +673,7 @@ export default function Home() {
                 and conversation history--designed for the "split the terminal and ship" workflow.
               </p>
 
-              <div style={{ height: 24 }} />
+              <div style={{ height: 32 }} />
 
               <div className="sc-actions">
                 <Link className="sc-btn sc-btnPrimary" to="/docs/intro">
@@ -688,7 +687,7 @@ export default function Home() {
                 </a>
               </div>
 
-              <div style={{ height: 14 }} />
+              <div style={{ height: 28 }} />
 
               <div className="sc-codeBlock sc-installBlock" aria-label="Quick install snippet">
                 <div className="sc-installHeader">

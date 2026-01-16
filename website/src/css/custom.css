@@ -1,5 +1,5 @@
 /* External fonts - @import must be at top */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import url('https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css');
 
 /**
@@ -23,10 +23,17 @@
   --ifm-font-color-secondary: rgba(232, 232, 227, 0.78);
 
   --ifm-code-font-size: 92%;
-  /* Primary: Google Sans Code (self-host if needed), Secondary: JetBrains Mono */
-  --ifm-font-family-base: "Google Sans Code", "JetBrains Mono", ui-monospace,
-    SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  --ifm-heading-font-family: var(--ifm-font-family-base);
+
+  /* Body text: Inter for readability */
+  --ifm-font-family-base: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Headings: Monospace for terminal aesthetic */
+  --ifm-heading-font-family: "JetBrains Mono", "Google Sans Code", ui-monospace,
+    SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Code blocks and terminal elements */
+  --ifm-font-family-monospace: "JetBrains Mono", "Google Sans Code", ui-monospace,
+    SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Sidecar-ish accents */
   --sc-pink: #f92672;
@@ -108,7 +115,7 @@ a:hover {
 
 .sc-hero {
   position: relative;
-  padding: 56px 0 22px;
+  padding: 64px 0 40px;
   overflow: hidden;
 }
 
@@ -155,13 +162,26 @@ a:hover {
 
 .sc-title {
   font-size: clamp(34px, 4.2vw, 52px);
-  line-height: 1.03;
+  line-height: 1.1;
   letter-spacing: -0.7px;
-  margin: 0 0 12px;
+  margin: 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sc-titleBrand {
+  color: var(--ifm-color-primary);
+}
+
+.sc-titleTagline {
+  font-size: clamp(18px, 2.2vw, 24px);
+  color: var(--ifm-font-color-secondary);
+  letter-spacing: -0.3px;
 }
 
 .sc-subtitle {
-  margin: 0 0 18px;
+  margin: 0 0 24px;
   font-size: 15px;
   line-height: 1.55;
   color: var(--ifm-font-color-secondary);
@@ -236,6 +256,7 @@ a:hover {
   border: 1px solid var(--sc-border);
   box-shadow: var(--sc-shadow);
   overflow: hidden;
+  font-family: var(--ifm-font-family-monospace);
 }
 
 .sc-frameTop {
@@ -285,7 +306,7 @@ a:hover {
   color: rgba(232,232,227,0.78);
   background: rgba(0,0,0,0.15);
   cursor: pointer;
-  font-family: var(--ifm-font-family-base);
+  font-family: var(--ifm-font-family-monospace);
   transition: border-color 120ms ease, background 120ms ease;
 }
 
@@ -613,16 +634,17 @@ a:hover {
 .sc-showcaseFullWidth {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 40px;
+  max-width: var(--ifm-container-width-xl);
+  margin: 0 auto;
+  padding: 0 var(--ifm-spacing-horizontal);
 }
 
 .sc-componentSection {
   border-radius: var(--sc-radius);
   border: 1px solid var(--sc-border);
-  padding: 24px;
-  margin: 0 auto;
+  padding: 32px;
   width: 100%;
-  max-width: 1400px;
 }
 
 /* Gradient variants */
@@ -724,6 +746,7 @@ a:hover {
   background: rgba(0, 0, 0, 0.4);
   overflow: hidden;
   font-size: 13px;
+  font-family: var(--ifm-font-family-monospace);
 }
 
 .sc-mockupHeader {
