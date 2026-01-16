@@ -30,6 +30,10 @@ const config = {
   projectName: 'sidecar',
   trailingSlash: false,
 
+  customFields: {
+    githubUrl: 'https://github.com/marcus/sidecar',
+  },
+
   onBrokenLinks: 'throw',
 
   // Even if you don't use internationalization, you can use this field to set
@@ -39,6 +43,35 @@ const config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
+
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.googleapis.com',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossorigin: 'anonymous',
+      },
+    },
+  ],
+
+  stylesheets: [
+    {
+      href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap',
+      type: 'text/css',
+    },
+    {
+      href: 'https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css',
+      type: 'text/css',
+    },
+  ],
 
   presets: [
     [
@@ -73,7 +106,9 @@ const config = {
       // Replace with your project's social card
       image: 'img/docusaurus-social-card.jpg',
       colorMode: {
-        respectPrefersColorScheme: true,
+        defaultMode: 'dark',
+        disableSwitch: true,
+        respectPrefersColorScheme: false,
       },
       navbar: {
         title: 'Sidecar',

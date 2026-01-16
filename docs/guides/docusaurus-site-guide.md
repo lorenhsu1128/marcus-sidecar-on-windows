@@ -243,6 +243,17 @@ The site deploys automatically via GitHub Actions when changes to `website/` are
 
 **First-time setup**: Enable GitHub Pages in repo Settings → Pages → Source: GitHub Actions
 
+## Style Guidelines
+
+**No emoji**: Do not use emoji in the site content, components, or documentation. Use icon fonts (Lucide) for visual indicators instead.
+
+**Icons**: The site uses [Lucide](https://lucide.dev) icon font. Use CSS classes like `icon-copy`, `icon-check`, `icon-arrow-right`. Example:
+```jsx
+<i className="icon-copy" />
+```
+
+**Terminal aesthetic**: Maintain the TUI/terminal visual style. Use monospace fonts, muted colors with bright accents, and clean 1px borders.
+
 ## Common Tasks
 
 ### Add a new docs section
