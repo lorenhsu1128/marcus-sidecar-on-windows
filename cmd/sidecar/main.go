@@ -103,6 +103,7 @@ func main() {
 	pluginCtx := &plugin.Context{
 		WorkDir:   workDir,
 		ConfigDir: config.ConfigPath(),
+		Config:    cfg,
 		Adapters:  make(map[string]adapter.Adapter),
 		EventBus:  dispatcher,
 		Logger:    logger,

@@ -28,6 +28,13 @@ func TestValidateBranchName(t *testing.T) {
 		{"contains backslash", "feature\\branch", false, true},
 		{"contains double dots", "feature..branch", false, true},
 		{"contains @{", "feature@{branch", false, true},
+		// Slash tests - important for branch prefix feature
+		{"valid with single slash", "myrepo/feature", true, false},
+		{"valid with multiple slashes", "org/repo/feature", true, false},
+		{"starts with slash", "/feature", false, true},
+		{"ends with slash", "feature/", false, true},
+		{"double slash", "myrepo//feature", false, true},
+		{"slash dot", "myrepo/.feature", false, true},
 	}
 
 	for _, tt := range tests {
@@ -66,6 +73,13 @@ func TestSanitizeBranchName(t *testing.T) {
 		{"lock-with-trailing-dashes", "bar.lock--", "bar"},
 		{"lock-with-trailing-slash", "branch.lock/", "branch"},
 		{"lock-trailing-dash-multiple", "test.lock.lock-", "test"},
+		// Slash handling for branch prefix feature
+		{"preserves single slash", "myrepo/feature", "myrepo/feature"},
+		{"removes leading slash", "/feature", "feature"},
+		{"removes trailing slash", "feature/", "feature"},
+		{"collapses double slash", "myrepo//feature", "myrepo/feature"},
+		{"removes slash-dot", "myrepo/.feature", "myrepo/feature"},
+		{"spaces in path with slash", "my repo/my feature", "my-repo/my-feature"},
 	}
 
 	for _, tt := range tests {
@@ -143,6 +157,41 @@ detached
 			wantCount:   0,
 			wantNames:   nil,
 			wantBranch:  nil,
+		},
+		// Branch prefix tests - branch name has repo prefix, directory name does not
+		{
+			name: "prefixed branch name",
+			output: `worktree /home/user/project
+HEAD abc123
+branch refs/heads/main
+
+worktree /home/user/feature-auth
+HEAD def456
+branch refs/heads/project/feature-auth
+`,
+			mainWorkdir: "/home/user/project",
+			wantCount:   1,
+			wantNames:   []string{"feature-auth"},
+			wantBranch:  []string{"project/feature-auth"},
+		},
+		{
+			name: "multiple prefixed branches",
+			output: `worktree /home/user/sidecar
+HEAD abc123
+branch refs/heads/main
+
+worktree /home/user/fix-bug
+HEAD def456
+branch refs/heads/sidecar/fix-bug
+
+worktree /home/user/add-feature
+HEAD ghi789
+branch refs/heads/sidecar/add-feature
+`,
+			mainWorkdir: "/home/user/sidecar",
+			wantCount:   2,
+			wantNames:   []string{"fix-bug", "add-feature"},
+			wantBranch:  []string{"sidecar/fix-bug", "sidecar/add-feature"},
 		},
 	}
 

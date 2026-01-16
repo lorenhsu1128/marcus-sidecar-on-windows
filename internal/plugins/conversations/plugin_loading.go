@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -68,8 +69,13 @@ func (p *Plugin) loadSessions() tea.Cmd {
 					continue
 				}
 
-				// Get worktree name for sessions from this path
+				// Get worktree name: prefer git branch name, fall back to directory name
 				wtName := app.WorktreeNameForPath(p.ctx.WorkDir, wtPath)
+				if wtName == "" && wtPath != currentPath {
+					// For deleted worktrees, derive name from directory
+					// Directory format: {repo}-{name} (e.g., myrepo-feature-auth)
+					wtName = deriveWorktreeNameFromPath(wtPath, mainPath)
+				}
 
 				for i := range adapterSessions {
 					// Skip duplicates
@@ -261,4 +267,23 @@ func shortID(id string) string {
 		return id[:8]
 	}
 	return id
+}
+
+// deriveWorktreeNameFromPath extracts the worktree name from a directory path.
+// For paths like '/Users/foo/code/myrepo-feature-auth' with main repo 'myrepo',
+// returns 'feature-auth'. This is used for deleted worktrees where git no longer
+// has branch information.
+func deriveWorktreeNameFromPath(wtPath, mainPath string) string {
+	dirName := filepath.Base(wtPath)
+	repoName := filepath.Base(mainPath)
+
+	// If directory starts with repo name + hyphen, strip it
+	// This handles the {repo}-{name} naming convention
+	prefix := repoName + "-"
+	if strings.HasPrefix(dirName, prefix) {
+		return strings.TrimPrefix(dirName, prefix)
+	}
+
+	// Fallback: just use directory name
+	return dirName
 }

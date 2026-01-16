@@ -104,30 +104,6 @@ func GetMainWorktreePath(workDir string) string {
 	return ""
 }
 
-// GetWorktreeName returns the worktree name for display (branch name or directory name).
-// Returns empty string if workDir is not in a worktree or is the main worktree.
-func GetWorktreeName(workDir string) string {
-	cleanPath, err := normalizePath(workDir)
-	if err != nil {
-		return ""
-	}
-
-	worktrees := GetWorktrees(workDir)
-	for _, wt := range worktrees {
-		normalizedWtPath, err := normalizePath(wt.Path)
-		if err != nil {
-			continue
-		}
-		if normalizedWtPath == cleanPath && !wt.IsMain {
-			if wt.Branch != "" {
-				return wt.Branch
-			}
-			return filepath.Base(wt.Path)
-		}
-	}
-	return ""
-}
-
 // GetAllRelatedPaths returns all paths that share the same git repository:
 // the main worktree and all linked worktrees. Each path is absolute.
 // Returns nil if workDir is not in a git repository.
@@ -142,26 +118,6 @@ func GetAllRelatedPaths(workDir string) []string {
 		paths = append(paths, wt.Path)
 	}
 	return paths
-}
-
-// IsWorktree returns true if workDir is a linked worktree (not the main worktree).
-func IsWorktree(workDir string) bool {
-	cleanPath, err := normalizePath(workDir)
-	if err != nil {
-		return false
-	}
-
-	worktrees := GetWorktrees(workDir)
-	for _, wt := range worktrees {
-		normalizedWtPath, err := normalizePath(wt.Path)
-		if err != nil {
-			continue
-		}
-		if normalizedWtPath == cleanPath {
-			return !wt.IsMain
-		}
-	}
-	return false
 }
 
 // WorktreeNameForPath returns the worktree name for a given absolute path.

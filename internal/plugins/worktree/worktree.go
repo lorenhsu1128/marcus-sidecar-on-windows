@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/marcus/sidecar/internal/app"
 )
 
 // refreshWorktrees returns a command to refresh the worktree list.
@@ -108,11 +109,23 @@ func (p *Plugin) doCreateWorktree(name, baseBranch, taskID string, agentType Age
 		baseBranch = "HEAD"
 	}
 
+	// Determine worktree directory name with optional repo prefix
+	// When enabled, prefixes directory with repo name (e.g., "myrepo-feature-auth")
+	// This helps conversation adapters discover related worktree conversations
+	// by matching the directory path pattern after worktree deletion
+	dirName := name
+	if p.ctx.Config != nil && p.ctx.Config.Plugins.Worktree.DirPrefix {
+		repoName := app.GetRepoName(p.ctx.WorkDir)
+		if repoName != "" {
+			dirName = repoName + "-" + name
+		}
+	}
+
 	// Determine worktree path (sibling to main repo)
 	parentDir := filepath.Dir(p.ctx.WorkDir)
-	wtPath := filepath.Join(parentDir, name)
+	wtPath := filepath.Join(parentDir, dirName)
 
-	// Create worktree with new branch
+	// Create worktree with new branch (branch name stays simple, just the user-provided name)
 	args := []string{"worktree", "add", "-b", name, wtPath, baseBranch}
 	cmd := exec.Command("git", args...)
 	cmd.Dir = p.ctx.WorkDir
@@ -150,7 +163,7 @@ func (p *Plugin) doCreateWorktree(name, baseBranch, taskID string, agentType Age
 	}
 
 	wt := &Worktree{
-		Name:            name,
+		Name:            dirName,
 		Path:            wtPath,
 		Branch:          name,
 		BaseBranch:      actualBase,
@@ -543,12 +556,15 @@ func ValidateBranchName(name string) (bool, []string, string) {
 		}
 	}
 
-	// Cannot start with dash or dot
+	// Cannot start with dash, dot, or slash
 	if strings.HasPrefix(name, "-") {
 		errors = append(errors, "starts with '-'")
 	}
 	if strings.HasPrefix(name, ".") {
 		errors = append(errors, "starts with '.'")
+	}
+	if strings.HasPrefix(name, "/") {
+		errors = append(errors, "starts with '/'")
 	}
 
 	// Cannot end with .lock
@@ -621,8 +637,8 @@ func SanitizeBranchName(name string) string {
 	}
 	result = cleaned.String()
 
-	// Remove leading dashes and dots
-	for len(result) > 0 && (result[0] == '-' || result[0] == '.') {
+	// Remove leading dashes, dots, and slashes
+	for len(result) > 0 && (result[0] == '-' || result[0] == '.' || result[0] == '/') {
 		result = result[1:]
 	}
 

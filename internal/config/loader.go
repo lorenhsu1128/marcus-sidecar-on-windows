@@ -30,6 +30,11 @@ type rawPluginsConfig struct {
 	GitStatus     rawGitStatusConfig     `json:"git-status"`
 	TDMonitor     rawTDMonitorConfig     `json:"td-monitor"`
 	Conversations rawConversationsConfig `json:"conversations"`
+	Worktree      rawWorktreeConfig      `json:"worktree"`
+}
+
+type rawWorktreeConfig struct {
+	DirPrefix *bool `json:"dirPrefix"`
 }
 
 type rawGitStatusConfig struct {
@@ -132,6 +137,11 @@ func mergeConfig(cfg *Config, raw *rawConfig) {
 	}
 	if raw.Plugins.Conversations.ClaudeDataDir != "" {
 		cfg.Plugins.Conversations.ClaudeDataDir = raw.Plugins.Conversations.ClaudeDataDir
+	}
+
+	// Worktree
+	if raw.Plugins.Worktree.DirPrefix != nil {
+		cfg.Plugins.Worktree.DirPrefix = *raw.Plugins.Worktree.DirPrefix
 	}
 
 	// Keymap

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/config"
 	"github.com/marcus/sidecar/internal/event"
 )
 
@@ -17,6 +18,7 @@ type BindingRegistrar interface {
 type Context struct {
 	WorkDir   string
 	ConfigDir string
+	Config    *config.Config
 	Adapters  map[string]adapter.Adapter
 	EventBus  *event.Dispatcher
 	Logger    *slog.Logger
