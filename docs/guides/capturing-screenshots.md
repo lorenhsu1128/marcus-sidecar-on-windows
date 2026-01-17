@@ -32,8 +32,10 @@ This starts sidecar in a detached tmux session sized to your current terminal.
 Or directly: `tmux attach -t sidecar-screenshot`
 
 Once attached:
-1. Navigate to the desired view using keyboard shortcuts (1-5 for plugins, j/k for navigation)
-2. Detach from tmux with `Ctrl+B D` (or `Ctrl+A D` if your prefix is Ctrl+A)
+1. Navigate to screens using number keys: **1=TD, 2=Git, 3=Files, 4=Conversations, 5=Worktrees**
+2. Within a screen, use **j/k** (or arrow keys) to navigate up/down
+3. Press **Enter** or **Space** to interact with items
+4. Detach from tmux with **Ctrl+A D** (the tmux prefix in this session is Ctrl+A)
 
 ### Step 3: Capture the screenshot
 
@@ -66,12 +68,23 @@ Repeat steps 2-3 for additional screenshots, then:
 For AI agents, run `tmux attach -t sidecar-screenshot` in **interact mode** to navigate. The workflow:
 
 1. `./scripts/tmux-screenshot.sh start`
-2. `tmux attach -t sidecar-screenshot` → navigate with keys (1-5 for plugins) → Ctrl+A D to detach
+2. `tmux attach -t sidecar-screenshot` → Press a screen number (1-5) to navigate → Ctrl+A D to detach
 3. `./scripts/tmux-screenshot.sh capture sidecar-{plugin}`
 4. Repeat 2-3 for each plugin
 5. `./scripts/tmux-screenshot.sh stop`
 
-**Plugin keys:** 1=TD, 2=Git, 3=Files, 4=Conversations, 5=Worktrees
+**Screen navigation keys:**
+- **1** = TD (task management)
+- **2** = Git
+- **3** = Files (file browser)
+- **4** = Conversations
+- **5** = Worktrees
+
+**Within a screen:**
+- **j/k** or arrow keys = navigate items
+- **Enter/Space** = interact with selected item
+
+**Important for agents:** The tmux prefix is **Ctrl+A** (not Ctrl+B). Always use **Ctrl+A D** to detach from the tmux session.
 
 ## Why Interactive?
 

@@ -67,9 +67,10 @@ capture_screenshot() {
     # Capture with ANSI codes
     tmux capture-pane -t "$SESSION_NAME" -e -p > "$txt_file"
     
-    # Convert to HTML
+    # Convert to HTML and remove .txt if successful
     if command -v aha &>/dev/null; then
         cat "$txt_file" | aha --black > "$html_file"
+        rm -f "$txt_file"
         echo "Captured: $html_file"
     else
         echo "Captured: $txt_file"
