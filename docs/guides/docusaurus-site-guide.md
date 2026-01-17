@@ -17,7 +17,9 @@ The dev server hot-reloads on file changes.
 ```
 website/
 ├── docs/                    # Markdown documentation pages
-│   └── intro.md            # Main docs entry point
+│   ├── intro.md            # Getting Started (sidebar_position: 1)
+│   ├── td.md               # TD task manager docs (sidebar_position: 2)
+│   └── git-plugin.md       # Git plugin docs (sidebar_position: 3)
 ├── blog/                    # Blog posts (date-prefixed markdown)
 │   ├── authors.yml         # Blog author definitions
 │   └── tags.yml            # Blog tag definitions
