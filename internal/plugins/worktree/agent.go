@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -54,9 +55,11 @@ func (c *paneCache) setAll(outputs map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := time.Now()
-	// Clear old entries to prevent memory growth from stale sessions
+	// Remove stale entries not in the new batch (prevents memory growth)
 	for k := range c.entries {
-		delete(c.entries, k)
+		if _, exists := outputs[k]; !exists {
+			delete(c.entries, k)
+		}
 	}
 	for session, output := range outputs {
 		c.entries[session] = paneCacheEntry{output: output, timestamp: now}
@@ -93,6 +96,14 @@ const (
 
 	// Poll staggering to prevent simultaneous subprocess spawns
 	pollStaggerMax = 400 * time.Millisecond // Max stagger offset based on worktree name hash
+
+	// Status detection window - chars from end to check for status patterns
+	// ~10 lines of 150 chars each = 1500, but we use 2048 for UTF-8 safety margin
+	statusCheckBytes = 2048
+
+	// Prompt extraction window - chars from end to search for prompts
+	// ~15 lines of 150 chars each = 2250, but we use 2560 for UTF-8 safety margin
+	promptCheckBytes = 2560
 )
 
 // AgentStartedMsg signals an agent has been started in a worktree.
@@ -603,15 +614,29 @@ done
 	return results, nil
 }
 
+// tailUTF8Safe returns the last n bytes of s, adjusted to not split UTF-8 chars.
+// If the slice would split a multi-byte character, it advances to the next valid
+// UTF-8 boundary (returning slightly fewer than n bytes).
+func tailUTF8Safe(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	start := len(s) - n
+	// Advance to next valid UTF-8 start byte (max 3 bytes forward for 4-byte chars)
+	for i := 0; i < 3 && start < len(s); i++ {
+		if utf8.RuneStart(s[start]) {
+			break
+		}
+		start++
+	}
+	return s[start:]
+}
+
 // detectStatus determines agent status from captured output.
 // Optimized to avoid unnecessary string allocations.
 func detectStatus(output string) WorktreeStatus {
-	// Find the last ~1500 chars (approx 10 lines of 150 chars each)
-	// This avoids splitting the entire output string.
-	checkText := output
-	if len(output) > 1500 {
-		checkText = output[len(output)-1500:]
-	}
+	// Check tail of output for status patterns (avoids splitting entire string)
+	checkText := tailUTF8Safe(output, statusCheckBytes)
 	textLower := strings.ToLower(checkText)
 
 	// Waiting patterns (agent needs user input) - highest priority
@@ -674,11 +699,8 @@ func detectStatus(output string) WorktreeStatus {
 // extractPrompt finds the prompt text from output.
 // Optimized to search backwards without splitting the entire string.
 func extractPrompt(output string) string {
-	// Search the last ~2000 chars for prompts (approx 10-15 lines)
-	checkText := output
-	if len(output) > 2000 {
-		checkText = output[len(output)-2000:]
-	}
+	// Search tail of output for prompts (avoids splitting entire string)
+	checkText := tailUTF8Safe(output, promptCheckBytes)
 
 	// Find last newline and work backwards line by line
 	for linesChecked := 0; linesChecked < 10 && len(checkText) > 0; linesChecked++ {

@@ -267,6 +267,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if wt := p.findWorktree(msg.WorktreeName); wt != nil {
 			wt.Agent = nil
 			wt.Status = StatusPaused
+			// Clean up cache entry for stopped agent
+			globalPaneCache.remove(tmuxSessionPrefix + wt.Name)
 		}
 		delete(p.agents, msg.WorktreeName)
 		return p, nil
