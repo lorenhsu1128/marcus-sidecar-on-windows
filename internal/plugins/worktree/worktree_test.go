@@ -193,6 +193,39 @@ branch refs/heads/sidecar/add-feature
 			wantNames:   []string{"fix-bug", "add-feature"},
 			wantBranch:  []string{"sidecar/fix-bug", "sidecar/add-feature"},
 		},
+		// Nested worktree directories - when branch name contains '/' and creates nested dirs
+		{
+			name: "nested worktree directory",
+			output: `worktree /home/user/sidecar
+HEAD abc123
+branch refs/heads/main
+
+worktree /home/user/sidecar-prefix/nested-branch
+HEAD def456
+branch refs/heads/nested-branch
+`,
+			mainWorkdir: "/home/user/sidecar",
+			wantCount:   1,
+			// Name should be full relative path to match session name derivation
+			wantNames:  []string{"sidecar-prefix/nested-branch"},
+			wantBranch: []string{"nested-branch"},
+		},
+		{
+			name: "deeply nested worktree directory",
+			output: `worktree /home/user/project
+HEAD abc123
+branch refs/heads/main
+
+worktree /home/user/project-td-123/feature/auth/login
+HEAD def456
+branch refs/heads/feature/auth/login
+`,
+			mainWorkdir: "/home/user/project",
+			wantCount:   1,
+			// Full relative path from parent dir
+			wantNames:  []string{"project-td-123/feature/auth/login"},
+			wantBranch: []string{"feature/auth/login"},
+		},
 	}
 
 	for _, tt := range tests {

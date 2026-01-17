@@ -907,10 +907,11 @@ func (p *Plugin) reconnectAgents() tea.Cmd {
 				continue
 			}
 
-			worktreeName := strings.TrimPrefix(session, tmuxSessionPrefix)
+			sanitizedName := strings.TrimPrefix(session, tmuxSessionPrefix)
 
 			// Check if we have a matching worktree
-			wt := p.findWorktree(worktreeName)
+			// Use sanitized name lookup since session names are created with sanitizeName()
+			wt := p.findWorktreeBySanitizedName(sanitizedName)
 			if wt == nil {
 				// Session exists but no worktree - orphaned, skip
 				continue
@@ -931,7 +932,7 @@ func (p *Plugin) reconnectAgents() tea.Cmd {
 			p.managedSessions[session] = true
 
 			// Schedule polling via tea.Cmd
-			pollingCmds = append(pollingCmds, p.scheduleAgentPoll(worktreeName, 0))
+			pollingCmds = append(pollingCmds, p.scheduleAgentPoll(wt.Name, 0))
 		}
 
 		return reconnectedAgentsMsg{Cmds: pollingCmds}
@@ -973,8 +974,9 @@ func (p *Plugin) CleanupOrphanedSessions() error {
 		}
 
 		// Check if corresponding worktree still exists
-		worktreeName := strings.TrimPrefix(session, tmuxSessionPrefix)
-		if p.findWorktree(worktreeName) == nil {
+		// Use sanitized name lookup since session names are created with sanitizeName()
+		sanitizedName := strings.TrimPrefix(session, tmuxSessionPrefix)
+		if p.findWorktreeBySanitizedName(sanitizedName) == nil {
 			exec.Command("tmux", "kill-session", "-t", session).Run()
 			delete(p.managedSessions, session)
 		}
@@ -986,6 +988,19 @@ func (p *Plugin) CleanupOrphanedSessions() error {
 func (p *Plugin) findWorktree(name string) *Worktree {
 	for _, wt := range p.worktrees {
 		if wt.Name == name {
+			return wt
+		}
+	}
+	return nil
+}
+
+// findWorktreeBySanitizedName finds a worktree by its sanitized name.
+// This is used when matching tmux session names back to worktrees, since
+// session names are created with sanitizeName(wt.Name) which replaces
+// '.', ':', and '/' with '-'.
+func (p *Plugin) findWorktreeBySanitizedName(sanitizedName string) *Worktree {
+	for _, wt := range p.worktrees {
+		if sanitizeName(wt.Name) == sanitizedName {
 			return wt
 		}
 	}

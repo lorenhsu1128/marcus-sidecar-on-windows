@@ -39,6 +39,9 @@ func parseWorktreeList(output, mainWorkdir string) ([]*Worktree, error) {
 	var worktrees []*Worktree
 	var current *Worktree
 
+	// Parent directory of main workdir - worktrees are created as siblings
+	parentDir := filepath.Dir(mainWorkdir)
+
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -48,11 +51,17 @@ func parseWorktreeList(output, mainWorkdir string) ([]*Worktree, error) {
 				worktrees = append(worktrees, current)
 			}
 			path := strings.TrimPrefix(line, "worktree ")
-			name := filepath.Base(path)
 			// Skip main worktree (where git repo lives)
 			if path == mainWorkdir {
 				current = nil
 				continue
+			}
+			// Derive name as relative path from parent dir, not just basename.
+			// This handles nested worktree directories (e.g., repo-prefix/branch-name)
+			// which are created when the branch name contains '/'.
+			name := filepath.Base(path)
+			if relPath, err := filepath.Rel(parentDir, path); err == nil && relPath != "" {
+				name = relPath
 			}
 			current = &Worktree{
 				Name:      name,

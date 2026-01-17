@@ -29,6 +29,102 @@ func TestSanitizeName(t *testing.T) {
 	}
 }
 
+func TestFindWorktreeBySanitizedName(t *testing.T) {
+	tests := []struct {
+		name          string
+		worktrees     []*Worktree
+		sanitizedName string
+		expectName    string // empty if no match expected
+	}{
+		{
+			name: "exact match",
+			worktrees: []*Worktree{
+				{Name: "simple-name"},
+				{Name: "other-name"},
+			},
+			sanitizedName: "simple-name",
+			expectName:    "simple-name",
+		},
+		{
+			name: "match with dot sanitized",
+			worktrees: []*Worktree{
+				{Name: "feature.branch"},
+				{Name: "other-name"},
+			},
+			sanitizedName: "feature-branch",
+			expectName:    "feature.branch",
+		},
+		{
+			name: "match with slash sanitized",
+			worktrees: []*Worktree{
+				{Name: "feature/auth/login"},
+				{Name: "other-name"},
+			},
+			sanitizedName: "feature-auth-login",
+			expectName:    "feature/auth/login",
+		},
+		{
+			name: "match with colon sanitized",
+			worktrees: []*Worktree{
+				{Name: "fix:bug:123"},
+				{Name: "other-name"},
+			},
+			sanitizedName: "fix-bug-123",
+			expectName:    "fix:bug:123",
+		},
+		{
+			name: "match with multiple special chars",
+			worktrees: []*Worktree{
+				{Name: "feature/v1.0:hotfix"},
+				{Name: "other-name"},
+			},
+			sanitizedName: "feature-v1-0-hotfix",
+			expectName:    "feature/v1.0:hotfix",
+		},
+		{
+			name: "long name with DirPrefix",
+			worktrees: []*Worktree{
+				{Name: "sidecar-td-c92aa56d-conversations-yank-add-y-y-key-bindings"},
+			},
+			sanitizedName: "sidecar-td-c92aa56d-conversations-yank-add-y-y-key-bindings",
+			expectName:    "sidecar-td-c92aa56d-conversations-yank-add-y-y-key-bindings",
+		},
+		{
+			name: "no match",
+			worktrees: []*Worktree{
+				{Name: "existing-wt"},
+			},
+			sanitizedName: "nonexistent-wt",
+			expectName:    "",
+		},
+		{
+			name:          "empty worktrees",
+			worktrees:     []*Worktree{},
+			sanitizedName: "any-name",
+			expectName:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Plugin{worktrees: tt.worktrees}
+			result := p.findWorktreeBySanitizedName(tt.sanitizedName)
+
+			if tt.expectName == "" {
+				if result != nil {
+					t.Errorf("findWorktreeBySanitizedName(%q) = %q, want nil", tt.sanitizedName, result.Name)
+				}
+			} else {
+				if result == nil {
+					t.Errorf("findWorktreeBySanitizedName(%q) = nil, want %q", tt.sanitizedName, tt.expectName)
+				} else if result.Name != tt.expectName {
+					t.Errorf("findWorktreeBySanitizedName(%q) = %q, want %q", tt.sanitizedName, result.Name, tt.expectName)
+				}
+			}
+		})
+	}
+}
+
 func TestGetAgentCommand(t *testing.T) {
 	tests := []struct {
 		agentType AgentType
