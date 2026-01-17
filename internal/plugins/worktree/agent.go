@@ -8,10 +8,54 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// paneCacheEntry holds cached capture output with timestamp
+type paneCacheEntry struct {
+	output    string
+	timestamp time.Time
+}
+
+// paneCache provides thread-safe caching for tmux pane captures.
+// When one poll triggers a capture, it captures ALL active sessions
+// at once, so subsequent polls within the cache window get cached results.
+type paneCache struct {
+	mu      sync.Mutex
+	entries map[string]paneCacheEntry
+	ttl     time.Duration
+}
+
+// Global cache instance for pane captures
+var globalPaneCache = &paneCache{
+	entries: make(map[string]paneCacheEntry),
+	ttl:     300 * time.Millisecond, // Cache valid for 300ms
+}
+
+// get returns cached output if valid, or empty string if expired/missing
+func (c *paneCache) get(session string) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if entry, ok := c.entries[session]; ok {
+		if time.Since(entry.timestamp) < c.ttl {
+			return entry.output, true
+		}
+	}
+	return "", false
+}
+
+// setAll stores multiple session outputs at once
+func (c *paneCache) setAll(outputs map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for session, output := range outputs {
+		c.entries[session] = paneCacheEntry{output: output, timestamp: now}
+	}
+}
 
 const (
 	// Tmux session prefix for sidecar-managed worktree sessions
@@ -25,13 +69,17 @@ const (
 	captureLineCount = 600
 
 	// Polling intervals - adaptive based on agent status
+	// Conservative values to reduce CPU with multiple worktrees while maintaining responsiveness
 	pollIntervalInitial    = 500 * time.Millisecond // First poll after agent starts
-	pollIntervalActive     = 500 * time.Millisecond // Agent actively processing
-	pollIntervalIdle       = 3 * time.Second        // No change detected
+	pollIntervalActive     = 500 * time.Millisecond // Agent actively processing (keep fast for UX)
+	pollIntervalIdle       = 5 * time.Second        // No change detected (was 3s)
 	pollIntervalWaiting    = 5 * time.Second        // Agent waiting for user input
-	pollIntervalDone       = 10 * time.Second       // Agent completed/exited
-	pollIntervalBackground = 5 * time.Second        // Output not visible, plugin focused
-	pollIntervalUnfocused  = 15 * time.Second       // Plugin not focused
+	pollIntervalDone       = 20 * time.Second       // Agent completed/exited (was 10s)
+	pollIntervalBackground = 10 * time.Second       // Output not visible, plugin focused (was 5s)
+	pollIntervalUnfocused  = 20 * time.Second       // Plugin not focused (was 15s)
+
+	// Poll staggering to prevent simultaneous subprocess spawns
+	pollStaggerMax = 400 * time.Millisecond // Max stagger offset based on worktree name hash
 )
 
 // AgentStartedMsg signals an agent has been started in a worktree.
@@ -377,9 +425,22 @@ func sanitizeName(name string) string {
 	return name
 }
 
+// staggerOffset returns a consistent stagger offset for a worktree name.
+// This spreads poll timings across worktrees to prevent CPU spikes.
+func staggerOffset(name string) time.Duration {
+	// Simple hash: sum of bytes mod max stagger
+	var hash uint32
+	for i := 0; i < len(name); i++ {
+		hash = hash*31 + uint32(name[i])
+	}
+	return time.Duration(hash%uint32(pollStaggerMax/time.Millisecond)) * time.Millisecond
+}
+
 // scheduleAgentPoll returns a command that schedules a poll after delay.
+// Adds stagger offset based on worktree name to prevent simultaneous polls.
 func (p *Plugin) scheduleAgentPoll(worktreeName string, delay time.Duration) tea.Cmd {
-	return tea.Tick(delay, func(t time.Time) tea.Msg {
+	stagger := staggerOffset(worktreeName)
+	return tea.Tick(delay+stagger, func(t time.Time) tea.Msg {
 		return pollAgentMsg{WorktreeName: worktreeName}
 	})
 }
@@ -447,16 +508,35 @@ func (p *Plugin) handlePollAgent(worktreeName string) tea.Cmd {
 }
 
 // capturePane captures the last N lines of a tmux pane.
-// We only capture captureLineCount lines since that's sufficient for:
-// - Status detection (checks last ~10 lines)
-// - OutputBuffer storage (caps at 500 lines)
-// - User scroll-back viewing
+// Uses caching to avoid redundant subprocess calls when multiple worktrees poll simultaneously.
+// On cache miss, captures ALL sidecar sessions at once to populate cache for other polls.
 func capturePane(sessionName string) (string, error) {
-	// -p: Print to stdout (instead of buffer)
-	// -e: Preserve ANSI escape sequences (colors)
-	// -J: Join wrapped lines
-	// -S -N: Capture last N lines (negative = from end of scrollback)
-	// -t: Target session
+	// Check cache first
+	if output, ok := globalPaneCache.get(sessionName); ok {
+		return output, nil
+	}
+
+	// Cache miss - batch capture all sidecar sessions
+	outputs, err := batchCaptureAllSessions()
+	if err != nil {
+		// Fall back to single capture on batch error
+		return capturePaneDirect(sessionName)
+	}
+
+	// Cache all results
+	globalPaneCache.setAll(outputs)
+
+	// Return requested session's output
+	if output, ok := outputs[sessionName]; ok {
+		return output, nil
+	}
+
+	// Session not in batch results - try direct capture
+	return capturePaneDirect(sessionName)
+}
+
+// capturePaneDirect captures a single pane without caching.
+func capturePaneDirect(sessionName string) (string, error) {
 	startLine := fmt.Sprintf("-%d", captureLineCount)
 	cmd := exec.Command("tmux", "capture-pane", "-p", "-e", "-J", "-S", startLine, "-t", sessionName)
 	output, err := cmd.Output()
@@ -464,6 +544,50 @@ func capturePane(sessionName string) (string, error) {
 		return "", fmt.Errorf("capture-pane: %w", err)
 	}
 	return string(output), nil
+}
+
+// batchCaptureAllSessions captures all sidecar-wt-* sessions in a single subprocess.
+// Returns map of session name to output.
+func batchCaptureAllSessions() (map[string]string, error) {
+	// Single shell command that lists sessions and captures each
+	// Uses a unique delimiter to separate outputs
+	script := fmt.Sprintf(`
+for session in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^%s'); do
+    echo "===SIDECAR_SESSION:$session==="
+    tmux capture-pane -p -e -J -S -%d -t "$session" 2>/dev/null
+done
+`, tmuxSessionPrefix, captureLineCount)
+
+	cmd := exec.Command("bash", "-c", script)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("batch capture: %w", err)
+	}
+
+	// Parse output by splitting on delimiter
+	results := make(map[string]string)
+	parts := strings.Split(string(output), "===SIDECAR_SESSION:")
+
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		// Find session name (ends with ===)
+		idx := strings.Index(part, "===")
+		if idx == -1 {
+			continue
+		}
+		sessionName := part[:idx]
+		content := ""
+		if idx+3 < len(part) {
+			content = part[idx+3:]
+			// Trim leading newline from content
+			content = strings.TrimPrefix(content, "\n")
+		}
+		results[sessionName] = content
+	}
+
+	return results, nil
 }
 
 // detectStatus determines agent status from captured output.
