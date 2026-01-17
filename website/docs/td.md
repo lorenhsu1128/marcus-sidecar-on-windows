@@ -294,8 +294,6 @@ Sidecar's TD Monitor plugin provides a visual dashboard for TD:
 - View issue details (`enter`)
 - Real-time refresh
 
-![TD in Sidecar](/img/screenshots/sidecar-td2.png)
-
 ## Source
 
 [GitHub Repository](https://github.com/marcus/td)

@@ -115,10 +115,6 @@ const config = {
       },
       navbar: {
         title: 'Sidecar',
-        logo: {
-          alt: 'Sidecar Logo',
-          src: 'img/logo.svg',
-        },
         items: [
           {
             type: 'docSidebar',
@@ -126,7 +122,6 @@ const config = {
             position: 'left',
             label: 'Docs',
           },
-          {to: '/blog', label: 'Blog', position: 'left'},
           {
             href: 'https://github.com/marcus/sidecar',
             label: 'GitHub',
@@ -149,10 +144,6 @@ const config = {
           {
             title: 'More',
             items: [
-              {
-                label: 'Blog',
-                to: '/blog',
-              },
               {
                 label: 'GitHub',
                 href: 'https://github.com/marcus/sidecar',

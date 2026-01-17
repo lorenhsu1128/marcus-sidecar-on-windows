@@ -7,6 +7,8 @@ title: Conversations Plugin
 
 Browse and search your Claude Code sessions with turn-based organization, message expansion, and session analytics—see what your agent has been doing.
 
+![Conversations Plugin](/img/screenshots/sidecar-conversations.png)
+
 ## Overview
 
 The Conversations plugin provides a two-pane layout:

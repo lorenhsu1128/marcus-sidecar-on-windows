@@ -57,8 +57,6 @@ View changes inline or in full-screen mode with syntax highlighting.
 | `0` | Reset horizontal scroll |
 | `esc`, `q` | Close diff |
 
-![Side-by-side Diff](/img/screenshots/sidecar-git-diff-side-by-side.png)
-
 ### Diff Modes
 
 - **Unified**: Traditional line-by-line format with `+` and `-` markers

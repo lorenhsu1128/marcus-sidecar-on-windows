@@ -7,6 +7,8 @@ title: Files Plugin
 
 Browse, preview, and manage your project files with syntax highlighting, markdown rendering, and fuzzy search—all in a two-pane terminal interface.
 
+![Files Plugin](/img/screenshots/sidecar-file-browser.png)
+
 ## Overview
 
 The Files plugin provides a two-pane layout:
