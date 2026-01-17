@@ -285,10 +285,11 @@ func (p *Plugin) renderWorktreeItem(wt *Worktree, selected bool, width int) stri
 	if maxNameWidth < 8 {
 		maxNameWidth = 8 // Minimum name width
 	}
-	// Truncate name if too long
-	if len(name) > maxNameWidth {
+	// Truncate name if too long (use runes for proper Unicode handling)
+	nameRunes := []rune(name)
+	if len(nameRunes) > maxNameWidth {
 		if maxNameWidth > 1 {
-			name = name[:maxNameWidth-1] + "…"
+			name = string(nameRunes[:maxNameWidth-1]) + "…"
 		} else {
 			name = "…"
 		}
