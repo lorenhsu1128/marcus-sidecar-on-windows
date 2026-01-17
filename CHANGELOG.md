@@ -2,6 +2,15 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.20.0] - 2026-01-17
+
+### Features
+- **Simplified worktree kanban**: Removed "Thinking" status, streamlined to Active/Waiting/Done/Paused
+- Updated Waiting status icon from 💬 to ⧗ for better clarity
+
+### Dependencies
+- Updated embedded td to latest version
+
 ## [v0.19.0] - 2026-01-16
 
 ### Features
