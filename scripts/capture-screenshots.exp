@@ -1,0 +1,50 @@
+#!/usr/bin/expect -f
+# Automated screenshot capture for Sidecar documentation
+# Uses expect to handle TTY requirements
+
+set timeout 5
+set output_dir [file dirname [info script]]/../docs/screenshots
+
+proc take_screenshot {name} {
+    global output_dir
+    exec screencapture -x "$output_dir/$name"
+    puts "  Captured: $name"
+}
+
+puts "Starting screenshot capture session..."
+puts "Screenshots will be saved to: $output_dir"
+
+# Spawn sidecar with a PTY
+spawn sidecar
+
+# Wait for initial render
+sleep 1.5
+
+# Capture main view (td plugin)
+take_screenshot "sidecar-td.png"
+
+# Navigate to git (tab 2)
+send "2"
+sleep 0.7
+take_screenshot "sidecar-git.png"
+
+# Navigate to files (tab 3)
+send "3"
+sleep 0.7
+take_screenshot "sidecar-files.png"
+
+# Navigate to conversations (tab 4)
+send "4"
+sleep 0.7
+take_screenshot "sidecar-conversations.png"
+
+# Quit sidecar
+send "q"
+sleep 0.3
+send "y"
+
+# Wait for process to exit
+expect eof
+
+puts ""
+puts "Screenshot capture complete!"
