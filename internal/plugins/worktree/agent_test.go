@@ -230,6 +230,32 @@ func TestDetectStatus(t *testing.T) {
 			output:   "Processing complete\nChanges applied successfully\n\n❯",
 			expected: StatusWaiting,
 		},
+		// Thinking status tests
+		{
+			name:     "thinking with claude extended thinking tag",
+			output:   "Let me analyze this\n<thinking>considering the options",
+			expected: StatusThinking,
+		},
+		{
+			name:     "thinking with internal monologue",
+			output:   "Processing\n<internal_monologue>evaluating approach",
+			expected: StatusThinking,
+		},
+		{
+			name:     "thinking with generic indicator",
+			output:   "Working on it\nthinking... processing request",
+			expected: StatusThinking,
+		},
+		{
+			name:     "thinking with aider reasoning",
+			output:   "Aider output\nreasoning about the implementation",
+			expected: StatusThinking,
+		},
+		{
+			name:     "closed thinking tag should be active not thinking",
+			output:   "<thinking>analyzed</thinking>\nNow implementing the fix",
+			expected: StatusActive,
+		},
 	}
 
 	for _, tt := range tests {
@@ -287,6 +313,20 @@ func TestDetectStatusPriorityOrder(t *testing.T) {
 	result := detectStatus(output)
 	if result != StatusWaiting {
 		t.Errorf("waiting should take priority over error, got %v", result)
+	}
+
+	// Waiting should take priority over thinking when both patterns present
+	output2 := "<thinking>analyzing\nDo you want to proceed? [y/n]"
+	result2 := detectStatus(output2)
+	if result2 != StatusWaiting {
+		t.Errorf("waiting should take priority over thinking, got %v", result2)
+	}
+
+	// Thinking should take priority over error
+	output3 := "<thinking>analyzing the error\nError: something went wrong"
+	result3 := detectStatus(output3)
+	if result3 != StatusThinking {
+		t.Errorf("thinking should take priority over error, got %v", result3)
 	}
 }
 

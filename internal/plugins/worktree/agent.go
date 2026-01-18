@@ -670,6 +670,7 @@ func detectStatus(output string) WorktreeStatus {
 	textLower := strings.ToLower(checkText)
 
 	// Waiting patterns (agent needs user input) - highest priority
+	// Check before thinking since waiting blocks progress
 	waitingPatterns := []string{
 		"[y/n]",       // Claude Code permission prompt
 		"(y/n)",       // Aider style
@@ -689,6 +690,30 @@ func detectStatus(output string) WorktreeStatus {
 		if strings.Contains(textLower, pattern) {
 			return StatusWaiting
 		}
+	}
+
+	// Thinking patterns (agent is processing) - check after waiting
+	// Only report thinking if we have an unclosed thinking tag
+	thinkingTags := []struct {
+		open  string
+		close string
+	}{
+		{"<thinking>", "</thinking>"},
+		{"<internal_monologue>", "</internal_monologue>"},
+	}
+	for _, tag := range thinkingTags {
+		openIdx := strings.LastIndex(textLower, tag.open)
+		if openIdx >= 0 {
+			closeIdx := strings.LastIndex(textLower, tag.close)
+			// Only thinking if open tag is after close tag (or no close tag)
+			if closeIdx < openIdx {
+				return StatusThinking
+			}
+		}
+	}
+	// Generic thinking indicators (no close tag to check)
+	if strings.Contains(textLower, "thinking...") || strings.Contains(textLower, "reasoning about") {
+		return StatusThinking
 	}
 
 	// Done patterns (agent completed)

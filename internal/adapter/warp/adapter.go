@@ -20,8 +20,9 @@ import (
 var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 const (
-	adapterID   = "warp"
-	adapterName = "Warp"
+	adapterID    = "warp"
+	adapterName  = "Warp"
+	queryTimeout = 5 * time.Second // timeout for database queries
 )
 
 // Adapter implements the adapter.Adapter interface for Warp terminal AI sessions.
@@ -89,7 +90,9 @@ func (a *Adapter) Detect(projectRoot string) (bool, error) {
 	pattern := projectAbs + "%"
 
 	var exists int
-	err = db.QueryRow(query, pattern, projectAbs).Scan(&exists)
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+	err = db.QueryRowContext(ctx, query, pattern, projectAbs).Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
@@ -128,7 +131,9 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 		ORDER BY last_msg DESC
 	`
 
-	rows, err := db.Query(query, pattern, projectAbs)
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+	rows, err := db.QueryContext(ctx, query, pattern, projectAbs)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +238,9 @@ func (a *Adapter) Messages(sessionID string) ([]adapter.Message, error) {
 		WHERE conversation_id = ?
 		ORDER BY start_ts
 	`
-	rows, err := db.Query(querySQL, sessionID)
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
+	rows, err := db.QueryContext(ctx, querySQL, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +291,9 @@ func (a *Adapter) Messages(sessionID string) ([]adapter.Message, error) {
 		ORDER BY start_ts
 	`
 	pattern := "%" + sessionID + "%"
-	rows, err = db.Query(blocksSQL, pattern)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel2()
+	rows, err = db.QueryContext(ctx2, blocksSQL, pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -370,8 +379,10 @@ func (a *Adapter) Usage(sessionID string) (*adapter.UsageStats, error) {
 
 	// Get conversation_data from agent_conversations
 	query := `SELECT conversation_data FROM agent_conversations WHERE conversation_id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel()
 	var convDataJSON sql.NullString
-	err = db.QueryRow(query, sessionID).Scan(&convDataJSON)
+	err = db.QueryRowContext(ctx, query, sessionID).Scan(&convDataJSON)
 	if err == sql.ErrNoRows {
 		// No usage data available, return zeros
 		return &adapter.UsageStats{}, nil
@@ -404,7 +415,9 @@ func (a *Adapter) Usage(sessionID string) (*adapter.UsageStats, error) {
 
 	// Count messages from ai_queries
 	countQuery := `SELECT COUNT(*) FROM ai_queries WHERE conversation_id = ?`
-	err = db.QueryRow(countQuery, sessionID).Scan(&stats.MessageCount)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), queryTimeout)
+	defer cancel2()
+	err = db.QueryRowContext(ctx2, countQuery, sessionID).Scan(&stats.MessageCount)
 	if err != nil {
 		stats.MessageCount = 0
 	}

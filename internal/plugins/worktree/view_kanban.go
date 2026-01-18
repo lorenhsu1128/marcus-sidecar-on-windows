@@ -46,16 +46,18 @@ func (p *Plugin) renderKanbanView(width, height int) string {
 
 	// Column headers and colors
 	columnTitles := map[WorktreeStatus]string{
-		StatusActive:  "● Active",
-		StatusWaiting: "⧗ Waiting",
-		StatusDone:    "✓ Ready",
-		StatusPaused:  "⏸ Paused",
+		StatusActive:   "● Active",
+		StatusThinking: "◐ Thinking",
+		StatusWaiting:  "⧗ Waiting",
+		StatusDone:     "✓ Ready",
+		StatusPaused:   "⏸ Paused",
 	}
 	columnColors := map[WorktreeStatus]lipgloss.Color{
-		StatusActive:  styles.StatusCompleted.GetForeground().(lipgloss.Color), // Green
-		StatusWaiting: styles.StatusModified.GetForeground().(lipgloss.Color),  // Yellow
-		StatusDone:    lipgloss.Color("81"),                                    // Cyan
-		StatusPaused:  lipgloss.Color("245"),                                   // Gray
+		StatusActive:   styles.StatusCompleted.GetForeground().(lipgloss.Color), // Green
+		StatusThinking: lipgloss.Color("141"),                                   // Purple
+		StatusWaiting:  styles.StatusModified.GetForeground().(lipgloss.Color),  // Yellow
+		StatusDone:     lipgloss.Color("81"),                                    // Cyan
+		StatusPaused:   lipgloss.Color("245"),                                   // Gray
 	}
 
 	// Calculate column widths (account for panel borders)

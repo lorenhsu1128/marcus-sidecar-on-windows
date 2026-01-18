@@ -51,11 +51,12 @@ const (
 type WorktreeStatus int
 
 const (
-	StatusPaused  WorktreeStatus = iota // No agent, worktree exists
-	StatusActive                        // Agent running, recent output
-	StatusWaiting                       // Agent waiting for input
-	StatusDone                          // Agent completed task
-	StatusError                         // Agent crashed or errored
+	StatusPaused   WorktreeStatus = iota // No agent, worktree exists
+	StatusActive                         // Agent running, recent output
+	StatusThinking                       // Agent is processing/thinking
+	StatusWaiting                        // Agent waiting for input
+	StatusDone                           // Agent completed task
+	StatusError                          // Agent crashed or errored
 )
 
 // String returns the display string for a WorktreeStatus.
@@ -65,6 +66,8 @@ func (s WorktreeStatus) String() string {
 		return "paused"
 	case StatusActive:
 		return "active"
+	case StatusThinking:
+		return "thinking"
 	case StatusWaiting:
 		return "waiting"
 	case StatusDone:
@@ -83,6 +86,8 @@ func (s WorktreeStatus) Icon() string {
 		return "⏸"
 	case StatusActive:
 		return "●"
+	case StatusThinking:
+		return "◐"
 	case StatusWaiting:
 		return "⧗"
 	case StatusDone:
