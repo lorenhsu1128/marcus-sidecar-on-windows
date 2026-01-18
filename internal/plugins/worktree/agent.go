@@ -223,7 +223,7 @@ func (p *Plugin) StartAgent(wt *Worktree, agentType AgentType) tea.Cmd {
 			strconv.Itoa(tmuxHistoryLimit)).Run()
 
 		// Set TD_SESSION_ID environment variable for td session tracking
-		envCmd := fmt.Sprintf("export TD_SESSION_ID=%s", sessionName)
+		envCmd := fmt.Sprintf("export TD_SESSION_ID=%s", shellQuote(sessionName))
 		exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
 
 		// Apply environment isolation to prevent conflicts (GOWORK, etc.)
@@ -368,7 +368,7 @@ rm -f %q
 		return "", err
 	}
 
-	return "bash " + launcherFile, nil
+	return "bash " + shellQuote(launcherFile), nil
 }
 
 // getAgentCommandWithContext returns the agent command with optional task context (legacy, no skip perms).
@@ -412,7 +412,7 @@ func (p *Plugin) StartAgentWithOptions(wt *Worktree, agentType AgentType, skipPe
 			strconv.Itoa(tmuxHistoryLimit)).Run()
 
 		// Set TD_SESSION_ID environment variable for td session tracking
-		tdEnvCmd := fmt.Sprintf("export TD_SESSION_ID=%s", sessionName)
+		tdEnvCmd := fmt.Sprintf("export TD_SESSION_ID=%s", shellQuote(sessionName))
 		exec.Command("tmux", "send-keys", "-t", sessionName, tdEnvCmd, "Enter").Run()
 
 		// Apply environment isolation to prevent conflicts (GOWORK, etc.)

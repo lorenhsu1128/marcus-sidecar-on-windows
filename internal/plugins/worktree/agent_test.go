@@ -522,21 +522,21 @@ func TestWriteAgentLauncher(t *testing.T) {
 			agentType: AgentClaude,
 			baseCmd:   "claude",
 			prompt:    "Task: fix bug",
-			wantCmd:   "bash " + tmpDir + "/.sidecar-start.sh",
+			wantCmd:   "bash '" + tmpDir + "/.sidecar-start.sh'",
 		},
 		{
 			name:      "claude with complex markdown",
 			agentType: AgentClaude,
 			baseCmd:   "claude",
 			prompt:    "Task: implement feature\n\n```go\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n```\n\nDon't break the user's code!",
-			wantCmd:   "bash " + tmpDir + "/.sidecar-start.sh",
+			wantCmd:   "bash '" + tmpDir + "/.sidecar-start.sh'",
 		},
 		{
 			name:      "aider uses --message flag",
 			agentType: AgentAider,
 			baseCmd:   "aider --yes",
 			prompt:    "Task: fix bug",
-			wantCmd:   "bash " + tmpDir + "/.sidecar-start.sh",
+			wantCmd:   "bash '" + tmpDir + "/.sidecar-start.sh'",
 		},
 	}
 
