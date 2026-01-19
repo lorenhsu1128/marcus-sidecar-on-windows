@@ -287,3 +287,185 @@ func TestSessionCacheInitialized(t *testing.T) {
 		t.Error("expected sessionCache to be initialized")
 	}
 }
+
+// TestParseContentBlocks_TextBlock verifies text blocks produce ContentBlock with Type='text'
+func TestParseContentBlocks_TextBlock(t *testing.T) {
+	a := New()
+	content := []byte(`[{"type":"text","text":"Hello world"}]`)
+
+	_, _, _, contentBlocks, _ := a.parseContent(content)
+
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "text" {
+		t.Errorf("expected Type='text', got %q", contentBlocks[0].Type)
+	}
+	if contentBlocks[0].Text != "Hello world" {
+		t.Errorf("expected Text='Hello world', got %q", contentBlocks[0].Text)
+	}
+}
+
+// TestParseContentBlocks_ToolCall verifies tool-call blocks produce ContentBlock with Type='tool_use'
+func TestParseContentBlocks_ToolCall(t *testing.T) {
+	a := New()
+	content := []byte(`[{"type":"tool-call","toolCallId":"tc_123","toolName":"Read","args":{"path":"foo.go"}}]`)
+
+	_, toolUses, _, contentBlocks, _ := a.parseContent(content)
+
+	// Verify ToolUses array
+	if len(toolUses) != 1 {
+		t.Fatalf("expected 1 tool use, got %d", len(toolUses))
+	}
+	if toolUses[0].ID != "tc_123" {
+		t.Errorf("expected ToolUse.ID='tc_123', got %q", toolUses[0].ID)
+	}
+
+	// Verify ContentBlocks
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "tool_use" {
+		t.Errorf("expected Type='tool_use', got %q", contentBlocks[0].Type)
+	}
+	if contentBlocks[0].ToolUseID != "tc_123" {
+		t.Errorf("expected ToolUseID='tc_123', got %q", contentBlocks[0].ToolUseID)
+	}
+	if contentBlocks[0].ToolName != "Read" {
+		t.Errorf("expected ToolName='Read', got %q", contentBlocks[0].ToolName)
+	}
+}
+
+// TestParseContentBlocks_ToolResult verifies tool-result blocks produce ContentBlock with Type='tool_result'
+func TestParseContentBlocks_ToolResult(t *testing.T) {
+	a := New()
+	content := []byte(`[{"type":"tool-result","toolCallId":"tc_123","result":"file contents here"}]`)
+
+	_, _, _, contentBlocks, _ := a.parseContent(content)
+
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "tool_result" {
+		t.Errorf("expected Type='tool_result', got %q", contentBlocks[0].Type)
+	}
+	if contentBlocks[0].ToolUseID != "tc_123" {
+		t.Errorf("expected ToolUseID='tc_123', got %q", contentBlocks[0].ToolUseID)
+	}
+	if contentBlocks[0].ToolOutput != "file contents here" {
+		t.Errorf("expected ToolOutput='file contents here', got %q", contentBlocks[0].ToolOutput)
+	}
+}
+
+// TestParseContentBlocks_ToolResultArray verifies tool-result with array content is extracted
+func TestParseContentBlocks_ToolResultArray(t *testing.T) {
+	a := New()
+	content := []byte(`[{"type":"tool-result","toolCallId":"tc_456","result":[{"type":"text","text":"line 1"},{"type":"text","text":"line 2"}]}]`)
+
+	_, _, _, contentBlocks, _ := a.parseContent(content)
+
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "tool_result" {
+		t.Errorf("expected Type='tool_result', got %q", contentBlocks[0].Type)
+	}
+	if contentBlocks[0].ToolOutput != "line 1\nline 2" {
+		t.Errorf("expected ToolOutput='line 1\\nline 2', got %q", contentBlocks[0].ToolOutput)
+	}
+}
+
+// TestParseContentBlocks_Reasoning verifies reasoning blocks produce ContentBlock with Type='thinking'
+func TestParseContentBlocks_Reasoning(t *testing.T) {
+	a := New()
+	content := []byte(`[{"type":"reasoning","text":"Let me think about this..."}]`)
+
+	_, _, thinkingBlocks, contentBlocks, _ := a.parseContent(content)
+
+	// Verify ThinkingBlocks array
+	if len(thinkingBlocks) != 1 {
+		t.Fatalf("expected 1 thinking block, got %d", len(thinkingBlocks))
+	}
+	if thinkingBlocks[0].Content != "Let me think about this..." {
+		t.Errorf("expected ThinkingBlock.Content='Let me think about this...', got %q", thinkingBlocks[0].Content)
+	}
+
+	// Verify ContentBlocks
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "thinking" {
+		t.Errorf("expected Type='thinking', got %q", contentBlocks[0].Type)
+	}
+	if contentBlocks[0].Text != "Let me think about this..." {
+		t.Errorf("expected Text='Let me think about this...', got %q", contentBlocks[0].Text)
+	}
+}
+
+// TestParseContentBlocks_Mixed verifies mixed content produces correct ContentBlocks in order
+func TestParseContentBlocks_Mixed(t *testing.T) {
+	a := New()
+	content := []byte(`[
+		{"type":"text","text":"I will read the file"},
+		{"type":"tool-call","toolCallId":"tc_001","toolName":"Read","args":{"path":"main.go"}}
+	]`)
+
+	text, toolUses, _, contentBlocks, _ := a.parseContent(content)
+
+	// Verify content string
+	if text != "I will read the file" {
+		t.Errorf("expected content='I will read the file', got %q", text)
+	}
+
+	// Verify ToolUses
+	if len(toolUses) != 1 {
+		t.Fatalf("expected 1 tool use, got %d", len(toolUses))
+	}
+
+	// Verify ContentBlocks order
+	if len(contentBlocks) != 2 {
+		t.Fatalf("expected 2 content blocks, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "text" {
+		t.Errorf("blocks[0].Type=%q, want 'text'", contentBlocks[0].Type)
+	}
+	if contentBlocks[1].Type != "tool_use" {
+		t.Errorf("blocks[1].Type=%q, want 'tool_use'", contentBlocks[1].Type)
+	}
+}
+
+// TestParseContentBlocks_StringContent verifies string content produces single text ContentBlock
+func TestParseContentBlocks_StringContent(t *testing.T) {
+	a := New()
+	content := []byte(`"Just a simple string message"`)
+
+	text, _, _, contentBlocks, _ := a.parseContent(content)
+
+	if text != "Just a simple string message" {
+		t.Errorf("expected content='Just a simple string message', got %q", text)
+	}
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if contentBlocks[0].Type != "text" {
+		t.Errorf("expected Type='text', got %q", contentBlocks[0].Type)
+	}
+	if contentBlocks[0].Text != "Just a simple string message" {
+		t.Errorf("expected Text='Just a simple string message', got %q", contentBlocks[0].Text)
+	}
+}
+
+// TestParseContentBlocks_ToolResultError verifies IsError flag is captured
+func TestParseContentBlocks_ToolResultError(t *testing.T) {
+	a := New()
+	content := []byte(`[{"type":"tool-result","toolCallId":"tc_err","result":"Error: file not found","isError":true}]`)
+
+	_, _, _, contentBlocks, _ := a.parseContent(content)
+
+	if len(contentBlocks) != 1 {
+		t.Fatalf("expected 1 content block, got %d", len(contentBlocks))
+	}
+	if !contentBlocks[0].IsError {
+		t.Error("expected IsError=true, got false")
+	}
+}

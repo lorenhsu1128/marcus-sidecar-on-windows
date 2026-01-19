@@ -388,7 +388,7 @@ func (a *Adapter) collectMessages(blobs map[string][]byte, blobID string, messag
 
 	// Check if this blob is JSON (starts with '{')
 	if data[0] == '{' {
-		msg, err := a.parseMessageBlob(data)
+		msg, err := a.parseMessageBlob(data, blobID)
 		if err == nil && (msg.Role == "user" || msg.Role == "assistant") {
 			// Skip system context messages (have system tags but no user content)
 			if msg.Role == "user" && isSystemContextMessage(msg.Content) {
@@ -423,7 +423,7 @@ func (a *Adapter) collectMessages(blobs map[string][]byte, blobID string, messag
 			jsonStart++
 		}
 		if jsonStart < len(data) {
-			msg, err := a.parseMessageBlob(data[jsonStart:])
+			msg, err := a.parseMessageBlob(data[jsonStart:], blobID)
 			if err == nil && (msg.Role == "user" || msg.Role == "assistant") {
 				// Skip system context messages
 				if msg.Role == "user" && isSystemContextMessage(msg.Content) {
@@ -440,53 +440,64 @@ func (a *Adapter) collectMessages(blobs map[string][]byte, blobID string, messag
 }
 
 // parseMessageBlob parses a single message blob into an adapter.Message.
-func (a *Adapter) parseMessageBlob(data []byte) (adapter.Message, error) {
+// blobID is the database blob hash, used as the message ID for uniqueness.
+// (Cursor stores all assistant messages with internal id="1", so we use blob hash instead)
+func (a *Adapter) parseMessageBlob(data []byte, blobID string) (adapter.Message, error) {
 	var blob MessageBlob
 	if err := json.Unmarshal(data, &blob); err != nil {
 		return adapter.Message{}, err
 	}
 
+	// Use blob hash as message ID for uniqueness
+	// Cursor's internal id field is always "1" for assistant messages, causing cache collisions
+	msgID := shortID(blobID)
+
 	msg := adapter.Message{
-		ID:   blob.ID,
+		ID:   msgID,
 		Role: blob.Role,
 	}
 
-	// Parse content
-	content, toolUses, thinkingBlocks, model := a.parseContent(blob.Content)
+	// Parse content (now returns ContentBlocks as well)
+	content, toolUses, thinkingBlocks, contentBlocks, model := a.parseContent(blob.Content)
 	msg.Content = content
 	msg.ToolUses = toolUses
 	msg.ThinkingBlocks = thinkingBlocks
+	msg.ContentBlocks = contentBlocks
 	msg.Model = model
 
 	return msg, nil
 }
 
-// parseContent extracts text content, tool uses, and thinking blocks from the content field.
+// parseContent extracts text content, tool uses, thinking blocks, and content blocks from the content field.
 // Also extracts model name from providerOptions if present.
-func (a *Adapter) parseContent(rawContent json.RawMessage) (string, []adapter.ToolUse, []adapter.ThinkingBlock, string) {
+// Returns: content string, tool uses, thinking blocks, content blocks, model name
+func (a *Adapter) parseContent(rawContent json.RawMessage) (string, []adapter.ToolUse, []adapter.ThinkingBlock, []adapter.ContentBlock, string) {
 	if len(rawContent) == 0 {
-		return "", nil, nil, ""
+		return "", nil, nil, nil, ""
 	}
 
 	// Try parsing as string first (first user message format)
 	var strContent string
 	if err := json.Unmarshal(rawContent, &strContent); err == nil {
 		// Extract user query from XML tags if present
+		text := strContent
 		if query := extractUserQuery(strContent); query != "" {
-			return query, nil, nil, ""
+			text = query
 		}
-		return strContent, nil, nil, ""
+		contentBlocks := []adapter.ContentBlock{{Type: "text", Text: text}}
+		return text, nil, nil, contentBlocks, ""
 	}
 
 	// Parse as array of content blocks (subsequent messages)
 	var blocks []ContentBlock
 	if err := json.Unmarshal(rawContent, &blocks); err != nil {
-		return "", nil, nil, ""
+		return "", nil, nil, nil, ""
 	}
 
 	var texts []string
 	var toolUses []adapter.ToolUse
 	var thinkingBlocks []adapter.ThinkingBlock
+	var contentBlocks []adapter.ContentBlock
 	var model string
 	toolResultCount := 0
 
@@ -501,16 +512,28 @@ func (a *Adapter) parseContent(rawContent json.RawMessage) (string, []adapter.To
 		switch block.Type {
 		case "text":
 			// Extract user query from XML tags if present
+			text := block.Text
 			if query := extractUserQuery(block.Text); query != "" {
-				texts = append(texts, query)
-			} else {
-				texts = append(texts, block.Text)
+				text = query
 			}
+			texts = append(texts, text)
+			contentBlocks = append(contentBlocks, adapter.ContentBlock{
+				Type: "text",
+				Text: text,
+			})
+
 		case "reasoning":
+			tokenCount := len(block.Text) / 4 // rough estimate
 			thinkingBlocks = append(thinkingBlocks, adapter.ThinkingBlock{
 				Content:    block.Text,
-				TokenCount: len(block.Text) / 4, // rough estimate
+				TokenCount: tokenCount,
 			})
+			contentBlocks = append(contentBlocks, adapter.ContentBlock{
+				Type:       "thinking",
+				Text:       block.Text,
+				TokenCount: tokenCount,
+			})
+
 		case "tool-call":
 			inputStr := ""
 			if len(block.Args) > 0 {
@@ -521,8 +544,23 @@ func (a *Adapter) parseContent(rawContent json.RawMessage) (string, []adapter.To
 				Name:  block.ToolName,
 				Input: inputStr,
 			})
+			contentBlocks = append(contentBlocks, adapter.ContentBlock{
+				Type:      "tool_use",
+				ToolUseID: block.ToolCallID,
+				ToolName:  block.ToolName,
+				ToolInput: inputStr,
+			})
+
 		case "tool-result":
 			toolResultCount++
+			// Extract result content from the Result field
+			resultContent := extractToolResultContent(block.Result)
+			contentBlocks = append(contentBlocks, adapter.ContentBlock{
+				Type:       "tool_result",
+				ToolUseID:  block.ToolCallID,
+				ToolOutput: resultContent,
+				IsError:    block.IsError,
+			})
 		}
 	}
 
@@ -538,7 +576,45 @@ func (a *Adapter) parseContent(rawContent json.RawMessage) (string, []adapter.To
 		content = fmt.Sprintf("[%d tool result(s)]", toolResultCount)
 	}
 
-	return content, toolUses, thinkingBlocks, model
+	return content, toolUses, thinkingBlocks, contentBlocks, model
+}
+
+// extractToolResultContent extracts the content string from a tool result's Result field.
+// The result can be a string, array of content blocks, or other JSON structure.
+func extractToolResultContent(result json.RawMessage) string {
+	if len(result) == 0 {
+		return ""
+	}
+
+	// Try parsing as string first
+	var strResult string
+	if err := json.Unmarshal(result, &strResult); err == nil {
+		return strResult
+	}
+
+	// Try parsing as array of content blocks (common format: [{type: "text", text: "..."}])
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(result, &blocks); err == nil {
+		var parts []string
+		for _, b := range blocks {
+			if b.Type == "text" && b.Text != "" {
+				parts = append(parts, b.Text)
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, "\n")
+		}
+	}
+
+	// Fallback: return raw JSON (truncated if too long)
+	raw := string(result)
+	if len(raw) > 500 {
+		return raw[:497] + "..."
+	}
+	return raw
 }
 
 // shortID returns the first 8 characters of an ID, or the full ID if shorter.

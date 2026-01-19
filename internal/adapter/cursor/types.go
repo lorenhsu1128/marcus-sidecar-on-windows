@@ -37,6 +37,8 @@ type ContentBlock struct {
 	ToolCallID      string          `json:"toolCallId,omitempty"`
 	ToolName        string          `json:"toolName,omitempty"`
 	Args            json.RawMessage `json:"args,omitempty"`
+	Result          json.RawMessage `json:"result,omitempty"`  // For tool-result blocks
+	IsError         bool            `json:"isError,omitempty"` // For tool-result error status
 	ProviderOptions *ProviderOpts   `json:"providerOptions,omitempty"`
 	Signature       string          `json:"signature,omitempty"`
 }
