@@ -2,6 +2,23 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.26.0] - 2026-01-19
+
+### Features
+- **Git Blame View**: Added blame view to file browser plugin
+- **Thinking Status**: Added thinking status indicator to worktree with detection priority fix
+- **Truncation Cache**: Added truncation cache to eliminate ANSI parser allocation churn
+
+### Performance
+- **Conversations Plugin**: Performance improvements with code review refinements
+
+### Bug Fixes
+- Fixed memory leak in worktree output panel horizontal scrolling
+- Fixed unicode truncation and extracted blame constants
+
+### Dependencies
+- Updated embedded td to v0.15.1
+
 ## [v0.25.0] - 2026-01-17
 
 ### Features
