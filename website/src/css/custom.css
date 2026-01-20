@@ -494,6 +494,14 @@ a:hover {
   padding: 26px 0 46px;
 }
 
+.sc-gridHint {
+  font-size: 12px;
+  color: rgba(232, 232, 227, 0.45);
+  margin: 0 0 12px;
+  text-align: center;
+  font-family: var(--ifm-font-family-monospace);
+}
+
 .sc-gridInner {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
@@ -1068,6 +1076,34 @@ a:hover {
   text-align: center;
   margin: 24px auto 0;
   max-width: 60ch;
+}
+
+/* ---------- Bottom CTA ---------- */
+
+.sc-bottomCta {
+  padding: 64px 0;
+  text-align: center;
+  border-top: 1px solid var(--sc-border);
+  background: linear-gradient(180deg, rgba(15, 17, 20, 0.3), rgba(23, 26, 31, 0.2));
+}
+
+.sc-bottomCtaTitle {
+  font-size: 24px;
+  margin: 0 0 24px;
+  letter-spacing: -0.3px;
+}
+
+.sc-bottomInstall {
+  max-width: 600px;
+  margin: 0 auto 24px;
+  text-align: left;
+}
+
+.sc-bottomCtaLinks {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* ---------- Workflow Section ---------- */
