@@ -469,6 +469,21 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.projectSwitcherScroll = projectSwitcherEnsureCursorVisible(m.projectSwitcherCursor, m.projectSwitcherScroll, 8)
 			return m, nil
 
+		case "g":
+			// Go to first project
+			m.projectSwitcherCursor = 0
+			m.projectSwitcherScroll = projectSwitcherEnsureCursorVisible(m.projectSwitcherCursor, m.projectSwitcherScroll, 8)
+			return m, nil
+
+		case "G":
+			// Go to last project
+			m.projectSwitcherCursor = len(projects) - 1
+			if m.projectSwitcherCursor < 0 {
+				m.projectSwitcherCursor = 0
+			}
+			m.projectSwitcherScroll = projectSwitcherEnsureCursorVisible(m.projectSwitcherCursor, m.projectSwitcherScroll, 8)
+			return m, nil
+
 		case "@":
 			// Close modal
 			m.resetProjectSwitcher()
