@@ -1251,14 +1251,41 @@ a:hover {
   background-color: var(--ifm-background-color);
   border-right: 1px solid var(--sc-border);
   z-index: 100; /* Ensure it's above other elements */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .navbar-sidebar__items {
   padding: 1rem;
+  flex: 1;
+  overflow-y: auto;
+  height: auto;
+}
+
+/* Ensure the primary items container shows all items */
+.navbar-sidebar__items--show-secondary {
+  display: none;
+}
+
+.navbar-sidebar__items:not(.navbar-sidebar__items--show-secondary) {
+  display: flex;
+  flex-direction: column;
 }
 
 .navbar-sidebar__item {
   padding: 0.5rem 0;
+}
+
+/* Ensure menu items display properly */
+.navbar-sidebar .menu {
+  padding: 0;
+}
+
+.navbar-sidebar .menu__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .navbar-sidebar .menu__link {
