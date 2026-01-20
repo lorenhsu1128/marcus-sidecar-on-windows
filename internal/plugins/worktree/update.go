@@ -122,8 +122,19 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		} else {
 			p.viewMode = ViewModeList
 			p.worktrees = append(p.worktrees, msg.Worktree)
+
+			// Auto-focus newly created worktree (same pattern as click selection)
+			p.shellSelected = false
 			p.selectedIdx = len(p.worktrees) - 1
+			p.previewOffset = 0
+			p.previewHorizOffset = 0
+			p.autoScrollOutput = true
+			p.ensureVisible()
+
 			p.clearCreateModal()
+
+			// Load content for preview pane
+			cmds = append(cmds, p.loadSelectedContent())
 
 			// Start agent or attach based on selection
 			if msg.AgentType != AgentNone && msg.AgentType != "" {
