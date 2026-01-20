@@ -373,9 +373,9 @@ func (p *Plugin) Start() tea.Cmd {
 	// Refresh worktrees - reconnectAgents will be called after worktrees are loaded
 	cmds = append(cmds, p.refreshWorktrees())
 
-	// Start shell polling if session exists
+	// Start shell polling immediately if session exists (so preview shows content right away)
 	if p.shellSession != nil {
-		cmds = append(cmds, p.scheduleShellPoll(500*time.Millisecond))
+		cmds = append(cmds, p.pollShellSession())
 	}
 
 	return tea.Batch(cmds...)
@@ -652,6 +652,12 @@ func (p *Plugin) cyclePreviewTab(delta int) tea.Cmd {
 // Always loads diff (for preloading), and also loads task if task tab is active.
 func (p *Plugin) loadSelectedContent() tea.Cmd {
 	var cmds []tea.Cmd
+
+	// If shell is selected, poll shell output immediately
+	if p.shellSelected && p.shellSession != nil && p.previewTab == PreviewTabOutput {
+		cmds = append(cmds, p.pollShellSession())
+	}
+
 	switch p.previewTab {
 	case PreviewTabTask:
 		if cmd := p.loadSelectedDiff(); cmd != nil {

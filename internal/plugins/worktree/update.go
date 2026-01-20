@@ -19,7 +19,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if p.focused {
 			// Poll shell or selected agent when plugin gains focus
 			if p.shellSelected && p.shellSession != nil {
-				return p, p.scheduleShellPoll(0)
+				return p, p.pollShellSession()
 			}
 			return p, p.pollSelectedAgentNowIfVisible()
 		}
