@@ -762,14 +762,14 @@ var cursorStyle = lipgloss.NewStyle().
 // getCursorPosition returns the cached cursor position for rendering (td-648af4).
 // This NEVER spawns subprocesses - it only returns cached state updated by
 // queryCursorPositionCmd() which runs asynchronously during polling.
-// Returns the cursor row, column (0-indexed), and whether the cursor is visible.
-func (p *Plugin) getCursorPosition() (row, col int, visible bool, err error) {
+// Returns the cursor row, column (0-indexed), pane height, and whether the cursor is visible.
+func (p *Plugin) getCursorPosition() (row, col, paneHeight int, visible bool, err error) {
 	if p.interactiveState == nil || !p.interactiveState.Active {
-		return 0, 0, false, nil
+		return 0, 0, 0, false, nil
 	}
 
 	// Return cached values - never spawn subprocess from View()
-	return p.interactiveState.CursorRow, p.interactiveState.CursorCol, p.interactiveState.CursorVisible, nil
+	return p.interactiveState.CursorRow, p.interactiveState.CursorCol, p.interactiveState.PaneHeight, p.interactiveState.CursorVisible, nil
 }
 
 // queryCursorPositionCmd returns a tea.Cmd that queries tmux for cursor position (td-648af4).
@@ -811,28 +811,32 @@ func (p *Plugin) queryCursorPositionCmd() tea.Cmd {
 
 // queryCursorPositionSync synchronously queries cursor position for the given target.
 // Used to capture cursor position atomically with output in poll goroutines.
-// Returns row, col (0-indexed), visible, and ok (false if query failed).
-func queryCursorPositionSync(target string) (row, col int, visible, ok bool) {
+// Returns row, col (0-indexed), paneHeight, visible, and ok (false if query failed).
+// paneHeight is needed to calculate cursor offset when display height differs from pane height.
+func queryCursorPositionSync(target string) (row, col, paneHeight int, visible, ok bool) {
 	if target == "" {
-		return 0, 0, false, false
+		return 0, 0, 0, false, false
 	}
 
 	cmd := exec.Command("tmux", "display-message", "-t", target,
-		"-p", "#{cursor_x},#{cursor_y},#{cursor_flag}")
+		"-p", "#{cursor_x},#{cursor_y},#{cursor_flag},#{pane_height}")
 	output, err := cmd.Output()
 	if err != nil {
-		return 0, 0, false, false
+		return 0, 0, 0, false, false
 	}
 
 	parts := strings.Split(strings.TrimSpace(string(output)), ",")
 	if len(parts) < 2 {
-		return 0, 0, false, false
+		return 0, 0, 0, false, false
 	}
 
 	col, _ = strconv.Atoi(parts[0])
 	row, _ = strconv.Atoi(parts[1])
 	visible = len(parts) < 3 || parts[2] != "0"
-	return row, col, visible, true
+	if len(parts) >= 4 {
+		paneHeight, _ = strconv.Atoi(parts[3])
+	}
+	return row, col, paneHeight, visible, true
 }
 
 // renderWithCursor overlays the cursor on content at the specified position.

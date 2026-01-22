@@ -291,6 +291,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 					p.interactiveState.CursorRow = msg.CursorRow
 					p.interactiveState.CursorCol = msg.CursorCol
 					p.interactiveState.CursorVisible = msg.CursorVisible
+					p.interactiveState.PaneHeight = msg.PaneHeight
 				}
 			}
 		}
@@ -312,6 +313,13 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			background := p.backgroundPollInterval()
 			if background > interval {
 				interval = background
+			}
+		}
+		// Use interactive polling in interactive mode for fast response
+		if p.viewMode == ViewModeInteractive && !p.shellSelected {
+			if wt := p.selectedWorktree(); wt != nil && wt.Name == msg.WorktreeName {
+				cmds = append(cmds, p.pollInteractivePane())
+				return p, tea.Batch(cmds...)
 			}
 		}
 		cmds = append(cmds, p.scheduleAgentPoll(msg.WorktreeName, interval))
@@ -348,6 +356,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 					p.interactiveState.CursorRow = msg.CursorRow
 					p.interactiveState.CursorCol = msg.CursorCol
 					p.interactiveState.CursorVisible = msg.CursorVisible
+					p.interactiveState.PaneHeight = msg.PaneHeight
 				}
 			}
 		}
@@ -496,6 +505,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 					p.interactiveState.CursorRow = msg.CursorRow
 					p.interactiveState.CursorCol = msg.CursorCol
 					p.interactiveState.CursorVisible = msg.CursorVisible
+					p.interactiveState.PaneHeight = msg.PaneHeight
 				}
 			}
 		}
@@ -511,6 +521,13 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			background := p.backgroundPollInterval()
 			if background > interval {
 				interval = background
+			}
+		}
+		// Use interactive polling in interactive mode for fast response
+		if p.viewMode == ViewModeInteractive && p.shellSelected {
+			if selectedShell != nil && selectedShell.TmuxName == msg.TmuxName {
+				cmds = append(cmds, p.pollInteractivePane())
+				return p, tea.Batch(cmds...)
 			}
 		}
 		cmds = append(cmds, p.scheduleShellPollByName(msg.TmuxName, interval))

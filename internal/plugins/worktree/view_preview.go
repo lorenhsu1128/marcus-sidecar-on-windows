@@ -268,13 +268,20 @@ func (p *Plugin) renderOutputContent(width, height int) string {
 
 	// Apply cursor overlay in interactive mode
 	if p.viewMode == ViewModeInteractive && p.interactiveState != nil && p.interactiveState.Active {
-		row, col, visible, err := p.getCursorPosition()
+		row, col, paneHeight, visible, err := p.getCursorPosition()
 		if err == nil && visible {
-			relativeRow := row + 1 // tmux reports cursor one row too high
+			// cursor_y is relative to tmux pane (0 to paneHeight-1).
+			// Our display shows len(displayLines) lines.
+			// If paneHeight > displayLines, we need to offset the cursor.
+			displayHeight := len(displayLines)
+			relativeRow := row + 1 // +1 adjustment needed for correct positioning
+			if paneHeight > displayHeight {
+				relativeRow = (row + 1) - (paneHeight - displayHeight)
+			}
 			relativeCol := col - p.previewHorizOffset
 
 			// Only render cursor if within visible area
-			if relativeRow >= 0 && relativeRow < len(displayLines) && relativeCol >= 0 && relativeCol < width {
+			if relativeRow >= 0 && relativeRow < displayHeight && relativeCol >= 0 && relativeCol < width {
 				content = renderWithCursor(content, relativeRow, relativeCol, visible)
 			}
 		}
@@ -386,13 +393,20 @@ func (p *Plugin) renderShellOutput(width, height int) string {
 
 	// Apply cursor overlay in interactive mode
 	if p.viewMode == ViewModeInteractive && p.interactiveState != nil && p.interactiveState.Active {
-		row, col, visible, err := p.getCursorPosition()
+		row, col, paneHeight, visible, err := p.getCursorPosition()
 		if err == nil && visible {
-			relativeRow := row + 1 // tmux reports cursor one row too high
+			// cursor_y is relative to tmux pane (0 to paneHeight-1).
+			// Our display shows len(displayLines) lines.
+			// If paneHeight > displayLines, we need to offset the cursor.
+			displayHeight := len(displayLines)
+			relativeRow := row + 1 // +1 adjustment needed for correct positioning
+			if paneHeight > displayHeight {
+				relativeRow = (row + 1) - (paneHeight - displayHeight)
+			}
 			relativeCol := col - p.previewHorizOffset
 
 			// Only render cursor if within visible area
-			if relativeRow >= 0 && relativeRow < len(displayLines) && relativeCol >= 0 && relativeCol < width {
+			if relativeRow >= 0 && relativeRow < displayHeight && relativeCol >= 0 && relativeCol < width {
 				content = renderWithCursor(content, relativeRow, relativeCol, visible)
 			}
 		}

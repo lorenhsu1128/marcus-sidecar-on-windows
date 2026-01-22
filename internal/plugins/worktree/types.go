@@ -253,6 +253,10 @@ type InteractiveState struct {
 	// Updated asynchronously via cursorPositionMsg from poll handler (td-648af4).
 	CursorVisible bool
 
+	// PaneHeight tracks the tmux pane height for cursor offset calculation.
+	// Used to adjust cursor_y when display height differs from pane height.
+	PaneHeight int
+
 	// BracketedPasteEnabled tracks whether the target app has enabled
 	// bracketed paste mode (ESC[?2004h). Updated from captured output.
 	BracketedPasteEnabled bool
