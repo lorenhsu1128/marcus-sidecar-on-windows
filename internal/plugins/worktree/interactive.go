@@ -347,27 +347,30 @@ func (p *Plugin) enterInteractiveMode() tea.Cmd {
 		TargetPane:    paneID,
 		TargetSession: sessionName,
 		LastKeyTime:   time.Now(),
+		CursorVisible: true, // Assume visible until we get first cursor query result
 	}
 
 	p.viewMode = ViewModeInteractive
 
-	// Trigger immediate poll for fresh content
-	return p.pollInteractivePane()
+	// Trigger immediate poll for fresh content and initial cursor position query (td-648af4)
+	return tea.Batch(p.pollInteractivePane(), p.queryCursorPositionCmd())
 }
 
 // calculatePreviewDimensions returns the content width and height for the preview pane.
 // Used to resize tmux panes to match the visible area.
+// IMPORTANT: This must stay in sync with renderListView() width calculations.
 func (p *Plugin) calculatePreviewDimensions() (width, height int) {
 	if p.width <= 0 || p.height <= 0 {
 		return 80, 24 // Safe defaults
 	}
 
 	// Calculate preview pane width based on sidebar visibility
+	// Uses panelOverhead constant to ensure consistency with render path
 	if !p.sidebarVisible {
-		// Full width minus borders and padding (4 chars)
-		width = p.width - 4
+		// Full width minus panel overhead (borders + padding)
+		width = p.width - panelOverhead
 	} else {
-		// Account for sidebar and divider
+		// Account for sidebar and divider (same calculation as renderListView)
 		available := p.width - dividerWidth
 		sidebarW := (available * p.sidebarWidth) / 100
 		if sidebarW < 25 {
@@ -380,15 +383,15 @@ func (p *Plugin) calculatePreviewDimensions() (width, height int) {
 		if previewW < 40 {
 			previewW = 40
 		}
-		// Subtract 4 for borders and padding
-		width = previewW - 4
+		// Subtract panel overhead for content width
+		width = previewW - panelOverhead
 	}
 
 	// Calculate height: total height minus borders (2) and UI elements
-	// - 2 for panel borders
+	// - panelBorderWidth for top/bottom panel borders
 	// - 1 for hint line
 	// - 2 for tabs header (worktrees only)
-	paneHeight := p.height - 2
+	paneHeight := p.height - panelBorderWidth
 	if p.shellSelected {
 		// Shell: no tabs, just hint
 		height = paneHeight - 1
@@ -469,6 +472,7 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 		if p.interactiveState.EscapePressed {
 			// Second Escape within window: exit interactive mode
 			p.interactiveState.EscapePressed = false
+			p.interactiveState.EscapeTimerPending = false // Cancel pending timer
 			p.exitInteractiveMode()
 			return nil
 		}
@@ -476,15 +480,22 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 		// Do NOT forward to tmux yet - wait for timer or next key
 		p.interactiveState.EscapePressed = true
 		p.interactiveState.EscapeTime = time.Now()
-		return tea.Tick(doubleEscapeDelay, func(t time.Time) tea.Msg {
-			return escapeTimerMsg{}
-		})
+		// Timer leak prevention (td-83dc22): only schedule timer if one isn't already pending
+		if !p.interactiveState.EscapeTimerPending {
+			p.interactiveState.EscapeTimerPending = true
+			return tea.Tick(doubleEscapeDelay, func(t time.Time) tea.Msg {
+				return escapeTimerMsg{}
+			})
+		}
+		return nil
 	}
 
 	// Non-escape key: check if we have a pending Escape to forward first
 	var cmds []tea.Cmd
 	if p.interactiveState.EscapePressed {
 		p.interactiveState.EscapePressed = false
+		// Timer leak prevention (td-83dc22): pending timer will be ignored when it fires
+		// since EscapePressed is now false (no need to cancel, it's harmless)
 		// Forward the pending Escape before this key
 		if err := sendKeyToTmux(p.interactiveState.TargetSession, "Escape"); err != nil {
 			p.exitInteractiveMode()
@@ -554,6 +565,9 @@ func (p *Plugin) handleEscapeTimer() tea.Cmd {
 	if p.interactiveState == nil || !p.interactiveState.Active {
 		return nil
 	}
+
+	// Timer leak prevention (td-83dc22): clear the pending flag since timer has fired
+	p.interactiveState.EscapeTimerPending = false
 
 	if !p.interactiveState.EscapePressed {
 		// Escape was already handled (double-press or another key arrived)
@@ -693,43 +707,54 @@ var cursorStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("14")). // Bright cyan when reversed becomes the text color
 	Foreground(lipgloss.Color("0"))   // Black text on bright background
 
-// getCursorPosition queries tmux for the current cursor position in the target pane.
+// getCursorPosition returns the cached cursor position for rendering (td-648af4).
+// This NEVER spawns subprocesses - it only returns cached state updated by
+// queryCursorPositionCmd() which runs asynchronously during polling.
 // Returns the cursor row, column (0-indexed), and whether the cursor is visible.
 func (p *Plugin) getCursorPosition() (row, col int, visible bool, err error) {
 	if p.interactiveState == nil || !p.interactiveState.Active {
 		return 0, 0, false, nil
 	}
 
+	// Return cached values - never spawn subprocess from View()
+	return p.interactiveState.CursorRow, p.interactiveState.CursorCol, p.interactiveState.CursorVisible, nil
+}
+
+// queryCursorPositionCmd returns a tea.Cmd that queries tmux for cursor position (td-648af4).
+// This is called from the poll handler when output changes, NOT from View().
+// The result is delivered via cursorPositionMsg and cached in interactiveState.
+func (p *Plugin) queryCursorPositionCmd() tea.Cmd {
+	if p.interactiveState == nil || !p.interactiveState.Active {
+		return nil
+	}
+
 	paneID := p.interactiveState.TargetPane
 	if paneID == "" {
-		// Fall back to session name if pane ID not available
 		paneID = p.interactiveState.TargetSession
 	}
 
-	// Query cursor position using tmux display-message
-	// #{cursor_x},#{cursor_y} gives 0-indexed position
-	// #{cursor_flag} is 0 if cursor hidden (e.g., alternate screen), 1 if visible
-	cmd := exec.Command("tmux", "display-message", "-t", paneID,
-		"-p", "#{cursor_x},#{cursor_y},#{cursor_flag}")
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, 0, false, err
+	return func() tea.Msg {
+		// Query cursor position using tmux display-message
+		// #{cursor_x},#{cursor_y} gives 0-indexed position
+		// #{cursor_flag} is 0 if cursor hidden (e.g., alternate screen), 1 if visible
+		cmd := exec.Command("tmux", "display-message", "-t", paneID,
+			"-p", "#{cursor_x},#{cursor_y},#{cursor_flag}")
+		output, err := cmd.Output()
+		if err != nil {
+			return cursorPositionMsg{Row: 0, Col: 0, Visible: false}
+		}
+
+		parts := strings.Split(strings.TrimSpace(string(output)), ",")
+		if len(parts) < 2 {
+			return cursorPositionMsg{Row: 0, Col: 0, Visible: false}
+		}
+
+		col, _ := strconv.Atoi(parts[0])
+		row, _ := strconv.Atoi(parts[1])
+		visible := len(parts) < 3 || parts[2] != "0"
+
+		return cursorPositionMsg{Row: row, Col: col, Visible: visible}
 	}
-
-	parts := strings.Split(strings.TrimSpace(string(output)), ",")
-	if len(parts) < 2 {
-		return 0, 0, false, nil
-	}
-
-	col, _ = strconv.Atoi(parts[0])
-	row, _ = strconv.Atoi(parts[1])
-	visible = len(parts) < 3 || parts[2] != "0"
-
-	// Update cached position in state
-	p.interactiveState.CursorCol = col
-	p.interactiveState.CursorRow = row
-
-	return row, col, visible, nil
 }
 
 // renderWithCursor overlays the cursor on content at the specified position.

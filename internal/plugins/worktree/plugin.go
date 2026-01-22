@@ -132,6 +132,12 @@ type Plugin struct {
 	attachedSession     string // Name of worktree we're attached to (pauses polling)
 	tmuxCaptureMaxBytes int    // Cap for tmux capture output (bytes)
 
+	// Timer leak prevention (td-83dc22): generation counters to invalidate stale timers.
+	// When a timer fires, it checks if its captured generation matches the current one.
+	// If not, the timer is stale (worktree/shell was removed) and the msg is ignored.
+	pollGeneration      map[string]int // Per-worktree/shell poll generation counter
+	shellPollGeneration map[string]int // Per-shell poll generation counter
+
 	// Truncation cache to eliminate ANSI parser allocation churn
 	truncateCache *ui.TruncateCache
 
@@ -277,6 +283,8 @@ func New() *Plugin {
 		agents:              make(map[string]*Agent),
 		managedSessions:     make(map[string]bool),
 		shells:              make([]*ShellSession, 0),
+		pollGeneration:      make(map[string]int),
+		shellPollGeneration: make(map[string]int),
 		viewMode:            ViewModeList,
 		activePane:          PaneSidebar,
 		previewTab:          PreviewTabOutput,
@@ -329,6 +337,10 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.managedSessions = make(map[string]bool)
 	p.worktrees = make([]*Worktree, 0)
 	p.attachedSession = ""
+
+	// Reset poll generation counters (td-83dc22): invalidates any stale timers from previous project
+	p.pollGeneration = make(map[string]int)
+	p.shellPollGeneration = make(map[string]int)
 
 	// Reset shell state before initializing for new project (critical for project switching)
 	p.shells = make([]*ShellSession, 0)

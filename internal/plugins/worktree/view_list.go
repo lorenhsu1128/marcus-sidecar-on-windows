@@ -30,6 +30,14 @@ var (
 
 const tabStopWidth = 8
 
+// Panel dimension constants for consistent width calculations.
+// These must stay in sync with styles.RenderGradientBorder.
+const (
+	panelBorderWidth  = 2 // Left + right border (1 each)
+	panelPaddingWidth = 2 // Left + right padding (1 each)
+	panelOverhead     = panelBorderWidth + panelPaddingWidth // Total overhead: 4
+)
+
 // View renders the plugin UI.
 func (p *Plugin) View(width, height int) string {
 	// Clear truncation cache if dimensions changed
@@ -90,32 +98,38 @@ func (p *Plugin) renderListView(width, height int) string {
 
 	// If sidebar is hidden, show only preview pane at full width
 	if !p.sidebarVisible {
-		// Register hit region for full-width preview
-		p.mouseHandler.HitMap.AddRect(regionPreviewPane, 0, 0, width, paneHeight, nil)
+		// Full-width preview: outer width is the full width, content width subtracts panel overhead
+		previewW := width
+		contentW := previewW - panelOverhead
+
+		// Register hit region for full-width preview (uses outer dimensions)
+		p.mouseHandler.HitMap.AddRect(regionPreviewPane, 0, 0, previewW, paneHeight, nil)
 
 		// Register preview tab hit regions only when a worktree is selected (not shell)
 		// Shell has no tabs - it shows primer/output directly
 		if !p.shellSelected {
-			// X starts at 2 (1 for border + 1 for panel padding)
+			// X starts at panelOverhead/2 (1 for border + 1 for panel padding)
 			tabWidths := []int{10, 8, 8} // " Output " + padding, " Diff " + padding, " Task " + padding
-			tabX := 2
+			tabX := panelOverhead / 2
 			for i, tabWidth := range tabWidths {
 				p.mouseHandler.HitMap.AddRect(regionPreviewTab, tabX, 1, tabWidth, 1, i)
 				tabX += tabWidth + 1
 			}
 		}
 
-		previewContent := p.renderPreviewContent(width-4, innerHeight)
+		// Render content using calculated content width (consistent with panel overhead)
+		previewContent := p.renderPreviewContent(contentW, innerHeight)
 
 		// Check if preview should flash (guard against zero-value time)
 		flashActive := !p.flashPreviewTime.IsZero() && time.Since(p.flashPreviewTime) < flashDuration
 		if flashActive {
-			return styles.RenderPanelWithGradient(previewContent, width, paneHeight, styles.GetFlashGradient())
+			return styles.RenderPanelWithGradient(previewContent, previewW, paneHeight, styles.GetFlashGradient())
 		}
-		return styles.RenderPanel(previewContent, width, paneHeight, true)
+		return styles.RenderPanel(previewContent, previewW, paneHeight, true)
 	}
 
-	// RenderPanel handles borders internally, so only subtract divider
+	// Calculate pane widths for split view
+	// RenderPanel handles borders internally, so only subtract divider from available space
 	available := width - dividerWidth
 	sidebarW := (available * p.sidebarWidth) / 100
 	if sidebarW < 25 {
@@ -128,6 +142,10 @@ func (p *Plugin) renderListView(width, height int) string {
 	if previewW < 40 {
 		previewW = 40
 	}
+
+	// Calculate content widths (subtract panel overhead for borders + padding)
+	sidebarContentW := sidebarW - panelOverhead
+	previewContentW := previewW - panelOverhead
 
 	// Determine pane focus state
 	sidebarActive := p.activePane == PaneSidebar
@@ -146,8 +164,8 @@ func (p *Plugin) renderListView(width, height int) string {
 	// Shell has no tabs - it shows primer/output directly
 	if !p.shellSelected {
 		// Tabs are rendered at Y=1 (first line inside panel border)
-		// X starts at sidebarW + dividerWidth + 2 (1 for border + 1 for padding)
-		previewPaneX := sidebarW + dividerWidth + 2 // +1 for border, +1 for panel padding
+		// X starts at sidebarW + dividerWidth + panelOverhead/2 (border + padding on left side)
+		previewPaneX := sidebarW + dividerWidth + panelOverhead/2
 		// Tab widths: text is " Output " (8), " Diff " (6), " Task " (6)
 		// Plus BarChip Padding(0,1) adds 2 chars = 10, 8, 8 visual width
 		tabWidths := []int{10, 8, 8}
@@ -158,9 +176,9 @@ func (p *Plugin) renderListView(width, height int) string {
 		}
 	}
 
-	// Render content for each pane (subtract 4 for border + padding: 2 border + 2 padding)
-	sidebarContent := p.renderSidebarContent(sidebarW-4, innerHeight)
-	previewContent := p.renderPreviewContent(previewW-4, innerHeight)
+	// Render content for each pane using pre-calculated content widths
+	sidebarContent := p.renderSidebarContent(sidebarContentW, innerHeight)
+	previewContent := p.renderPreviewContent(previewContentW, innerHeight)
 
 	// Check if preview should flash (guard against zero-value time)
 	flashActive := !p.flashPreviewTime.IsZero() && time.Since(p.flashPreviewTime) < flashDuration

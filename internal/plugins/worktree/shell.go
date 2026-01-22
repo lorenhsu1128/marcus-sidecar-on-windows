@@ -89,9 +89,11 @@ type (
 		Err      error  // Non-nil if rename failed
 	}
 
-	// pollShellByNameMsg triggers a poll for a specific shell's output by name
+	// pollShellByNameMsg triggers a poll for a specific shell's output by name.
+	// Includes generation for timer leak prevention (td-83dc22).
 	pollShellByNameMsg struct {
-		TmuxName string
+		TmuxName   string
+		Generation int // Generation at time of scheduling; ignore if stale
 	}
 
 	// shellAttachAfterCreateMsg triggers attachment after shell creation
@@ -364,6 +366,7 @@ func (p *Plugin) killShellSessionByName(sessionName string) tea.Cmd {
 }
 
 // pollShellSessionByName captures output from a specific shell session by name.
+// Uses cached capture to avoid blocking subprocess calls (td-c2961e).
 func (p *Plugin) pollShellSessionByName(tmuxName string) tea.Cmd {
 	// Find the shell by TmuxName
 	var shell *ShellSession
@@ -377,16 +380,25 @@ func (p *Plugin) pollShellSessionByName(tmuxName string) tea.Cmd {
 		return nil
 	}
 
+	// Capture references before spawning closure to avoid data races
 	outputBuf := shell.Agent.OutputBuf
 	maxBytes := p.tmuxCaptureMaxBytes
 
 	return func() tea.Msg {
+		// Use capturePaneDirect which is faster for shells (they don't benefit from batch capture)
+		// Shell sessions have prefix "sidecar-sh-" not "sidecar-wt-" so batch capture skips them
 		output, err := capturePaneDirect(tmuxName)
 		if err != nil {
-			// Check if session is dead (not just a capture error)
-			if !sessionExists(tmuxName) {
+			// Capture error - check error message to determine if session is dead
+			// Avoid synchronous sessionExists() call which would block (td-c2961e)
+			errStr := err.Error()
+			if strings.Contains(errStr, "can't find") ||
+				strings.Contains(errStr, "no server") ||
+				strings.Contains(errStr, "no such session") ||
+				strings.Contains(errStr, "session not found") {
 				return ShellSessionDeadMsg{TmuxName: tmuxName}
 			}
+			// Other errors (timeout, etc.) - return empty output and schedule retry
 			return ShellOutputMsg{TmuxName: tmuxName, Output: "", Changed: false}
 		}
 
@@ -401,9 +413,12 @@ func (p *Plugin) pollShellSessionByName(tmuxName string) tea.Cmd {
 }
 
 // scheduleShellPollByName schedules a poll for a specific shell's output by name.
+// Uses generation tracking (td-83dc22) to invalidate stale timers when shells are removed.
 func (p *Plugin) scheduleShellPollByName(tmuxName string, delay time.Duration) tea.Cmd {
+	// Capture current generation for this shell
+	gen := p.shellPollGeneration[tmuxName]
 	return tea.Tick(delay, func(t time.Time) tea.Msg {
-		return pollShellByNameMsg{TmuxName: tmuxName}
+		return pollShellByNameMsg{TmuxName: tmuxName, Generation: gen}
 	})
 }
 

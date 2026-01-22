@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSanitizeName(t *testing.T) {
@@ -334,6 +335,107 @@ func TestTmuxSessionPrefix(t *testing.T) {
 	// Verify the session prefix constant
 	if !strings.HasPrefix(tmuxSessionPrefix, "sidecar-") {
 		t.Errorf("tmux session prefix should start with 'sidecar-', got %q", tmuxSessionPrefix)
+	}
+}
+
+func TestPaneCacheCleanup(t *testing.T) {
+	// Create a test cache with short TTL
+	cache := &paneCache{
+		entries: make(map[string]paneCacheEntry),
+		ttl:     10 * time.Millisecond,
+	}
+
+	// Add entries
+	cache.entries["session1"] = paneCacheEntry{output: "output1", timestamp: time.Now()}
+	cache.entries["session2"] = paneCacheEntry{output: "output2", timestamp: time.Now()}
+
+	// Verify entries exist
+	if len(cache.entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(cache.entries))
+	}
+
+	// Wait for TTL to expire
+	time.Sleep(15 * time.Millisecond)
+
+	// Cleanup should remove expired entries
+	cache.cleanup()
+
+	if len(cache.entries) != 0 {
+		t.Errorf("cleanup should remove expired entries, got %d remaining", len(cache.entries))
+	}
+}
+
+func TestPaneCacheRemove(t *testing.T) {
+	cache := &paneCache{
+		entries: make(map[string]paneCacheEntry),
+		ttl:     1 * time.Hour, // Long TTL
+	}
+
+	// Add entry
+	cache.entries["session1"] = paneCacheEntry{output: "output1", timestamp: time.Now()}
+
+	// Remove it
+	cache.remove("session1")
+
+	if _, exists := cache.entries["session1"]; exists {
+		t.Error("remove should delete the entry")
+	}
+}
+
+func TestPaneCacheGetRemovesExpired(t *testing.T) {
+	cache := &paneCache{
+		entries: make(map[string]paneCacheEntry),
+		ttl:     10 * time.Millisecond,
+	}
+
+	// Add expired entry
+	cache.entries["session1"] = paneCacheEntry{
+		output:    "output1",
+		timestamp: time.Now().Add(-20 * time.Millisecond), // Already expired
+	}
+
+	// Get should return empty and remove the entry
+	output, ok := cache.get("session1")
+	if ok {
+		t.Error("get should return false for expired entry")
+	}
+	if output != "" {
+		t.Errorf("get should return empty string for expired, got %q", output)
+	}
+
+	// Entry should be removed
+	if _, exists := cache.entries["session1"]; exists {
+		t.Error("get should remove expired entries")
+	}
+}
+
+func TestPaneCacheSetAllRemovesStale(t *testing.T) {
+	cache := &paneCache{
+		entries: make(map[string]paneCacheEntry),
+		ttl:     1 * time.Hour,
+	}
+
+	// Add initial entries
+	cache.entries["old-session"] = paneCacheEntry{output: "old", timestamp: time.Now()}
+	cache.entries["kept-session"] = paneCacheEntry{output: "kept", timestamp: time.Now()}
+
+	// SetAll with new batch (only kept-session)
+	cache.setAll(map[string]string{
+		"kept-session": "new-kept",
+		"new-session":  "new",
+	})
+
+	// old-session should be removed
+	if _, exists := cache.entries["old-session"]; exists {
+		t.Error("setAll should remove entries not in new batch")
+	}
+
+	// kept-session and new-session should exist
+	if _, exists := cache.entries["kept-session"]; !exists {
+		t.Error("setAll should keep entries that are in new batch")
+	}
+	if _, exists := cache.entries["new-session"]; !exists {
+		t.Error("setAll should add new entries")
 	}
 }
 

@@ -238,13 +238,22 @@ type InteractiveState struct {
 	// EscapeTime is when the first Escape was pressed.
 	EscapeTime time.Time
 
-	// CursorRow and CursorCol track the cursor position for overlay rendering.
+	// CursorRow and CursorCol track the cached cursor position for overlay rendering.
+	// Updated asynchronously via cursorPositionMsg from poll handler (td-648af4).
 	CursorRow int
 	CursorCol int
+
+	// CursorVisible indicates if the cursor should be rendered.
+	// Updated asynchronously via cursorPositionMsg from poll handler (td-648af4).
+	CursorVisible bool
 
 	// BracketedPasteEnabled tracks whether the target app has enabled
 	// bracketed paste mode (ESC[?2004h). Updated from captured output.
 	BracketedPasteEnabled bool
+
+	// EscapeTimerPending tracks if an escape timer is already in flight.
+	// Prevents duplicate timers from accumulating (td-83dc22).
+	EscapeTimerPending bool
 }
 
 // AgentStatus represents the current status of an agent.
@@ -302,8 +311,11 @@ func (b *OutputBuffer) Update(content string) bool {
 	defer b.mu.Unlock()
 
 	// Strip mouse escape sequences that can leak into captured tmux output
-	// when applications have mouse mode enabled
-	content = mouseEscapeRegex.ReplaceAllString(content, "")
+	// when applications have mouse mode enabled.
+	// Fast path: only run regex if mouse sequences are likely present (td-53e8a023)
+	if strings.Contains(content, "\x1b[<") {
+		content = mouseEscapeRegex.ReplaceAllString(content, "")
+	}
 
 	// Compute hash of new content
 	hash := maphash.String(b.hashSeed, content)
@@ -330,8 +342,11 @@ func (b *OutputBuffer) Write(content string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Strip mouse escape sequences
-	content = mouseEscapeRegex.ReplaceAllString(content, "")
+	// Strip mouse escape sequences.
+	// Fast path: only run regex if mouse sequences are likely present (td-53e8a023)
+	if strings.Contains(content, "\x1b[<") {
+		content = mouseEscapeRegex.ReplaceAllString(content, "")
+	}
 
 	// Replace instead of append to avoid duplication
 	b.lines = strings.Split(content, "\n")
@@ -396,4 +411,77 @@ func (b *OutputBuffer) Len() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return len(b.lines)
+}
+
+// validateManagedSessionsMsg triggers periodic validation of managedSessions.
+type validateManagedSessionsMsg struct{}
+
+// validateManagedSessionsResultMsg delivers validation results.
+type validateManagedSessionsResultMsg struct {
+	ExistingSessions map[string]bool // Set of actually existing tmux sessions
+}
+
+// AsyncCaptureResultMsg delivers async tmux capture results.
+// Used to avoid blocking the UI thread on tmux subprocess calls (td-c2961e).
+type AsyncCaptureResultMsg struct {
+	WorktreeName string // Worktree this capture is for
+	SessionName  string // tmux session name
+	Output       string // Captured output (empty on error)
+	Err          error  // Non-nil if capture failed
+}
+
+// AsyncShellCaptureResultMsg delivers async shell capture results.
+type AsyncShellCaptureResultMsg struct {
+	TmuxName string // Shell session tmux name
+	Output   string // Captured output (empty on error)
+	Err      error  // Non-nil if capture failed
+}
+
+// paneIDCache provides thread-safe caching of pane IDs.
+// Pane IDs rarely change so we cache them to avoid subprocess calls.
+type paneIDCache struct {
+	mu      sync.RWMutex
+	entries map[string]paneIDCacheEntry
+}
+
+type paneIDCacheEntry struct {
+	paneID   string
+	cachedAt time.Time
+}
+
+// paneIDCacheTTL is how long pane IDs are cached (they rarely change).
+const paneIDCacheTTL = 5 * time.Minute
+
+// globalPaneIDCache caches pane IDs to avoid subprocess calls.
+var globalPaneIDCache = &paneIDCache{
+	entries: make(map[string]paneIDCacheEntry),
+}
+
+// get returns cached pane ID if valid.
+func (c *paneIDCache) get(sessionName string) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if entry, ok := c.entries[sessionName]; ok {
+		if time.Since(entry.cachedAt) < paneIDCacheTTL {
+			return entry.paneID, true
+		}
+	}
+	return "", false
+}
+
+// set stores a pane ID in the cache.
+func (c *paneIDCache) set(sessionName, paneID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[sessionName] = paneIDCacheEntry{
+		paneID:   paneID,
+		cachedAt: time.Now(),
+	}
+}
+
+// remove deletes a session from the cache.
+func (c *paneIDCache) remove(sessionName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, sessionName)
 }

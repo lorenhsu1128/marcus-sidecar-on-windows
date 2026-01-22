@@ -250,6 +250,12 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		}
 
 	case pollAgentMsg:
+		// Timer leak prevention (td-83dc22): ignore stale poll messages.
+		// If the worktree was removed or reset since this timer was scheduled,
+		// the generation won't match and we drop the message.
+		if currentGen := p.pollGeneration[msg.WorktreeName]; msg.Generation != currentGen {
+			return p, nil // Stale timer, ignore
+		}
 		// Skip polling while user is attached to session
 		if p.attachedSession == msg.WorktreeName {
 			return p, nil
@@ -269,6 +275,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if p.viewMode == ViewModeInteractive && !p.shellSelected {
 			if wt := p.selectedWorktree(); wt != nil && wt.Name == msg.WorktreeName {
 				p.updateBracketedPasteMode(msg.Output)
+				// Query cursor position async when output changes in interactive mode (td-648af4)
+				cmds = append(cmds, p.queryCursorPositionCmd())
 			}
 		}
 		// Schedule next poll with adaptive interval based on status
@@ -285,7 +293,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 				interval = background
 			}
 		}
-		return p, p.scheduleAgentPoll(msg.WorktreeName, interval)
+		cmds = append(cmds, p.scheduleAgentPoll(msg.WorktreeName, interval))
+		return p, tea.Batch(cmds...)
 
 	case AgentPollUnchangedMsg:
 		// Content unchanged - use longer interval based on current status
@@ -349,6 +358,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		return p, p.attachToShellByIndex(msg.Index)
 
 	case ShellKilledMsg:
+		// Timer leak prevention (td-83dc22): increment generation to invalidate pending timers
+		p.shellPollGeneration[msg.SessionName]++
 		// Shell session killed, remove from list
 		removedIdx := -1
 		for i, shell := range p.shells {
@@ -386,6 +397,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		}
 
 	case ShellSessionDeadMsg:
+		// Timer leak prevention (td-83dc22): increment generation to invalidate pending timers
+		p.shellPollGeneration[msg.TmuxName]++
 		// Shell session externally terminated (user typed 'exit' in shell)
 		// Remove the dead shell from the list
 		removedIdx := -1
@@ -434,6 +447,10 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if p.viewMode == ViewModeInteractive && p.shellSelected {
 			if selectedShell := p.getSelectedShell(); selectedShell != nil && selectedShell.TmuxName == msg.TmuxName {
 				p.updateBracketedPasteMode(msg.Output)
+				// Query cursor position async when output changes in interactive mode (td-648af4)
+				if msg.Changed {
+					cmds = append(cmds, p.queryCursorPositionCmd())
+				}
 			}
 		}
 		// Schedule next poll with adaptive interval
@@ -450,7 +467,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 				interval = background
 			}
 		}
-		return p, p.scheduleShellPollByName(msg.TmuxName, interval)
+		cmds = append(cmds, p.scheduleShellPollByName(msg.TmuxName, interval))
+		return p, tea.Batch(cmds...)
 
 	case RenameShellDoneMsg:
 		// Find shell and update its display name
@@ -464,6 +482,12 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		p.saveSelectionState()
 
 	case pollShellByNameMsg:
+		// Timer leak prevention (td-83dc22): ignore stale poll messages.
+		// If the shell was removed since this timer was scheduled,
+		// the generation won't match and we drop the message.
+		if currentGen := p.shellPollGeneration[msg.TmuxName]; msg.Generation != currentGen {
+			return p, nil // Stale timer, ignore
+		}
 		// Poll specific shell session for output by name
 		if p.findShellByName(msg.TmuxName) != nil {
 			return p, p.pollShellSessionByName(msg.TmuxName)
@@ -478,13 +502,16 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		return p, nil
 
 	case AgentStoppedMsg:
+		// Timer leak prevention (td-83dc22): increment generation to invalidate pending timers
+		p.pollGeneration[msg.WorktreeName]++
 		if wt := p.findWorktree(msg.WorktreeName); wt != nil {
 			// Capture session name before clearing Agent (uses sanitized name like StartAgent)
 			sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
 			wt.Agent = nil
 			wt.Status = StatusPaused
-			// Clean up cache entry for stopped agent
+			// Clean up cache and session tracking (td-53e8a023)
 			globalPaneCache.remove(sessionName)
+			delete(p.managedSessions, sessionName)
 		}
 		delete(p.agents, msg.WorktreeName)
 		return p, nil
@@ -781,10 +808,34 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		// After reconnecting to existing sessions, detect orphaned worktrees
 		// (worktrees with .sidecar-agent file but no tmux session)
 		p.detectOrphanedWorktrees()
-		return p, tea.Batch(msg.Cmds...)
+		// Start periodic session validation to prevent memory leaks (td-41695b)
+		pollingCmds := append(msg.Cmds, p.scheduleSessionValidation(60*time.Second))
+		return p, tea.Batch(pollingCmds...)
+
+	case validateManagedSessionsMsg:
+		// Trigger validation of managedSessions against actual tmux sessions
+		return p, p.validateManagedSessions()
+
+	case validateManagedSessionsResultMsg:
+		// Prune managedSessions entries that no longer exist in tmux (td-41695b)
+		for session := range p.managedSessions {
+			if !msg.ExistingSessions[session] {
+				delete(p.managedSessions, session)
+			}
+		}
+		// Schedule next validation in 60 seconds
+		return p, p.scheduleSessionValidation(60 * time.Second)
 
 	case OpenCreateModalWithTaskMsg:
 		return p, p.openCreateModalWithTask(msg.TaskID, msg.TaskTitle)
+
+	case cursorPositionMsg:
+		// Update cached cursor position for interactive mode rendering (td-648af4)
+		if p.interactiveState != nil && p.interactiveState.Active {
+			p.interactiveState.CursorRow = msg.Row
+			p.interactiveState.CursorCol = msg.Col
+			p.interactiveState.CursorVisible = msg.Visible
+		}
 
 	case escapeTimerMsg:
 		// Handle escape delay timer for interactive mode double-escape detection

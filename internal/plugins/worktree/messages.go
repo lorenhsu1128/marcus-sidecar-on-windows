@@ -182,3 +182,11 @@ type OpenCreateModalWithTaskMsg struct {
 	TaskID    string
 	TaskTitle string
 }
+
+// cursorPositionMsg delivers async cursor position updates for interactive mode (td-648af4).
+// Queried during poll handler when output changes, not during View() rendering.
+type cursorPositionMsg struct {
+	Row     int  // 0-indexed row in visible pane
+	Col     int  // 0-indexed column
+	Visible bool // Whether cursor should be rendered
+}

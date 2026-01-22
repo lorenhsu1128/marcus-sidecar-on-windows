@@ -112,6 +112,36 @@ func (c *paneCache) remove(session string) {
 	delete(c.entries, session)
 }
 
+// cleanup removes all expired entries from the cache.
+// Called periodically to prevent memory leaks from dead sessions.
+func (c *paneCache) cleanup() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	for session, entry := range c.entries {
+		if now.Sub(entry.timestamp) >= c.ttl {
+			delete(c.entries, session)
+		}
+	}
+}
+
+// startCleanupLoop starts a background goroutine that periodically
+// cleans up expired cache entries. Runs every 10 seconds.
+func (c *paneCache) startCleanupLoop() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			c.cleanup()
+		}
+	}()
+}
+
+func init() {
+	// Start periodic cleanup to prevent memory leaks from dead sessions
+	globalPaneCache.startCleanupLoop()
+}
+
 const (
 	// Tmux session prefix for sidecar-managed worktree sessions
 	tmuxSessionPrefix = "sidecar-wt-"
@@ -182,8 +212,10 @@ type SendTextResultMsg struct {
 }
 
 // pollAgentMsg triggers output polling for a worktree's agent.
+// Includes generation for timer leak prevention (td-83dc22).
 type pollAgentMsg struct {
 	WorktreeName string
+	Generation   int // Generation at time of scheduling; ignore if stale
 }
 
 // reconnectedAgentsMsg delivers reconnected agents from startup.
@@ -540,7 +572,13 @@ func sanitizeName(name string) string {
 
 // getPaneID retrieves the tmux pane ID for a session.
 // Returns pane IDs like "%12" which are globally unique and stable.
+// Uses caching to avoid subprocess calls (pane IDs rarely change) (td-c2961e).
 func getPaneID(sessionName string) string {
+	// Check cache first
+	if paneID, ok := globalPaneIDCache.get(sessionName); ok {
+		return paneID
+	}
+
 	cmd := exec.Command("tmux", "list-panes", "-t", sessionName, "-F", "#{pane_id}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -550,6 +588,11 @@ func getPaneID(sessionName string) string {
 	paneID := strings.TrimSpace(string(output))
 	if idx := strings.Index(paneID, "\n"); idx > 0 {
 		paneID = paneID[:idx]
+	}
+
+	// Cache for future lookups
+	if paneID != "" {
+		globalPaneIDCache.set(sessionName, paneID)
 	}
 	return paneID
 }
@@ -567,10 +610,13 @@ func staggerOffset(name string) time.Duration {
 
 // scheduleAgentPoll returns a command that schedules a poll after delay.
 // Adds stagger offset based on worktree name to prevent simultaneous polls.
+// Uses generation tracking (td-83dc22) to invalidate stale timers when worktrees are removed.
 func (p *Plugin) scheduleAgentPoll(worktreeName string, delay time.Duration) tea.Cmd {
+	// Capture current generation for this worktree
+	gen := p.pollGeneration[worktreeName]
 	stagger := staggerOffset(worktreeName)
 	return tea.Tick(delay+stagger, func(t time.Time) tea.Msg {
-		return pollAgentMsg{WorktreeName: worktreeName}
+		return pollAgentMsg{WorktreeName: worktreeName, Generation: gen}
 	})
 }
 
@@ -580,15 +626,27 @@ type AgentPollUnchangedMsg struct {
 	CurrentStatus WorktreeStatus // For adaptive polling interval selection
 }
 
-// handlePollAgent captures output from a tmux session.
+// handlePollAgent captures output from a tmux session asynchronously.
+// Uses a goroutine to avoid blocking the UI thread on tmux subprocess calls (td-c2961e).
 func (p *Plugin) handlePollAgent(worktreeName string) tea.Cmd {
-	return func() tea.Msg {
-		wt := p.findWorktree(worktreeName)
-		if wt == nil || wt.Agent == nil {
+	wt := p.findWorktree(worktreeName)
+	if wt == nil || wt.Agent == nil {
+		return func() tea.Msg {
 			return AgentStoppedMsg{WorktreeName: worktreeName}
 		}
+	}
 
-		output, err := capturePane(wt.Agent.TmuxSession)
+	// Capture session name and worktree path before spawning goroutine
+	sessionName := wt.Agent.TmuxSession
+	wtPath := wt.Path
+	agentType := wt.Agent.Type
+	maxBytes := p.tmuxCaptureMaxBytes
+	outputBuf := wt.Agent.OutputBuf
+	currentStatus := wt.Status
+
+	// Return a tea.Cmd that spawns a goroutine for async capture
+	return func() tea.Msg {
+		output, err := capturePane(sessionName)
 		if err != nil {
 			// Session may have been killed
 			if strings.Contains(err.Error(), "can't find") ||
@@ -599,23 +657,18 @@ func (p *Plugin) handlePollAgent(worktreeName string) tea.Cmd {
 			return pollAgentMsg{WorktreeName: worktreeName}
 		}
 
-		output = trimCapturedOutput(output, p.tmuxCaptureMaxBytes)
+		output = trimCapturedOutput(output, maxBytes)
 
-	// Use hash-based change detection to skip processing if content unchanged
-	if wt.Agent.OutputBuf != nil && !wt.Agent.OutputBuf.Update(output) {
-		// Content unchanged - signal to schedule next poll with delay
-		// Include current status for adaptive polling interval selection
-		return AgentPollUnchangedMsg{
-			WorktreeName:  worktreeName,
-			CurrentStatus: wt.Status,
+		// Use hash-based change detection to skip processing if content unchanged
+		if outputBuf != nil && !outputBuf.Update(output) {
+			// Content unchanged - signal to schedule next poll with delay
+			return AgentPollUnchangedMsg{
+				WorktreeName:  worktreeName,
+				CurrentStatus: currentStatus,
+			}
 		}
-	}
 
-	// Content changed - don't clear cache. Cache is keyed by content hash,
-	// so different content automatically has different keys. Clearing would destroy
-	// cache hits for lines that haven't changed (e.g., prompt lines, earlier output).
-
-	// Content changed - detect status and emit
+		// Content changed - detect status and emit
 		status := detectStatus(output)
 		waitingFor := ""
 		if status == StatusWaiting {
@@ -625,7 +678,7 @@ func (p *Plugin) handlePollAgent(worktreeName string) tea.Cmd {
 		// For supported agents: supplement tmux detection with session file analysis
 		// Session files are more reliable for detecting "waiting at prompt" state
 		if status == StatusActive {
-			if sessionStatus, ok := detectAgentSessionStatus(wt.Agent.Type, wt.Path); ok {
+			if sessionStatus, ok := detectAgentSessionStatus(agentType, wtPath); ok {
 				if sessionStatus == StatusWaiting {
 					status = StatusWaiting
 					waitingFor = "Waiting for input"
@@ -1103,6 +1156,7 @@ func (p *Plugin) Cleanup(removeSessions bool) error {
 			if p.managedSessions[agent.TmuxSession] {
 				exec.Command("tmux", "kill-session", "-t", agent.TmuxSession).Run()
 				delete(p.managedSessions, agent.TmuxSession)
+				globalPaneCache.remove(agent.TmuxSession)
 			}
 		}
 		delete(p.agents, name)
@@ -1135,9 +1189,43 @@ func (p *Plugin) CleanupOrphanedSessions() error {
 		if p.findWorktreeBySanitizedName(sanitizedName) == nil {
 			exec.Command("tmux", "kill-session", "-t", session).Run()
 			delete(p.managedSessions, session)
+			globalPaneCache.remove(session)
 		}
 	}
 	return nil
+}
+
+// validateManagedSessions checks managedSessions against actual tmux sessions
+// and returns a command that will deliver the result.
+func (p *Plugin) validateManagedSessions() tea.Cmd {
+	return func() tea.Msg {
+		existing := make(map[string]bool)
+
+		// List all tmux sessions
+		cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
+		output, err := cmd.Output()
+		if err != nil {
+			// No tmux server, all sessions are gone
+			return validateManagedSessionsResultMsg{ExistingSessions: existing}
+		}
+
+		// Build set of existing sessions
+		for _, session := range strings.Split(string(output), "\n") {
+			session = strings.TrimSpace(session)
+			if session != "" {
+				existing[session] = true
+			}
+		}
+
+		return validateManagedSessionsResultMsg{ExistingSessions: existing}
+	}
+}
+
+// scheduleSessionValidation schedules the next session validation.
+func (p *Plugin) scheduleSessionValidation(delay time.Duration) tea.Cmd {
+	return tea.Tick(delay, func(t time.Time) tea.Msg {
+		return validateManagedSessionsMsg{}
+	})
 }
 
 // findWorktree finds a worktree by name.
