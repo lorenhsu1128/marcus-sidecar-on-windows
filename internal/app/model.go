@@ -44,6 +44,8 @@ type Model struct {
 	showFooter      bool
 	showPalette     bool
 	showQuitConfirm bool
+	quitButtonFocus int // 0=quit, 1=cancel
+	quitButtonHover int // 0=none, 1=quit, 2=cancel
 	palette         palette.Model
 
 	// Project switcher modal
