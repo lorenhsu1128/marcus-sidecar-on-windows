@@ -1,57 +1,86 @@
 package keymap
 
-// DefaultBindings returns the default key bindings.
+import "github.com/marcus/sidecar/internal/plugin"
+
+// Binding maps a key to a command in a specific context.
+type Binding struct {
+	Key      string
+	Command  string
+	Context  string // plugin ID or sub-context (e.g., "git-status", "git-diff")
+	Priority int    // 1=highest, 0=default (99)
+}
+
+// DefaultBindings returns the default keymap.
 func DefaultBindings() []Binding {
 	return []Binding{
-		// Global bindings
+		// Global context
 		{Key: "q", Command: "quit", Context: "global"},
-		{Key: "ctrl+c", Command: "quit", Context: "global"},
+		{Key: "?", Command: "toggle-palette", Context: "global"},
+		{Key: "!", Command: "toggle-diagnostics", Context: "global"},
 		{Key: "`", Command: "next-plugin", Context: "global"},
 		{Key: "~", Command: "prev-plugin", Context: "global"},
+		{Key: "@", Command: "switch-project", Context: "global"},
 		{Key: "1", Command: "focus-plugin-1", Context: "global"},
 		{Key: "2", Command: "focus-plugin-2", Context: "global"},
 		{Key: "3", Command: "focus-plugin-3", Context: "global"},
 		{Key: "4", Command: "focus-plugin-4", Context: "global"},
 		{Key: "5", Command: "focus-plugin-5", Context: "global"},
-		{Key: "?", Command: "toggle-palette", Context: "global"},
-		{Key: "!", Command: "toggle-diagnostics", Context: "global"},
-		{Key: "@", Command: "switch-project", Context: "global"},
-		{Key: "#", Command: "switch-theme", Context: "global"},
-		{Key: "ctrl+h", Command: "toggle-footer", Context: "global"},
-		{Key: "r", Command: "refresh", Context: "global"},
+		{Key: "6", Command: "focus-plugin-6", Context: "global"},
+		{Key: "7", Command: "focus-plugin-7", Context: "global"},
+		{Key: "8", Command: "focus-plugin-8", Context: "global"},
+		{Key: "9", Command: "focus-plugin-9", Context: "global"},
+
+		// Navigation (Global defaults)
 		{Key: "j", Command: "cursor-down", Context: "global"},
-		{Key: "down", Command: "cursor-down", Context: "global"},
 		{Key: "k", Command: "cursor-up", Context: "global"},
+		{Key: "down", Command: "cursor-down", Context: "global"},
 		{Key: "up", Command: "cursor-up", Context: "global"},
+		{Key: "ctrl+n", Command: "cursor-down", Context: "global"},
+		{Key: "ctrl+p", Command: "cursor-up", Context: "global"},
 		{Key: "g g", Command: "cursor-top", Context: "global"},
 		{Key: "G", Command: "cursor-bottom", Context: "global"},
 		{Key: "enter", Command: "select", Context: "global"},
 		{Key: "esc", Command: "back", Context: "global"},
 
-		// Git Status context (files)
+		// Project switcher context
+		{Key: "@", Command: "toggle", Context: "project-switcher"},
+		{Key: "esc", Command: "close", Context: "project-switcher"},
+		{Key: "enter", Command: "select", Context: "project-switcher"},
+		{Key: "down", Command: "cursor-down", Context: "project-switcher"},
+		{Key: "up", Command: "cursor-up", Context: "project-switcher"},
+		{Key: "ctrl+n", Command: "cursor-down", Context: "project-switcher"},
+		{Key: "ctrl+p", Command: "cursor-up", Context: "project-switcher"},
+
+		// Git status context
+		{Key: "j", Command: "cursor-down", Context: "git-status"},
+		{Key: "k", Command: "cursor-up", Context: "git-status"},
 		{Key: "tab", Command: "switch-pane", Context: "git-status"},
 		{Key: "shift+tab", Command: "switch-pane", Context: "git-status"},
 		{Key: "s", Command: "stage-file", Context: "git-status"},
 		{Key: "u", Command: "unstage-file", Context: "git-status"},
 		{Key: "S", Command: "stage-all", Context: "git-status"},
+		{Key: "U", Command: "unstage-all", Context: "git-status"},
 		{Key: "c", Command: "commit", Context: "git-status"},
+		{Key: "A", Command: "amend", Context: "git-status"},
 		{Key: "d", Command: "show-diff", Context: "git-status"},
-		{Key: "v", Command: "toggle-diff-mode", Context: "git-status"},
-		{Key: "h", Command: "show-history", Context: "git-status"},
-		{Key: "o", Command: "open-file", Context: "git-status"},
-		{Key: "O", Command: "open-in-file-browser", Context: "git-status"},
 		{Key: "enter", Command: "show-diff", Context: "git-status"},
-		{Key: "D", Command: "discard-changes", Context: "git-status"},
-		{Key: "z", Command: "stash", Context: "git-status"},
-		{Key: "Z", Command: "stash-pop", Context: "git-status"},
-		{Key: "b", Command: "branch-picker", Context: "git-status"},
+		{Key: "r", Command: "refresh", Context: "git-status"},
+		{Key: "h", Command: "show-history", Context: "git-status"},
+		{Key: "P", Command: "push", Context: "git-status"},
 		{Key: "f", Command: "fetch", Context: "git-status"},
-		{Key: "p", Command: "pull", Context: "git-status"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "git-status"},
+		{Key: "l", Command: "pull", Context: "git-status"},
+		{Key: "b", Command: "branch", Context: "git-status"},
+		{Key: "p", Command: "stash", Context: "git-status"},
+		{Key: "z", Command: "stash-pop", Context: "git-status"},
+		{Key: "o", Command: "open-in-file-browser", Context: "git-status"},
+		{Key: "y", Command: "yank-file", Context: "git-status"},
+		{Key: "Y", Command: "yank-path", Context: "git-status"},
+		{Key: "x", Command: "discard-changes", Context: "git-status"},
+		{Key: "\", Command: "toggle-sidebar", Context: "git-status"},
 
-		// Git Status commits context (recent commits in sidebar)
-		{Key: "tab", Command: "switch-pane", Context: "git-status-commits"},
-		{Key: "shift+tab", Command: "switch-pane", Context: "git-status-commits"},
+		// Git status commits context (sidebar)
+		{Key: "j", Command: "cursor-down", Context: "git-status-commits"},
+		{Key: "k", Command: "cursor-up", Context: "git-status-commits"},
 		{Key: "enter", Command: "view-commit", Context: "git-status-commits"},
 		{Key: "d", Command: "view-commit", Context: "git-status-commits"},
 		{Key: "h", Command: "show-history", Context: "git-status-commits"},
@@ -63,110 +92,75 @@ func DefaultBindings() []Binding {
 		{Key: "F", Command: "clear-filter", Context: "git-status-commits"},
 		{Key: "n", Command: "next-match", Context: "git-status-commits"},
 		{Key: "N", Command: "prev-match", Context: "git-status-commits"},
-		{Key: "v", Command: "toggle-graph", Context: "git-status-commits"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "git-status-commits"},
 		{Key: "o", Command: "open-in-github", Context: "git-status-commits"},
+		{Key: "v", Command: "toggle-graph", Context: "git-status-commits"},
+		{Key: "\", Command: "toggle-sidebar", Context: "git-status-commits"},
 
-		// Git commit preview context (commit preview in right pane)
-		{Key: "tab", Command: "switch-pane", Context: "git-commit-preview"},
-		{Key: "shift+tab", Command: "switch-pane", Context: "git-commit-preview"},
-		{Key: "esc", Command: "back", Context: "git-commit-preview"},
-		{Key: "h", Command: "back", Context: "git-commit-preview"},
-		{Key: "enter", Command: "view-diff", Context: "git-commit-preview"},
-		{Key: "d", Command: "view-diff", Context: "git-commit-preview"},
+		// Git status diff context (inline)
+		{Key: "j", Command: "scroll-down", Context: "git-status-diff"},
+		{Key: "k", Command: "scroll-up", Context: "git-status-diff"},
+		{Key: "ctrl+d", Command: "page-down", Context: "git-status-diff"},
+		{Key: "ctrl+u", Command: "page-up", Context: "git-status-diff"},
+		{Key: "enter", Command: "full-diff", Context: "git-status-diff"},
+		{Key: "s", Command: "stage-file", Context: "git-status-diff"},
+		{Key: "u", Command: "unstage-file", Context: "git-status-diff"},
+		{Key: "\", Command: "toggle-sidebar", Context: "git-status-diff"},
+
+		// Git commit preview context
+		{Key: "j", Command: "scroll-down", Context: "git-commit-preview"},
+		{Key: "k", Command: "scroll-up", Context: "git-commit-preview"},
 		{Key: "y", Command: "yank-commit", Context: "git-commit-preview"},
 		{Key: "Y", Command: "yank-id", Context: "git-commit-preview"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "git-commit-preview"},
 		{Key: "o", Command: "open-in-github", Context: "git-commit-preview"},
-		{Key: "b", Command: "open-in-file-browser", Context: "git-commit-preview"},
 
-		// Git Diff context
+		// Git diff context (full screen)
 		{Key: "esc", Command: "close-diff", Context: "git-diff"},
-		{Key: "j", Command: "scroll", Context: "git-diff"},
-		{Key: "k", Command: "scroll", Context: "git-diff"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "git-diff"},
-		{Key: "v", Command: "toggle-diff-view", Context: "git-diff"},
-		{Key: "O", Command: "open-in-file-browser", Context: "git-diff"},
+		{Key: "q", Command: "close-diff", Context: "git-diff"},
+		{Key: "j", Command: "scroll-down", Context: "git-diff"},
+		{Key: "k", Command: "scroll-up", Context: "git-diff"},
+		{Key: "down", Command: "scroll-down", Context: "git-diff"},
+		{Key: "up", Command: "scroll-up", Context: "git-diff"},
+		{Key: "ctrl+d", Command: "page-down", Context: "git-diff"},
+		{Key: "ctrl+u", Command: "page-up", Context: "git-diff"},
+		{Key: "s", Command: "stage-file", Context: "git-diff"},
+		{Key: "u", Command: "unstage-file", Context: "git-diff"},
+		{Key: "[", Command: "prev-file", Context: "git-diff"},
+		{Key: "]", Command: "next-file", Context: "git-diff"},
+		{Key: "y", Command: "yank-diff", Context: "git-diff"},
+		{Key: "c", Command: "commit", Context: "git-diff"},
 
-		// Git Status Diff Pane context (inline diff in three-pane view)
-		{Key: "tab", Command: "switch-pane", Context: "git-status-diff"},
-		{Key: "shift+tab", Command: "switch-pane", Context: "git-status-diff"},
-		{Key: "v", Command: "toggle-diff-view", Context: "git-status-diff"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "git-status-diff"},
+		// Git commit context
+		{Key: "ctrl+s", Command: "execute-commit", Context: "git-commit"},
+		{Key: "ctrl+enter", Command: "execute-commit", Context: "git-commit"},
+		{Key: "esc", Command: "cancel-commit", Context: "git-commit"},
 
-		// TD Monitor bindings are registered dynamically by the TD plugin
-		// via ctx.Keymap.RegisterPluginBinding() in Init()
-		// This keeps TD as the single source of truth for shortcuts
+		// Git history context
+		{Key: "esc", Command: "close-history", Context: "git-history"},
+		{Key: "q", Command: "close-history", Context: "git-history"},
+		{Key: "enter", Command: "view-commit", Context: "git-history"},
 
-		// Conversations context
-		{Key: "enter", Command: "view-session", Context: "conversations"},
-		{Key: "/", Command: "search", Context: "conversations"},
-		{Key: "r", Command: "refresh", Context: "conversations"},
-		{Key: "U", Command: "analytics", Context: "conversations"},
-		{Key: "y", Command: "yank-details", Context: "conversations"},
-		{Key: "Y", Command: "yank-resume", Context: "conversations"},
-
-		// Conversations search context
-		{Key: "enter", Command: "select", Context: "conversations-search"},
-		{Key: "esc", Command: "cancel", Context: "conversations-search"},
-		{Key: "up", Command: "cursor-up", Context: "conversations-search"},
-		{Key: "down", Command: "cursor-down", Context: "conversations-search"},
-		{Key: "ctrl+p", Command: "cursor-up", Context: "conversations-search"},
-		{Key: "ctrl+n", Command: "cursor-down", Context: "conversations-search"},
-
-		// Conversation detail context (turn list view)
-		{Key: "esc", Command: "back", Context: "conversation-detail"},
-		{Key: "q", Command: "back", Context: "conversation-detail"},
-		{Key: "j", Command: "scroll", Context: "conversation-detail"},
-		{Key: "k", Command: "scroll", Context: "conversation-detail"},
-		{Key: "g", Command: "cursor-top", Context: "conversation-detail"},
-		{Key: "G", Command: "cursor-bottom", Context: "conversation-detail"},
-		{Key: "y", Command: "yank-details", Context: "conversation-detail"},
-		{Key: "Y", Command: "yank-resume", Context: "conversation-detail"},
-
-		// Message detail context (single turn detail view - single-pane mode)
-		{Key: "esc", Command: "back", Context: "message-detail"},
-		{Key: "q", Command: "back", Context: "message-detail"},
-		{Key: "j", Command: "scroll", Context: "message-detail"},
-		{Key: "k", Command: "scroll", Context: "message-detail"},
-		{Key: "g", Command: "cursor-top", Context: "message-detail"},
-		{Key: "G", Command: "cursor-bottom", Context: "message-detail"},
-		{Key: "ctrl+d", Command: "page-down", Context: "message-detail"},
-		{Key: "ctrl+u", Command: "page-up", Context: "message-detail"},
-		{Key: "y", Command: "yank-details", Context: "message-detail"},
-		{Key: "Y", Command: "yank-resume", Context: "message-detail"},
-
-		// Turn detail context (two-pane mode, detail in right pane)
-		{Key: "esc", Command: "back", Context: "turn-detail"},
-		{Key: "q", Command: "back", Context: "turn-detail"},
-		{Key: "h", Command: "back", Context: "turn-detail"},
-		{Key: "left", Command: "back", Context: "turn-detail"},
-		{Key: "j", Command: "scroll-down", Context: "turn-detail"},
-		{Key: "k", Command: "scroll-up", Context: "turn-detail"},
-		{Key: "down", Command: "scroll-down", Context: "turn-detail"},
-		{Key: "up", Command: "scroll-up", Context: "turn-detail"},
-		{Key: "g", Command: "scroll-top", Context: "turn-detail"},
-		{Key: "G", Command: "scroll-bottom", Context: "turn-detail"},
-		{Key: "ctrl+d", Command: "page-down", Context: "turn-detail"},
-		{Key: "ctrl+u", Command: "page-up", Context: "turn-detail"},
-		{Key: "y", Command: "yank", Context: "turn-detail"},
+		// Git commit detail context
+		{Key: "esc", Command: "close-detail", Context: "git-commit-detail"},
+		{Key: "q", Command: "close-detail", Context: "git-commit-detail"},
 
 		// Conversations sidebar context (two-pane mode, left pane focused)
 		{Key: "tab", Command: "switch-pane", Context: "conversations-sidebar"},
 		{Key: "shift+tab", Command: "switch-pane", Context: "conversations-sidebar"},
-		{Key: "enter", Command: "view-session", Context: "conversations-sidebar"},
+		{Key: "a", Command: "new-session", Context: "conversations-sidebar"},
+		{Key: "d", Command: "delete-session", Context: "conversations-sidebar"},
+		{Key: "r", Command: "rename-session", Context: "conversations-sidebar"},
+		{Key: "e", Command: "export-session", Context: "conversations-sidebar"},
+		{Key: "c", Command: "copy-session", Context: "conversations-sidebar"},
+		{Key: "f", Command: "filter", Context: "conversations-sidebar"},
 		{Key: "/", Command: "search", Context: "conversations-sidebar"},
-		{Key: "r", Command: "refresh", Context: "conversations-sidebar"},
-		{Key: "U", Command: "analytics", Context: "conversations-sidebar"},
-		{Key: "j", Command: "cursor-down", Context: "conversations-sidebar"},
-		{Key: "k", Command: "cursor-up", Context: "conversations-sidebar"},
-		{Key: "down", Command: "cursor-down", Context: "conversations-sidebar"},
-		{Key: "up", Command: "cursor-up", Context: "conversations-sidebar"},
-		{Key: "g", Command: "cursor-top", Context: "conversations-sidebar"},
-		{Key: "G", Command: "cursor-bottom", Context: "conversations-sidebar"},
+		{Key: "s", Command: "toggle-star", Context: "conversations-sidebar"},
+		{Key: "A", Command: "show-analytics", Context: "conversations-sidebar"},
+		{Key: "o", Command: "open-in-claude-code", Context: "conversations-sidebar"},
 		{Key: "l", Command: "focus-right", Context: "conversations-sidebar"},
 		{Key: "right", Command: "focus-right", Context: "conversations-sidebar"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "conversations-sidebar"},
+		{Key: "v", Command: "toggle-view", Context: "conversations-sidebar"},
+		{Key: "enter", Command: "select-session", Context: "conversations-sidebar"},
+		{Key: "\", Command: "toggle-sidebar", Context: "conversations-sidebar"},
 		{Key: "y", Command: "yank-details", Context: "conversations-sidebar"},
 		{Key: "Y", Command: "yank-resume", Context: "conversations-sidebar"},
 
@@ -183,7 +177,7 @@ func DefaultBindings() []Binding {
 		{Key: "v", Command: "toggle-view", Context: "conversations-main"},
 		{Key: "e", Command: "expand", Context: "conversations-main"},
 		{Key: "enter", Command: "detail", Context: "conversations-main"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "conversations-main"},
+		{Key: "\", Command: "toggle-sidebar", Context: "conversations-main"},
 		{Key: "y", Command: "yank-details", Context: "conversations-main"},
 		{Key: "Y", Command: "yank-resume", Context: "conversations-main"},
 
@@ -204,12 +198,13 @@ func DefaultBindings() []Binding {
 		{Key: "Y", Command: "copy-path", Context: "file-browser-tree"},
 		{Key: "p", Command: "paste", Context: "file-browser-tree"},
 		{Key: "s", Command: "sort", Context: "file-browser-tree"},
-		{Key: "r", Command: "rename", Context: "file-browser-tree"},
+		{Key: "r", Command: "refresh", Context: "file-browser-tree"},
 		{Key: "m", Command: "move", Context: "file-browser-tree"},
-		{Key: "R", Command: "reveal", Context: "file-browser-tree"},
+		{Key: "R", Command: "rename", Context: "file-browser-tree"},
+		{Key: "ctrl+r", Command: "reveal", Context: "file-browser-tree"},
 		{Key: "i", Command: "info", Context: "file-browser-tree"},
 		{Key: "B", Command: "blame", Context: "file-browser-tree"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "file-browser-tree"},
+		{Key: "\", Command: "toggle-sidebar", Context: "file-browser-tree"},
 		{Key: "I", Command: "toggle-ignored", Context: "file-browser-tree"},
 
 		// File browser preview context
@@ -221,7 +216,9 @@ func DefaultBindings() []Binding {
 		{Key: "[", Command: "prev-tab", Context: "file-browser-preview"},
 		{Key: "]", Command: "next-tab", Context: "file-browser-preview"},
 		{Key: "x", Command: "close-tab", Context: "file-browser-preview"},
-		{Key: "R", Command: "reveal", Context: "file-browser-preview"},
+		{Key: "r", Command: "refresh", Context: "file-browser-preview"},
+		{Key: "R", Command: "rename", Context: "file-browser-preview"},
+		{Key: "ctrl+r", Command: "reveal", Context: "file-browser-preview"},
 		{Key: "i", Command: "info", Context: "file-browser-preview"},
 		{Key: "B", Command: "blame", Context: "file-browser-preview"},
 		{Key: "m", Command: "toggle-markdown", Context: "file-browser-preview"},
@@ -229,7 +226,7 @@ func DefaultBindings() []Binding {
 		{Key: "h", Command: "back", Context: "file-browser-preview"},
 		{Key: "y", Command: "yank-contents", Context: "file-browser-preview"},
 		{Key: "Y", Command: "yank-path", Context: "file-browser-preview"},
-		{Key: "\\", Command: "toggle-sidebar", Context: "file-browser-preview"},
+		{Key: "\", Command: "toggle-sidebar", Context: "file-browser-preview"},
 
 		// File browser tree search context
 		{Key: "esc", Command: "cancel", Context: "file-browser-search"},
@@ -254,55 +251,68 @@ func DefaultBindings() []Binding {
 		// File browser project search context
 		{Key: "esc", Command: "cancel", Context: "file-browser-project-search"},
 		{Key: "enter", Command: "select", Context: "file-browser-project-search"},
-		{Key: "tab", Command: "toggle", Context: "file-browser-project-search"},
-		{Key: " ", Command: "toggle", Context: "file-browser-project-search"},
 		{Key: "up", Command: "cursor-up", Context: "file-browser-project-search"},
 		{Key: "down", Command: "cursor-down", Context: "file-browser-project-search"},
 		{Key: "ctrl+n", Command: "cursor-down", Context: "file-browser-project-search"},
 		{Key: "ctrl+p", Command: "cursor-up", Context: "file-browser-project-search"},
+		{Key: "tab", Command: "toggle", Context: "file-browser-project-search"},
+		{Key: "alt+r", Command: "toggle-regex", Context: "file-browser-project-search"},
+		{Key: "alt+c", Command: "toggle-case", Context: "file-browser-project-search"},
+		{Key: "alt+w", Command: "toggle-word", Context: "file-browser-project-search"},
+		{Key: "ctrl+g", Command: "cursor-top", Context: "file-browser-project-search"},
+		{Key: "ctrl+e", Command: "open-in-editor", Context: "file-browser-project-search"},
+		{Key: "ctrl+d", Command: "page-down", Context: "file-browser-project-search"},
+		{Key: "ctrl+u", Command: "page-up", Context: "file-browser-project-search"},
 
-		// File browser file operation context (move/rename/create/delete)
+		// File browser file operation context
 		{Key: "esc", Command: "cancel", Context: "file-browser-file-op"},
 		{Key: "enter", Command: "confirm", Context: "file-browser-file-op"},
+		{Key: "tab", Command: "next-button", Context: "file-browser-file-op"},
+		{Key: "shift+tab", Command: "prev-button", Context: "file-browser-file-op"},
 
-		// File browser blame context
-		{Key: "esc", Command: "close", Context: "file-browser-blame"},
-		{Key: "q", Command: "close", Context: "file-browser-blame"},
-		{Key: "j", Command: "scroll-down", Context: "file-browser-blame"},
-		{Key: "k", Command: "scroll-up", Context: "file-browser-blame"},
-		{Key: "down", Command: "scroll-down", Context: "file-browser-blame"},
-		{Key: "up", Command: "scroll-up", Context: "file-browser-blame"},
-		{Key: "g", Command: "scroll-top", Context: "file-browser-blame"},
-		{Key: "G", Command: "scroll-bottom", Context: "file-browser-blame"},
-		{Key: "ctrl+d", Command: "page-down", Context: "file-browser-blame"},
-		{Key: "ctrl+u", Command: "page-up", Context: "file-browser-blame"},
-		{Key: "enter", Command: "view-commit", Context: "file-browser-blame"},
-		{Key: "y", Command: "yank-hash", Context: "file-browser-blame"},
+		// File browser line jump context
+		{Key: "esc", Command: "cancel", Context: "file-browser-line-jump"},
+		{Key: "enter", Command: "confirm", Context: "file-browser-line-jump"},
 
-		// Worktree preview context (diff view)
-		{Key: "}", Command: "next-file", Context: "worktree-preview"},
-		{Key: "{", Command: "prev-file", Context: "worktree-preview"},
-		{Key: "f", Command: "file-picker", Context: "worktree-preview"},
+		// Worktree context
+		{Key: "n", Command: "new-worktree", Context: "worktree-list"},
+		{Key: "v", Command: "toggle-view", Context: "worktree-list"},
+		{Key: "r", Command: "refresh", Context: "worktree-list"},
+		{Key: "D", Command: "delete-worktree", Context: "worktree-list"},
+		{Key: "p", Command: "push", Context: "worktree-list"},
+		{Key: "m", Command: "merge-workflow", Context: "worktree-list"},
+		{Key: "t", Command: "link-task", Context: "worktree-list"},
+		{Key: "s", Command: "start-agent", Context: "worktree-list"},
+		{Key: "enter", Command: "attach", Context: "worktree-list"},
+		{Key: "S", Command: "stop-agent", Context: "worktree-list"},
+		{Key: "y", Command: "approve", Context: "worktree-list"},
+		{Key: "N", Command: "reject", Context: "worktree-list"},
+		{Key: "tab", Command: "switch-pane", Context: "worktree-list"},
+		{Key: "shift+tab", Command: "switch-pane", Context: "worktree-list"},
+		{Key: "\", Command: "toggle-sidebar", Context: "worktree-list"},
+		{Key: "[", Command: "prev-tab", Context: "worktree-list"},
+		{Key: "]", Command: "next-tab", Context: "worktree-list"},
 
-		// Worktree file picker context
-		{Key: "esc", Command: "cancel", Context: "worktree-file-picker"},
-		{Key: "q", Command: "cancel", Context: "worktree-file-picker"},
-		{Key: "enter", Command: "select", Context: "worktree-file-picker"},
-		{Key: "j", Command: "cursor-down", Context: "worktree-file-picker"},
-		{Key: "k", Command: "cursor-up", Context: "worktree-file-picker"},
-		{Key: "down", Command: "cursor-down", Context: "worktree-file-picker"},
-		{Key: "up", Command: "cursor-up", Context: "worktree-file-picker"},
-
-		// Git Commit context (commit message editor)
-		{Key: "esc", Command: "cancel", Context: "git-commit"},
-		{Key: "alt+enter", Command: "execute-commit", Context: "git-commit"},
-		{Key: "alt+s", Command: "execute-commit", Context: "git-commit"},
+		// Worktree preview context
+		{Key: "tab", Command: "switch-pane", Context: "worktree-preview"},
+		{Key: "shift+tab", Command: "switch-pane", Context: "worktree-preview"},
+		{Key: "\", Command: "toggle-sidebar", Context: "worktree-preview"},
+		{Key: "[", Command: "prev-tab", Context: "worktree-preview"},
+		{Key: "]", Command: "next-tab", Context: "worktree-preview"},
+		{Key: "j", Command: "scroll-down", Context: "worktree-preview"},
+		{Key: "k", Command: "scroll-up", Context: "worktree-preview"},
+		{Key: "ctrl+d", Command: "page-down", Context: "worktree-preview"},
+		{Key: "ctrl+u", Command: "page-up", Context: "worktree-preview"}
 	}
 }
 
-// RegisterDefaults registers all default bindings with the registry.
-func RegisterDefaults(r *Registry) {
-	for _, b := range DefaultBindings() {
-		r.RegisterBinding(b)
-	}
-}
+// Category represents a command category.
+type Category string
+
+const (
+	CategoryNavigation Category = "Navigation"
+	CategoryActions    Category = "Actions"
+	CategoryView       Category = "View"
+	CategorySearch     Category = "Search"
+	CategorySystem     Category = "System"
+)

@@ -332,9 +332,10 @@ All plugins with two-pane layouts (Git, Conversations, Files) share consistent s
 | `y` | yank | Copy file/directory to clipboard |
 | `p` | paste | Paste from clipboard |
 | `s` | sort | Cycle sort mode (name/size/time/type) |
-| `r` | rename | Rename file/directory |
+| `r` | refresh | Refresh file tree |
 | `m` | move | Move file/directory |
-| `R` | reveal | Reveal in system file manager |
+| `R` | rename | Rename file/directory |
+| `ctrl+r` | reveal | Reveal in system file manager |
 | `\` | toggle-sidebar | Collapse/expand tree pane |
 
 Tab navigation shortcuts (`[`/`]`, `x`) also work in the preview pane.
