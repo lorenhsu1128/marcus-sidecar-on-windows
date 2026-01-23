@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/marcus/sidecar/internal/config"
@@ -1009,9 +1010,43 @@ func TestHandleInteractiveKeys_DropsPartialMouseSequence(t *testing.T) {
 	if p.viewMode != ViewModeInteractive {
 		t.Error("expected to remain in interactive mode after dropping mouse sequence")
 	}
-	// Should return nil or batch of empty cmds (no tmux forwarding)
-	// If cmd is non-nil, it's a tea.Batch of previously accumulated cmds
-	_ = cmd
+	// Should return nil (no commands to execute)
+	if cmd != nil {
+		t.Error("expected nil cmd when dropping partial mouse sequence")
+	}
+}
+
+// TestHandleInteractiveKeys_CancelsPendingEscapeForMouseSequence tests the actual
+// split-read scenario: ESC arrived first (setting EscapePressed=true), then the
+// partial mouse sequence arrives. The pending escape must be cancelled since it
+// was part of the mouse event, not a real user keypress (td-791865).
+func TestHandleInteractiveKeys_CancelsPendingEscapeForMouseSequence(t *testing.T) {
+	p := &Plugin{
+		viewMode: ViewModeInteractive,
+		interactiveState: &InteractiveState{
+			Active:          true,
+			TargetSession:   "test-session",
+			EscapePressed:   true, // ESC arrived first (split-read)
+			EscapeTime:      time.Now(),
+		},
+	}
+
+	// Partial mouse sequence arrives as the next message
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[<65;83;33M")}
+	cmd := p.handleInteractiveKeys(msg)
+
+	// EscapePressed must be cleared — it was part of the mouse sequence
+	if p.interactiveState.EscapePressed {
+		t.Error("expected EscapePressed to be cleared after partial mouse sequence")
+	}
+	// Should remain in interactive mode
+	if p.viewMode != ViewModeInteractive {
+		t.Error("expected to remain in interactive mode")
+	}
+	// No commands should be returned (no forwarding)
+	if cmd != nil {
+		t.Error("expected nil cmd, not forwarding anything to tmux")
+	}
 }
 
 // TestHandleInteractiveKeys_ForwardsNormalRunes tests that normal rune input is

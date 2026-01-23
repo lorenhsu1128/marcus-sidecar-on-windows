@@ -742,6 +742,18 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 
+	// Filter partial SGR mouse sequences that leaked through Bubble Tea's
+	// input parser due to split-read timing (ESC arrived separately) (td-791865).
+	// Must be checked BEFORE forwarding pending escape, since the ESC was part
+	// of the mouse sequence, not a real user keypress.
+	if msg.Type == tea.KeyRunes && len(msg.Runes) > 5 {
+		if partialMouseSeqRegex.MatchString(string(msg.Runes)) {
+			// Cancel the pending escape — it was the leading byte of this mouse event
+			p.interactiveState.EscapePressed = false
+			return nil
+		}
+	}
+
 	// Non-escape key: check if we have a pending Escape to forward first
 	var cmds []tea.Cmd
 	if p.interactiveState.EscapePressed {
@@ -768,15 +780,6 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 	}
 
 	sessionName := p.interactiveState.TargetSession
-
-	// Filter partial SGR mouse sequences that leaked through Bubble Tea's
-	// input parser due to split-read timing (ESC arrived separately) (td-791865).
-	// Must be checked before isPasteInput since these exceed the paste length threshold.
-	if msg.Type == tea.KeyRunes && len(msg.Runes) > 5 {
-		if partialMouseSeqRegex.MatchString(string(msg.Runes)) {
-			return tea.Batch(cmds...)
-		}
-	}
 
 	// Check for paste (multi-character input with newlines or long text)
 	if isPasteInput(msg) {
