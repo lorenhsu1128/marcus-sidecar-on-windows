@@ -54,17 +54,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 
 	case tea.MouseMsg:
-		// Forward mouse events to palette when it's open
-		if m.showPalette {
+		// Route mouse events to active modal (priority order)
+		switch m.activeModal() {
+		case ModalPalette:
 			var cmd tea.Cmd
 			m.palette, cmd = m.palette.Update(msg)
 			return m, cmd
-		}
-
-		// Handle diagnostics modal mouse events
-		if m.showDiagnostics {
+		case ModalHelp:
+			return m, nil
+		case ModalDiagnostics:
 			if m.hasUpdatesAvailable() && !m.updateInProgress && !m.needsRestart {
-				// Check if click is on update button
 				if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
 					if m.updateButtonBounds.Contains(msg.X, msg.Y) {
 						m.updateInProgress = true
@@ -75,26 +74,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
-		}
-
-		// Handle project switcher modal mouse events
-		if m.showProjectSwitcher {
-			return m.handleProjectSwitcherMouse(msg)
-		}
-
-		// Handle theme switcher modal mouse events
-		if m.showThemeSwitcher {
-			return m.handleThemeSwitcherMouse(msg)
-		}
-
-		// Handle quit confirm modal mouse events
-		if m.showQuitConfirm {
+		case ModalQuitConfirm:
 			return m.handleQuitConfirmMouse(msg)
-		}
-
-		// Ignore mouse events for other modals
-		if m.showHelp {
-			return m, nil
+		case ModalProjectSwitcher:
+			return m.handleProjectSwitcherMouse(msg)
+		case ModalThemeSwitcher:
+			return m.handleThemeSwitcherMouse(msg)
 		}
 
 		// Handle header tab clicks (Y < 2 means header area)
@@ -287,27 +272,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyMsg processes keyboard input.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Close modals with escape
+	// Close modals with escape (priority order via activeModal)
 	if msg.Type == tea.KeyEsc {
-		if m.showHelp {
+		switch m.activeModal() {
+		case ModalPalette:
+			m.showPalette = false
+			m.updateContext()
+			return m, nil
+		case ModalHelp:
 			m.showHelp = false
 			return m, nil
-		}
-		if m.showDiagnostics {
+		case ModalDiagnostics:
 			m.showDiagnostics = false
 			return m, nil
-		}
-		if m.showQuitConfirm {
+		case ModalQuitConfirm:
 			m.showQuitConfirm = false
 			return m, nil
-		}
-		if m.showProjectSwitcher {
+		case ModalProjectSwitcher:
+			// Esc: clear filter if set, otherwise close
+			if m.projectSwitcherInput.Value() != "" {
+				m.projectSwitcherInput.SetValue("")
+				m.projectSwitcherFiltered = m.cfg.Projects.List
+				m.projectSwitcherCursor = 0
+				m.projectSwitcherScroll = 0
+				return m, nil
+			}
 			m.resetProjectSwitcher()
 			m.updateContext()
 			return m, nil
-		}
-		if m.showThemeSwitcher {
-			// Restore original theme on cancel
+		case ModalThemeSwitcher:
+			// Esc: clear filter if set, otherwise close (restore original)
+			if m.themeSwitcherInput.Value() != "" {
+				m.themeSwitcherInput.SetValue("")
+				m.themeSwitcherFiltered = styles.ListThemes()
+				m.themeSwitcherCursor = 0
+				m.themeSwitcherScroll = 0
+				return m, nil
+			}
 			m.applyThemeFromConfig(m.themeSwitcherOriginal)
 			m.resetThemeSwitcher()
 			m.updateContext()
@@ -390,7 +391,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.activeContext == "git-commit" {
 		// ctrl+c shows quit confirmation
 		if msg.String() == "ctrl+c" {
-			if !m.showHelp && !m.showDiagnostics && !m.showPalette {
+			if !m.hasModal() {
 				m.showQuitConfirm = true
 			}
 			return m, nil
@@ -411,28 +412,20 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global quit - ctrl+c always takes precedence, 'q' in root plugin contexts
 	switch msg.String() {
 	case "ctrl+c":
-		if !m.showHelp && !m.showDiagnostics && !m.showPalette {
+		if !m.hasModal() {
 			m.showQuitConfirm = true
 			return m, nil
 		}
 	case "q":
-		// 'q' triggers quit in root contexts where it's not used for navigation
-		// Root contexts: global, or plugin root views (not sub-views like detail/diff)
-		if !m.showHelp && !m.showDiagnostics && !m.showPalette && isRootContext(m.activeContext) {
+		if !m.hasModal() && isRootContext(m.activeContext) {
 			m.showQuitConfirm = true
 			return m, nil
 		}
 		// Fall through to forward to plugin for navigation (back/escape)
 	}
 
-	// Handle palette input when open
+	// Handle palette input when open (Esc handled above)
 	if m.showPalette {
-		if msg.Type == tea.KeyEsc {
-			m.showPalette = false
-			m.updateContext()
-			return m, nil
-		}
-		// Forward to palette
 		var cmd tea.Cmd
 		m.palette, cmd = m.palette.Update(msg)
 		return m, cmd
@@ -463,19 +456,15 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle project switcher modal keys
+	// Handle project switcher modal keys (Esc handled above)
 	if m.showProjectSwitcher {
 		allProjects := m.cfg.Projects.List
 		if len(allProjects) == 0 {
-			// No projects configured - handle y for LLM prompt, close on esc/q/@
+			// No projects configured - handle y for LLM prompt, close on q/@
 			switch msg.String() {
 			case "y":
 				return m, m.copyProjectSetupPrompt()
 			case "q", "@":
-				m.resetProjectSwitcher()
-				m.updateContext()
-			}
-			if msg.Type == tea.KeyEsc {
 				m.resetProjectSwitcher()
 				m.updateContext()
 			}
@@ -485,19 +474,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		projects := m.projectSwitcherFiltered
 
 		switch msg.Type {
-		case tea.KeyEsc:
-			// Esc: clear filter if set, otherwise close modal
-			if m.projectSwitcherInput.Value() != "" {
-				m.projectSwitcherInput.SetValue("")
-				m.projectSwitcherFiltered = allProjects
-				m.projectSwitcherCursor = 0
-				m.projectSwitcherScroll = 0
-				return m, nil
-			}
-			m.resetProjectSwitcher()
-			m.updateContext()
-			return m, nil
-
 		case tea.KeyEnter:
 			// Select project and switch to it
 			if m.projectSwitcherCursor >= 0 && m.projectSwitcherCursor < len(projects) {
@@ -576,26 +552,11 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// Handle theme switcher modal keys
+	// Handle theme switcher modal keys (Esc handled above)
 	if m.showThemeSwitcher {
 		themes := m.themeSwitcherFiltered
 
 		switch msg.Type {
-		case tea.KeyEsc:
-			// Esc: clear filter if set, otherwise restore original and close
-			if m.themeSwitcherInput.Value() != "" {
-				m.themeSwitcherInput.SetValue("")
-				m.themeSwitcherFiltered = styles.ListThemes()
-				m.themeSwitcherCursor = 0
-				m.themeSwitcherScroll = 0
-				return m, nil
-			}
-			// Restore original theme
-			m.applyThemeFromConfig(m.themeSwitcherOriginal)
-			m.resetThemeSwitcher()
-			m.updateContext()
-			return m, nil
-
 		case tea.KeyEnter:
 			// Confirm selection and close
 			if m.themeSwitcherCursor >= 0 && m.themeSwitcherCursor < len(themes) {
@@ -700,8 +661,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// If modal is open, don't process other keys
-	if m.showHelp || m.showQuitConfirm {
+	// If any modal is open, don't process plugin/toggle keys
+	if m.hasModal() {
 		return m, nil
 	}
 

@@ -60,27 +60,24 @@ func (m Model) View() string {
 		b.WriteString(m.renderFooter())
 	}
 
-	// Overlay modals
-	if m.showPalette {
-		return m.renderPaletteOverlay(b.String())
-	}
-	if m.showHelp {
-		return m.renderHelpOverlay(b.String())
-	}
-	if m.showDiagnostics {
-		return m.renderDiagnosticsOverlay(b.String())
-	}
-	if m.showQuitConfirm {
-		return m.renderQuitConfirmOverlay(b.String())
-	}
-	if m.showProjectSwitcher {
-		return m.renderProjectSwitcherOverlay(b.String())
-	}
-	if m.showThemeSwitcher {
-		return m.renderThemeSwitcherOverlay(b.String())
+	// Overlay modals (priority order via activeModal)
+	bg := b.String()
+	switch m.activeModal() {
+	case ModalPalette:
+		return m.renderPaletteOverlay(bg)
+	case ModalHelp:
+		return m.renderHelpOverlay(bg)
+	case ModalDiagnostics:
+		return m.renderDiagnosticsOverlay(bg)
+	case ModalQuitConfirm:
+		return m.renderQuitConfirmOverlay(bg)
+	case ModalProjectSwitcher:
+		return m.renderProjectSwitcherOverlay(bg)
+	case ModalThemeSwitcher:
+		return m.renderThemeSwitcherOverlay(bg)
 	}
 
-	return b.String()
+	return bg
 }
 
 // renderPaletteOverlay renders the command palette modal.

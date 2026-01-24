@@ -19,6 +19,46 @@ import (
 	"github.com/marcus/sidecar/internal/version"
 )
 
+// ModalKind identifies an app-level modal with explicit priority ordering.
+// Lower values = higher priority (checked first for rendering and input routing).
+type ModalKind int
+
+const (
+	ModalNone          ModalKind = iota // No modal open
+	ModalPalette                        // Command palette (highest priority)
+	ModalHelp                           // Help overlay
+	ModalDiagnostics                    // Diagnostics/version info
+	ModalQuitConfirm                    // Quit confirmation dialog
+	ModalProjectSwitcher                // Project switcher
+	ModalThemeSwitcher                  // Theme switcher (lowest priority)
+)
+
+// activeModal returns the highest-priority open modal.
+// This is the single source of truth for which modal is currently active.
+func (m *Model) activeModal() ModalKind {
+	switch {
+	case m.showPalette:
+		return ModalPalette
+	case m.showHelp:
+		return ModalHelp
+	case m.showDiagnostics:
+		return ModalDiagnostics
+	case m.showQuitConfirm:
+		return ModalQuitConfirm
+	case m.showProjectSwitcher:
+		return ModalProjectSwitcher
+	case m.showThemeSwitcher:
+		return ModalThemeSwitcher
+	default:
+		return ModalNone
+	}
+}
+
+// hasModal returns true if any app-level modal is open.
+func (m *Model) hasModal() bool {
+	return m.activeModal() != ModalNone
+}
+
 // TabBounds represents the X position range of a tab for mouse hit testing.
 type TabBounds struct {
 	Start, End int
