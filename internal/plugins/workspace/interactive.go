@@ -645,6 +645,8 @@ func (p *Plugin) resizeInteractivePaneCmd() tea.Cmd {
 
 // resizeTmuxTargetCmd returns a tea.Cmd that resizes a tmux target to preview dimensions.
 // Skips resize if current size already matches. Retries once if verify fails.
+// Returns paneResizedMsg when the size actually changed, triggering a fresh poll
+// so captured content reflects the new width/wrapping.
 func (p *Plugin) resizeTmuxTargetCmd(target string) tea.Cmd {
 	if target == "" {
 		return nil
@@ -663,7 +665,7 @@ func (p *Plugin) resizeTmuxTargetCmd(target string) tea.Cmd {
 				p.resizeTmuxPane(target, previewWidth, previewHeight)
 			}
 		}
-		return nil
+		return paneResizedMsg{}
 	}
 }
 

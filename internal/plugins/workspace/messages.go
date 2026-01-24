@@ -198,6 +198,10 @@ type cursorPositionMsg struct {
 	Visible bool // Whether cursor should be rendered
 }
 
+// paneResizedMsg signals that a tmux pane was resized to match preview dimensions.
+// Triggers a fresh poll so captured content reflects the new width/wrapping.
+type paneResizedMsg struct{}
+
 // InteractivePasteResultMsg reports clipboard paste results for interactive mode.
 type InteractivePasteResultMsg struct {
 	Err         error

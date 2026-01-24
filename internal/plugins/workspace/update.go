@@ -450,6 +450,21 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			}
 		}
 
+	case paneResizedMsg:
+		// Pane was resized to match preview dimensions - trigger fresh poll so
+		// captured content reflects the new width/wrapping.
+		// Skip in interactive mode: it manages its own polling chain.
+		if p.viewMode == ViewModeInteractive {
+			return p, nil
+		}
+		if p.shellSelected {
+			if shell := p.getSelectedShell(); shell != nil && shell.Agent != nil {
+				return p, p.pollShellSessionByName(shell.TmuxName)
+			}
+		} else {
+			return p, p.pollSelectedAgentNowIfVisible()
+		}
+
 	case shellAttachAfterCreateMsg:
 		// Attach to shell after it was created
 		return p, p.attachToShellByIndex(msg.Index)
