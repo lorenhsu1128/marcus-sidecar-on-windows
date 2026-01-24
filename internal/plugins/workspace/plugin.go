@@ -134,6 +134,7 @@ type Plugin struct {
 	interactiveSelEnd          selectionPoint // end of selection (line, col), col is INCLUSIVE
 	interactiveSelAnchor       selectionPoint // anchor (click point) for drag
 	interactiveSelectionRect   mouse.Rect
+	interactiveCopyPasteHintShown bool
 
 	// Kanban view state
 	kanbanCol int // Current column index (0=Shells, 1=Active, 2=Thinking, 3=Waiting, 4=Done, 5=Paused)

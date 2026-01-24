@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	app "github.com/marcus/sidecar/internal/app"
 	"github.com/marcus/sidecar/internal/features"
 	"github.com/marcus/sidecar/internal/styles"
 )
@@ -569,7 +570,17 @@ func (p *Plugin) enterInteractiveMode() tea.Cmd {
 	}
 
 	// Trigger immediate poll for fresh content (cursor position is captured atomically with output)
-	return p.pollInteractivePane()
+	cmds := []tea.Cmd{p.pollInteractivePane()}
+	if !p.interactiveCopyPasteHintShown {
+		p.interactiveCopyPasteHintShown = true
+		cmds = append(cmds, func() tea.Msg {
+			return app.ToastMsg{
+				Message:  fmt.Sprintf("Interactive copy/paste: %s / %s (configurable)", p.getInteractiveCopyKey(), p.getInteractivePasteKey()),
+				Duration: 3 * time.Second,
+			}
+		})
+	}
+	return tea.Batch(cmds...)
 }
 
 // calculatePreviewDimensions returns the content width and height for the preview pane.

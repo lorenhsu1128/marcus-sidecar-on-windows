@@ -259,6 +259,8 @@ Interactive mode supports clipboard copy/paste without leaving Sidecar:
 - Copy: click-drag to select output lines when the app has mouse reporting disabled (otherwise clicks are forwarded to tmux). Press the copy key (`alt+c` by default, configurable via `plugins.workspace.interactiveCopyKey`) to copy the selection. If no selection exists, it copies the visible output.
 - Paste: press the paste key (`alt+v` by default, configurable via `plugins.workspace.interactivePasteKey`). Sidecar reads the system clipboard and sends it to tmux, using bracketed paste sequences when the app enabled bracketed paste mode.
 
+**Terminal shortcut note**: On macOS terminals, Cmd+C/Cmd+V are handled by the terminal and typically do not reach Sidecar in interactive mode. Use the Option-based bindings (or remap in your terminal). In iTerm, choosing "Disable mouse reporting" to enable mouse selection also disables all mouse events (click/scroll/drag) for Sidecar.
+
 ## Common Pitfalls
 
 ### ❌ Don't Clear the OutputBuffer
