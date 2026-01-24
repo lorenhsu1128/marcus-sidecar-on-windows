@@ -99,7 +99,7 @@ func main() {
 	}
 
 	// Apply theme from config
-	styles.ApplyThemeWithOverrides(cfg.UI.Theme.Name, cfg.UI.Theme.Overrides)
+	styles.ApplyThemeWithGenericOverrides(cfg.UI.Theme.Name, cfg.UI.Theme.Overrides)
 
 	// Initialize feature flags
 	features.Init(cfg)

@@ -347,3 +347,30 @@ styles.ApplyThemeWithOverrides("default", map[string]string{
     "primary": "#FF5500",
 })
 ```
+
+## Community Themes
+
+Press `#` to open the theme switcher, then `Tab` to browse 453 community color schemes. The browser supports:
+
+- **Search**: Type to filter by name
+- **Live preview**: Themes apply instantly as you navigate
+- **Color swatches**: Each entry shows a 4-color preview
+- **Save**: Press `Enter` to save the selected theme to your config
+
+Community themes are automatically converted from iTerm2 color schemes. The converter maps ANSI colors to Sidecar's semantic palette and derives tab gradients from the most saturated colors in each scheme.
+
+Saved community themes are stored as overrides on the `default` base theme in `~/.config/sidecar/config.json`. To revert, select any built-in theme from the `#` switcher.
+
+## Updating Community Themes
+
+The community theme browser (accessible via `#` → `Tab`) uses color schemes from the [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes) repository (MIT licensed). These are embedded as `internal/community/schemes.json`.
+
+To regenerate after pulling new schemes from upstream:
+
+```bash
+# Clone or update the source repo
+git clone https://github.com/mbadolato/iTerm2-Color-Schemes ~/code/iTerm2-Color-Schemes
+
+# Regenerate schemes.json (accepts optional path argument)
+./scripts/generate-schemes.sh [path-to-repo]
+```

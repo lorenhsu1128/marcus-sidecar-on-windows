@@ -172,12 +172,21 @@ Press `@` to switch between configured projects without restarting sidecar.
 
 All plugins reinitialize with the new project context. State (active plugin, cursor positions) is remembered per project.
 
+## Themes
+
+Press `#` to open the theme switcher. Choose from built-in themes (default, dracula) or press `Tab` to browse 453 community color schemes derived from iTerm2-Color-Schemes.
+
+The community browser supports search filtering, live preview as you navigate, and color swatches for each scheme. Press `Enter` to save a scheme as your active theme.
+
+See [Theme Creator Guide](docs/guides/theme-creator-guide.md) for custom theme creation and color palette reference.
+
 ## Keyboard Shortcuts
 
 | Key                 | Action                           |
 | ------------------- | -------------------------------- |
 | `q`, `ctrl+c`       | Quit                             |
 | `@`                 | Open project switcher            |
+| `#`                 | Open theme switcher              |
 | `tab` / `shift+tab` | Navigate plugins                 |
 | `1-9`               | Focus plugin by number           |
 | `j/k`, `↓/↑`        | Navigate items                   |
@@ -226,7 +235,11 @@ Config file: `~/.config/sidecar/config.json`
   },
   "ui": {
     "showFooter": true,
-    "showClock": true
+    "showClock": true,
+    "theme": {
+      "name": "default",
+      "overrides": {}
+    }
   }
 }
 ```

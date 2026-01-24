@@ -89,8 +89,8 @@ type UIConfig struct {
 
 // ThemeConfig configures the color theme.
 type ThemeConfig struct {
-	Name      string            `json:"name"`
-	Overrides map[string]string `json:"overrides"`
+	Name      string                 `json:"name"`
+	Overrides map[string]interface{} `json:"overrides"`
 }
 
 // Default returns the default configuration.
@@ -127,7 +127,7 @@ func Default() *Config {
 			ShowClock:  true,
 			Theme: ThemeConfig{
 				Name:      "default",
-				Overrides: make(map[string]string),
+				Overrides: make(map[string]interface{}),
 			},
 		},
 		Features: FeaturesConfig{

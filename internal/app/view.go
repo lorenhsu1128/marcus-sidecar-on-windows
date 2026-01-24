@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/marcus/sidecar/internal/community"
 	"github.com/marcus/sidecar/internal/keymap"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/styles"
@@ -369,6 +370,10 @@ func (m Model) renderProjectAddOverlay(content string) string {
 
 // renderThemeSwitcherOverlay renders the theme switcher modal.
 func (m Model) renderThemeSwitcherOverlay(content string) string {
+	if m.showCommunityBrowser {
+		return m.renderCommunityBrowserOverlay(content)
+	}
+
 	var b strings.Builder
 
 	// Title
@@ -483,8 +488,121 @@ func (m Model) renderThemeSwitcherOverlay(content string) string {
 	b.WriteString(styles.Muted.Render(" select  "))
 	b.WriteString(styles.KeyHint.Render("↑/↓"))
 	b.WriteString(styles.Muted.Render(" navigate  "))
+	b.WriteString(styles.KeyHint.Render("tab"))
+	b.WriteString(styles.Muted.Render(" community  "))
 	b.WriteString(styles.KeyHint.Render("esc"))
 	b.WriteString(styles.Muted.Render(" cancel"))
+
+	modal := styles.ModalBox.Render(b.String())
+	return ui.OverlayModal(content, modal, m.width, m.height)
+}
+
+// renderCommunityBrowserOverlay renders the community theme browser modal.
+func (m Model) renderCommunityBrowserOverlay(content string) string {
+	var b strings.Builder
+
+	allSchemes := community.ListSchemes()
+	schemes := m.communityBrowserFiltered
+
+	// Title
+	b.WriteString(styles.ModalTitle.Render(fmt.Sprintf("Community Themes (%d)", len(allSchemes))))
+	b.WriteString("  ")
+	b.WriteString(styles.Muted.Render("tab"))
+	b.WriteString("\n\n")
+
+	// Search input
+	b.WriteString(m.communityBrowserInput.View())
+	b.WriteString("\n")
+
+	// Show count if filtering
+	if m.communityBrowserInput.Value() != "" {
+		b.WriteString(styles.Muted.Render(fmt.Sprintf("%d of %d themes", len(schemes), len(allSchemes))))
+	}
+	b.WriteString("\n")
+
+	// Empty state
+	if len(schemes) == 0 {
+		b.WriteString("\n")
+		b.WriteString(styles.Muted.Render("No matches"))
+		b.WriteString("\n\n")
+		b.WriteString(styles.KeyHint.Render("esc"))
+		b.WriteString(styles.Muted.Render(" clear  "))
+		b.WriteString(styles.KeyHint.Render("tab"))
+		b.WriteString(styles.Muted.Render(" built-in"))
+
+		modal := styles.ModalBox.Render(b.String())
+		return ui.OverlayModal(content, modal, m.width, m.height)
+	}
+
+	// Scrolling
+	maxVisible := 8
+	visibleCount := len(schemes)
+	if visibleCount > maxVisible {
+		visibleCount = maxVisible
+	}
+	scrollOffset := m.communityBrowserScroll
+
+	// Scroll indicator (top)
+	if scrollOffset > 0 {
+		b.WriteString(styles.Muted.Render(fmt.Sprintf("  ↑ %d more\n", scrollOffset)))
+	}
+
+	// Styles
+	cursorStyle := lipgloss.NewStyle().Foreground(styles.Primary)
+	nameNormalStyle := lipgloss.NewStyle().Foreground(styles.Secondary)
+	nameSelectedStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+
+	// Scheme list
+	for i := scrollOffset; i < scrollOffset+visibleCount && i < len(schemes); i++ {
+		schemeName := schemes[i]
+		isCursor := i == m.communityBrowserCursor
+		isHover := i == m.communityBrowserHover
+
+		// Cursor
+		if isCursor {
+			b.WriteString(cursorStyle.Render("> "))
+		} else {
+			b.WriteString("  ")
+		}
+
+		// Color swatch (4 chars from scheme colors)
+		scheme := community.GetScheme(schemeName)
+		if scheme != nil {
+			swatchColors := []string{scheme.Red, scheme.Green, scheme.Blue, scheme.Purple}
+			for _, sc := range swatchColors {
+				b.WriteString(lipgloss.NewStyle().Background(lipgloss.Color(sc)).Render(" "))
+			}
+			b.WriteString(" ")
+		}
+
+		// Name
+		var nameStyle lipgloss.Style
+		if isCursor || isHover {
+			nameStyle = nameSelectedStyle
+		} else {
+			nameStyle = nameNormalStyle
+		}
+		b.WriteString(nameStyle.Render(schemeName))
+		b.WriteString("\n")
+	}
+
+	// Scroll indicator (bottom)
+	remaining := len(schemes) - (scrollOffset + visibleCount)
+	if remaining > 0 {
+		b.WriteString(styles.Muted.Render(fmt.Sprintf("  ↓ %d more\n", remaining)))
+	}
+
+	b.WriteString("\n")
+
+	// Help text
+	b.WriteString(styles.KeyHint.Render("enter"))
+	b.WriteString(styles.Muted.Render(" select  "))
+	b.WriteString(styles.KeyHint.Render("↑/↓"))
+	b.WriteString(styles.Muted.Render(" navigate  "))
+	b.WriteString(styles.KeyHint.Render("tab"))
+	b.WriteString(styles.Muted.Render(" built-in  "))
+	b.WriteString(styles.KeyHint.Render("esc"))
+	b.WriteString(styles.Muted.Render(" back"))
 
 	modal := styles.ModalBox.Render(b.String())
 	return ui.OverlayModal(content, modal, m.width, m.height)

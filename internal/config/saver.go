@@ -115,5 +115,17 @@ func SaveTheme(themeName string) error {
 		return err
 	}
 	cfg.UI.Theme.Name = themeName
+	cfg.UI.Theme.Overrides = make(map[string]interface{})
+	return Save(cfg)
+}
+
+// SaveThemeWithOverrides saves a theme name and full overrides map to config.
+func SaveThemeWithOverrides(themeName string, overrides map[string]interface{}) error {
+	cfg, err := Load()
+	if err != nil {
+		return err
+	}
+	cfg.UI.Theme.Name = themeName
+	cfg.UI.Theme.Overrides = overrides
 	return Save(cfg)
 }

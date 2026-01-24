@@ -10,6 +10,7 @@ import (
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/marcus/sidecar/internal/community"
 	"github.com/marcus/sidecar/internal/config"
 	"github.com/marcus/sidecar/internal/keymap"
 	"github.com/marcus/sidecar/internal/styles"
@@ -114,6 +115,15 @@ type Model struct {
 	themeSwitcherFiltered []string
 	themeSwitcherOriginal string // original theme to restore on cancel
 
+	// Community theme browser (sub-mode of theme switcher)
+	showCommunityBrowser      bool
+	communityBrowserCursor    int
+	communityBrowserScroll    int
+	communityBrowserHover     int
+	communityBrowserInput     textinput.Model
+	communityBrowserFiltered  []string
+	communityBrowserOriginal  string // theme state to restore on cancel
+
 	// Header/footer
 	ui *UIState
 
@@ -176,7 +186,8 @@ func New(reg *plugin.Registry, km *keymap.Registry, cfg *config.Config, currentV
 		intro:                 NewIntroModel(repoName),
 		currentVersion:       currentVersion,
 		projectSwitcherHover: -1, // No hover initially
-		themeSwitcherHover:   -1, // No hover initially
+		themeSwitcherHover:      -1, // No hover initially
+		communityBrowserHover:  -1,
 	}
 }
 
@@ -694,6 +705,47 @@ func themeSwitcherEnsureCursorVisible(cursor, scroll, maxVisible int) int {
 	return scroll
 }
 
+// initCommunityBrowser initializes the community theme browser sub-mode.
+func (m *Model) initCommunityBrowser() {
+	ti := textinput.New()
+	ti.Placeholder = "Search community themes..."
+	ti.Focus()
+	ti.CharLimit = 50
+	ti.Width = 40
+	m.communityBrowserInput = ti
+	m.communityBrowserFiltered = community.ListSchemes()
+	m.communityBrowserCursor = 0
+	m.communityBrowserScroll = 0
+	m.communityBrowserHover = -1
+	m.communityBrowserOriginal = styles.GetCurrentThemeName()
+	m.showCommunityBrowser = true
+}
+
+// resetCommunityBrowser resets the community browser state.
+func (m *Model) resetCommunityBrowser() {
+	m.showCommunityBrowser = false
+	m.communityBrowserCursor = 0
+	m.communityBrowserScroll = 0
+	m.communityBrowserHover = -1
+	m.communityBrowserFiltered = nil
+	m.communityBrowserOriginal = ""
+}
+
+// filterCommunitySchemes filters scheme names by substring match.
+func filterCommunitySchemes(all []string, query string) []string {
+	if query == "" {
+		return all
+	}
+	q := strings.ToLower(query)
+	var matches []string
+	for _, name := range all {
+		if strings.Contains(strings.ToLower(name), q) {
+			matches = append(matches, name)
+		}
+	}
+	return matches
+}
+
 // applyThemeFromConfig applies a theme, using config overrides only if the
 // saved config has that theme selected. This means live preview of other themes
 // won't include user customizations (which is intentional - you want to see the
@@ -701,7 +753,7 @@ func themeSwitcherEnsureCursorVisible(cursor, scroll, maxVisible int) int {
 func (m *Model) applyThemeFromConfig(themeName string) {
 	freshCfg, err := config.Load()
 	if err == nil && freshCfg.UI.Theme.Name == themeName {
-		styles.ApplyThemeWithOverrides(themeName, freshCfg.UI.Theme.Overrides)
+		styles.ApplyThemeWithGenericOverrides(themeName, freshCfg.UI.Theme.Overrides)
 	} else {
 		styles.ApplyTheme(themeName)
 	}
