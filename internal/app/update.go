@@ -1302,22 +1302,23 @@ func (m *Model) focusProjectAddInput() {
 
 // handleProjectAddMouse handles mouse events for the project add sub-mode.
 func (m Model) handleProjectAddMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	// Calculate modal dimensions and button positions
-	// Each bordered input takes 2 lines (Border(NormalBorder) + Padding(0,1))
+	// Calculate modal dimensions and button positions (same pattern as quit modal)
+	// Each \n\n = 1 blank line, each bordered input = 2 lines
 	// Line 0: "Add Project"
-	// Line 1: blank
+	// Line 1: blank (\n\n)
 	// Line 2: "Name:"
 	// Lines 3-4: name input (bordered, 2 lines)
-	// Line 5: blank
+	// Line 5: blank (\n\n)
 	// Line 6: "Path:"
 	// Lines 7-8: path input (bordered, 2 lines)
-	// WITHOUT error: Line 9: blank, Line 10: buttons, Line 11: blank, Line 12: help
-	// WITH error: Line 9: blank, Line 10: error, Line 11: blank, Line 12: buttons, Line 13: blank, Line 14: help
-	modalContentLines := 13 // Without error
-	buttonRow := 10         // Buttons on line 10 (0-indexed) without error
+	// Line 9: blank (\n)
+	// WITHOUT error: Line 10: blank (\n), Line 11: buttons, Line 12: blank (\n\n), Line 13: help
+	// WITH error: Line 10: blank (\n), Line 11: error, Line 12: blank (\n), Line 13: blank (\n), Line 14: buttons, Line 15: blank (\n\n), Line 16: help
+	modalContentLines := 14 // Without error
+	linesBeforeButtons := 10 // Without error
 	if m.projectAddError != "" {
-		modalContentLines = 15
-		buttonRow = 12 // Buttons shift down 2 lines when error is shown
+		modalContentLines = 17
+		linesBeforeButtons = 13 // With error (add 3: blank + error + blank)
 	}
 	modalHeight := modalContentLines + 4 // ModalBox padding/border
 	modalWidth := 50
@@ -1325,15 +1326,14 @@ func (m Model) handleProjectAddMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	modalX := (m.width - modalWidth) / 2
 	modalY := (m.height - modalHeight) / 2
 
+	// Button Y position: modalY + 2 (border/padding) + lines before buttons
+	buttonY := modalY + 2 + linesBeforeButtons
+
 	// Check if click is inside modal
 	if msg.X >= modalX && msg.X < modalX+modalWidth &&
 		msg.Y >= modalY && msg.Y < modalY+modalHeight {
 
-		// Calculate button Y position
-		// Content starts at modalY + 2 (border + padding)
-		buttonLineY := modalY + 2 + buttonRow
-
-		if msg.Y == buttonLineY {
+		if msg.Y == buttonY {
 			// Rough button X positions within the modal
 			addBtnStart := modalX + 3  // border + padding + small indent
 			addBtnEnd := addBtnStart + 7 // " Add " width
