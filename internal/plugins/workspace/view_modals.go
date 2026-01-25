@@ -463,57 +463,13 @@ func (p *Plugin) renderPromptPickerModal(width, height int) string {
 	// Render the background (create modal behind it)
 	background := p.renderCreateModal(width, height)
 
-	if p.promptPicker == nil {
+	p.ensurePromptPickerModal()
+	if p.promptPickerModal == nil {
 		return background
 	}
 
-	// Modal dimensions
-	modalW := 80
-	if modalW > width-4 {
-		modalW = width - 4
-	}
-	p.promptPicker.width = modalW
-	p.promptPicker.height = height
-
-	content := p.promptPicker.View()
-	modal := modalStyle().Width(modalW).Render(content)
-
-	// Calculate modal position for hit regions
-	modalH := lipgloss.Height(modal)
-	modalX := (width - modalW) / 2
-	modalY := (height - modalH) / 2
-
-	// Register hit region for filter input
-	// Layout from content start (modalY + 2 for border + padding):
-	// - header "Select Prompt..." (1 line)
-	// - blank from \n\n (1 line)
-	// - "Filter:" label (1 line)
-	// - bordered filter input (3 lines: border + content + border)
-	// Filter input starts at: 1 + 1 + 1 = 3 lines from content start
-	filterY := modalY + 2 + 3                                                        // border(1) + padding(1) + header + blank + label
-	p.mouseHandler.HitMap.AddRect(regionPromptFilter, modalX+2, filterY, 32, 3, nil) // height 3 for bordered input
-
-	// Register hit regions for prompt items
-	// After filter input (3 lines) + blank (1 line) + column headers (1 line) + separator (1 line) = 6 more lines
-	// Total from content start: 3 (before filter) + 3 (filter) + 1 (blank) + 1 (headers) + 1 (separator) = 9
-	// "None" option is first, then filtered prompts
-	itemStartY := modalY + 2 + 9 // border(1) + padding(1) + header + blank + label + bordered-filter + blank + col-headers + separator
-	itemHeight := 1              // Each prompt item is 1 line
-
-	// "None" option at index -1
-	p.mouseHandler.HitMap.AddRect(regionPromptItem, modalX+2, itemStartY, modalW-6, itemHeight, -1)
-
-	// Prompt items
-	maxVisible := 10
-	if len(p.promptPicker.filtered) > 0 {
-		visibleCount := min(maxVisible, len(p.promptPicker.filtered))
-		for i := range visibleCount {
-			y := itemStartY + 1 + i // +1 for "none" row
-			p.mouseHandler.HitMap.AddRect(regionPromptItem, modalX+2, y, modalW-6, itemHeight, i)
-		}
-	}
-
-	return ui.OverlayModal(background, modal, width, height)
+	modalContent := p.promptPickerModal.Render(width, height, p.mouseHandler)
+	return ui.OverlayModal(background, modalContent, width, height)
 }
 
 // renderAgentChoiceModal renders the agent action choice modal.

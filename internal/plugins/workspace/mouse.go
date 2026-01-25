@@ -48,6 +48,10 @@ func (p *Plugin) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		return p.handleConfirmDeleteShellModalMouse(msg)
 	}
 
+	if p.viewMode == ViewModePromptPicker {
+		return p.handlePromptPickerModalMouse(msg)
+	}
+
 	action := p.mouseHandler.HandleMouse(msg)
 
 	switch action.Type {
@@ -87,6 +91,7 @@ func (p *Plugin) handleCreateModalMouse(msg tea.MouseMsg) tea.Cmd {
 		p.createFocus = 2
 		p.syncCreateModalFocus()
 		p.promptPicker = NewPromptPicker(p.createPrompts, p.width, p.height)
+		p.clearPromptPickerModal()
 		p.viewMode = ViewModePromptPicker
 		return nil
 	case createNameFieldID:
@@ -201,6 +206,38 @@ func (p *Plugin) handleConfirmDeleteShellModalMouse(msg tea.MouseMsg) tea.Cmd {
 	return nil
 }
 
+func (p *Plugin) handlePromptPickerModalMouse(msg tea.MouseMsg) tea.Cmd {
+	if p.promptPicker == nil {
+		return nil
+	}
+
+	p.ensurePromptPickerModal()
+	if p.promptPickerModal == nil {
+		return nil
+	}
+
+	action := p.promptPickerModal.HandleMouse(msg, p.mouseHandler)
+	switch action {
+	case "":
+		return nil
+	case "cancel":
+		return func() tea.Msg { return PromptCancelledMsg{} }
+	case promptPickerFilterID:
+		p.promptPicker.filterFocused = true
+		p.syncPromptPickerFocus()
+		return nil
+	}
+
+	if idx, ok := parsePromptPickerItemID(action); ok {
+		p.promptPicker.selectedIdx = idx
+		p.promptPicker.filterFocused = false
+		p.syncPromptPickerFocus()
+		return p.promptPickerSelectCmd()
+	}
+
+	return nil
+}
+
 // handleMouseHover handles hover events for visual feedback.
 func (p *Plugin) handleMouseHover(action mouse.MouseAction) tea.Cmd {
 	// Guard: absorb background region hovers when a modal is open (td-f63097).
@@ -243,24 +280,6 @@ func (p *Plugin) handleMouseHover(action mouse.MouseAction) tea.Cmd {
 	case ViewModeRenameShell:
 		// Modal library handles hover state internally
 		return nil
-	case ViewModePromptPicker:
-		if p.promptPicker == nil {
-			return nil
-		}
-		if action.Region == nil {
-			p.promptPicker.ClearHover()
-			return nil
-		}
-		switch action.Region.ID {
-		case regionPromptItem:
-			if idx, ok := action.Region.Data.(int); ok {
-				p.promptPicker.SetHover(idx)
-			}
-		case regionPromptFilter:
-			p.promptPicker.ClearHover()
-		default:
-			p.promptPicker.ClearHover()
-		}
 	case ViewModeMerge:
 		if action.Region == nil {
 			p.mergeMethodHover = 0
@@ -523,6 +542,7 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) tea.Cmd {
 			// If clicking prompt field, open the picker
 			if focusIdx == 2 {
 				p.promptPicker = NewPromptPicker(p.createPrompts, p.width, p.height)
+				p.clearPromptPickerModal()
 				p.viewMode = ViewModePromptPicker
 			}
 		}
@@ -618,26 +638,6 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) tea.Cmd {
 			p.mergeState.PullAfterMerge = false
 			p.mergeState.ConfirmationFocus = 5
 			return p.advanceMergeStep()
-		}
-	case regionPromptFilter:
-		// Click on filter input in prompt picker - focus it
-		if p.promptPicker != nil {
-			p.promptPicker.FocusFilter()
-		}
-	case regionPromptItem:
-		// Click on prompt item in picker - select it
-		if idx, ok := action.Region.Data.(int); ok && p.promptPicker != nil {
-			// idx -1 means "none" option, >= 0 means filtered prompts
-			p.promptPicker.selectedIdx = idx
-			// Trigger selection
-			if idx < 0 {
-				// "None" selected
-				return func() tea.Msg { return PromptSelectedMsg{Prompt: nil} }
-			}
-			if idx < len(p.promptPicker.filtered) {
-				prompt := p.promptPicker.filtered[idx]
-				return func() tea.Msg { return PromptSelectedMsg{Prompt: &prompt} }
-			}
 		}
 	case regionTypeSelectorOption:
 		// Click on type selector option - select it (visual only)

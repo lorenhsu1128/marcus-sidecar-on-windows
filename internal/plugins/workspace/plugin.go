@@ -186,9 +186,12 @@ type Plugin struct {
 	branchNameSanitized string   // Suggested sanitized name
 
 	// Prompt state for create modal
-	createPrompts   []Prompt      // Available prompts (merged global + project)
-	createPromptIdx int           // Selected prompt index (-1 = none)
-	promptPicker    *PromptPicker // Picker modal state (when open)
+	createPrompts          []Prompt      // Available prompts (merged global + project)
+	createPromptIdx        int           // Selected prompt index (-1 = none)
+	promptPicker           *PromptPicker // Picker modal state (when open)
+	promptPickerModal      *modal.Modal
+	promptPickerModalWidth int
+	promptPickerModalEmpty bool
 
 	// Task search state for create modal
 	taskSearchInput    textinput.Model
@@ -616,6 +619,13 @@ func (p *Plugin) clearCreateModal() {
 	p.createPrompts = nil
 	p.createPromptIdx = -1
 	p.promptPicker = nil
+	p.clearPromptPickerModal()
+}
+
+func (p *Plugin) clearPromptPickerModal() {
+	p.promptPickerModal = nil
+	p.promptPickerModalWidth = 0
+	p.promptPickerModalEmpty = false
 }
 
 // initCreateModalBase initializes common create modal state.
@@ -660,6 +670,7 @@ func (p *Plugin) initCreateModalBase() {
 	p.createPrompts = LoadPrompts(configDir, p.ctx.WorkDir)
 	p.createPromptIdx = -1
 	p.promptPicker = nil
+	p.clearPromptPickerModal()
 	p.branchAll = nil
 	p.branchFiltered = nil
 	p.branchIdx = 0

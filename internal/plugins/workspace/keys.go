@@ -201,7 +201,101 @@ func (p *Plugin) handlePromptPickerKeys(msg tea.KeyMsg) tea.Cmd {
 	if p.promptPicker == nil {
 		return nil
 	}
-	_, cmd := p.promptPicker.Update(msg)
+
+	p.ensurePromptPickerModal()
+	if p.promptPickerModal == nil {
+		return nil
+	}
+
+	pp := p.promptPicker
+	key := msg.String()
+
+	if len(pp.prompts) == 0 && key == "d" {
+		return func() tea.Msg { return PromptInstallDefaultsMsg{} }
+	}
+
+	switch key {
+	case "esc", "q":
+		return func() tea.Msg { return PromptCancelledMsg{} }
+	case "tab", "shift+tab":
+		pp.filterFocused = !pp.filterFocused
+		p.syncPromptPickerFocus()
+		return nil
+	}
+
+	before := pp.filterInput.Value()
+	action, cmd := p.promptPickerModal.HandleKey(msg)
+	if action == "cancel" {
+		return func() tea.Msg { return PromptCancelledMsg{} }
+	}
+
+	if before != pp.filterInput.Value() {
+		pp.applyFilter()
+		if !pp.filterFocused {
+			p.syncPromptPickerFocus()
+		}
+	}
+
+	if action != "" {
+		if idx, ok := parsePromptPickerItemID(action); ok {
+			pp.selectedIdx = idx
+			return p.promptPickerSelectCmd()
+		}
+		if action == promptPickerFilterID {
+			return p.promptPickerSelectCmd()
+		}
+	}
+
+	switch key {
+	case "enter":
+		return p.promptPickerSelectCmd()
+
+	case "up":
+		if pp.selectedIdx > -1 {
+			pp.selectedIdx--
+		}
+		if !pp.filterFocused {
+			p.syncPromptPickerFocus()
+		}
+		return nil
+
+	case "down":
+		if pp.selectedIdx < len(pp.filtered)-1 {
+			pp.selectedIdx++
+		}
+		if !pp.filterFocused {
+			p.syncPromptPickerFocus()
+		}
+		return nil
+	}
+
+	if !pp.filterFocused {
+		switch key {
+		case "k":
+			if pp.selectedIdx > -1 {
+				pp.selectedIdx--
+			}
+			p.syncPromptPickerFocus()
+			return nil
+		case "j":
+			if pp.selectedIdx < len(pp.filtered)-1 {
+				pp.selectedIdx++
+			}
+			p.syncPromptPickerFocus()
+			return nil
+		case "home", "g":
+			pp.selectedIdx = -1
+			p.syncPromptPickerFocus()
+			return nil
+		case "end", "G":
+			if len(pp.filtered) > 0 {
+				pp.selectedIdx = len(pp.filtered) - 1
+			}
+			p.syncPromptPickerFocus()
+			return nil
+		}
+	}
+
 	return cmd
 }
 
@@ -902,6 +996,7 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 		}
 		if focusID == createPromptFieldID {
 			p.promptPicker = NewPromptPicker(p.createPrompts, p.width, p.height)
+			p.clearPromptPickerModal()
 			p.viewMode = ViewModePromptPicker
 			return nil
 		}
@@ -923,6 +1018,7 @@ func (p *Plugin) handleCreateKeys(msg tea.KeyMsg) tea.Cmd {
 		}
 		if p.createFocus == 2 {
 			p.promptPicker = NewPromptPicker(p.createPrompts, p.width, p.height)
+			p.clearPromptPickerModal()
 			p.viewMode = ViewModePromptPicker
 			return nil
 		}

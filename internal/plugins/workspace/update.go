@@ -175,6 +175,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		// Prompt selected from picker
 		p.viewMode = ViewModeCreate
 		p.promptPicker = nil
+		p.clearPromptPickerModal()
 		if msg.Prompt != nil {
 			// Find index of selected prompt
 			for i, pr := range p.createPrompts {
@@ -198,6 +199,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		// Picker cancelled, return to create modal
 		p.viewMode = ViewModeCreate
 		p.promptPicker = nil
+		p.clearPromptPickerModal()
 
 	case PromptInstallDefaultsMsg:
 		// User pressed 'd' to install default prompts
@@ -211,6 +213,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if WriteDefaultPromptsToConfig(configDir) {
 			p.createPrompts = LoadPrompts(configDir, p.ctx.WorkDir)
 			p.promptPicker = NewPromptPicker(p.createPrompts, p.width, p.height)
+			p.clearPromptPickerModal()
 		} else {
 			return p, func() tea.Msg {
 				return app.ToastMsg{Message: "Failed to write default prompts", Duration: 3 * time.Second, IsError: true}

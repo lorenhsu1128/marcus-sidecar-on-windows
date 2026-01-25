@@ -87,7 +87,7 @@ Also see `docs/guides/ui-feature-guide.md` for the modal initialization pattern.
 | Confirm Delete | Confirmation | ✓ |
 | Confirm Delete Shell | Confirmation | ✓ |
 | Rename Shell | Form | ✓ |
-| Prompt Picker | Selection | ○ |
+| Prompt Picker | Selection | ✓ |
 | Agent Choice | Selection | ○ |
 | Merge Workflow | Multi-step | ○ |
 | Commit for Merge | Form | ○ |
@@ -128,5 +128,5 @@ Also see `docs/guides/ui-feature-guide.md` for the modal initialization pattern.
 ## Summary
 
 **Total Modals:** 27 (excluding N/A)
-**Converted:** 12 (44%)
-**Remaining:** 15 (56%)
+**Converted:** 13 (48%)
+**Remaining:** 14 (52%)
