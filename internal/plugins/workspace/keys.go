@@ -301,49 +301,35 @@ func (p *Plugin) handlePromptPickerKeys(msg tea.KeyMsg) tea.Cmd {
 
 // handleAgentChoiceKeys handles keys in agent choice modal.
 func (p *Plugin) handleAgentChoiceKeys(msg tea.KeyMsg) tea.Cmd {
-	switch msg.String() {
-	case "tab":
-		// Cycle focus: options(0) -> confirm(1) -> cancel(2) -> options(0)
-		p.agentChoiceButtonFocus = (p.agentChoiceButtonFocus + 1) % 3
-	case "shift+tab":
-		// Reverse cycle
-		p.agentChoiceButtonFocus = (p.agentChoiceButtonFocus + 2) % 3
-	case "j", "down":
-		if p.agentChoiceButtonFocus == 0 && p.agentChoiceIdx < 1 {
-			p.agentChoiceIdx++
-		}
-	case "k", "up":
-		if p.agentChoiceButtonFocus == 0 && p.agentChoiceIdx > 0 {
-			p.agentChoiceIdx--
-		}
-	case "enter":
-		// If focused on cancel button, cancel
-		if p.agentChoiceButtonFocus == 2 {
-			p.viewMode = ViewModeList
-			p.agentChoiceWorktree = nil
-			p.agentChoiceButtonFocus = 0
-			return nil
-		}
-		// Confirm action
-		return p.executeAgentChoice()
-	case "esc", "q":
-		p.viewMode = ViewModeList
-		p.agentChoiceWorktree = nil
-		p.agentChoiceButtonFocus = 0
+	p.ensureAgentChoiceModal()
+	if p.agentChoiceModal == nil {
+		return nil
 	}
-	return nil
+
+	action, cmd := p.agentChoiceModal.HandleKey(msg)
+
+	switch action {
+	case "cancel", agentChoiceCancelID:
+		p.viewMode = ViewModeList
+		p.clearAgentChoiceModal()
+		return nil
+	case agentChoiceActionID, agentChoiceConfirmID, "agent-choice-attach", "agent-choice-restart":
+		return p.executeAgentChoice()
+	}
+
+	return cmd
 }
 
 // executeAgentChoice executes the selected agent choice action.
 func (p *Plugin) executeAgentChoice() tea.Cmd {
 	wt := p.agentChoiceWorktree
+	idx := p.agentChoiceIdx
 	p.viewMode = ViewModeList
-	p.agentChoiceWorktree = nil
-	p.agentChoiceButtonFocus = 0
+	p.clearAgentChoiceModal()
 	if wt == nil {
 		return nil
 	}
-	if p.agentChoiceIdx == 0 {
+	if idx == 0 {
 		// Attach to existing session
 		return p.AttachToSession(wt)
 	}
@@ -814,9 +800,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		}
 		// Agent exists - show choice modal (attach or restart)
 		p.agentChoiceWorktree = wt
-		p.agentChoiceIdx = 0         // Default to attach
-		p.agentChoiceButtonFocus = 0 // Start with options focused
-		p.agentChoiceButtonHover = 0 // Clear hover state
+		p.agentChoiceIdx = 0 // Default to attach
 		p.viewMode = ViewModeAgentChoice
 		return nil
 	case "S":

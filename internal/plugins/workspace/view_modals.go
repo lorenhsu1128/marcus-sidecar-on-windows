@@ -472,88 +472,68 @@ func (p *Plugin) renderPromptPickerModal(width, height int) string {
 	return ui.OverlayModal(background, modalContent, width, height)
 }
 
+// ensureAgentChoiceModal builds/rebuilds the agent choice modal.
+func (p *Plugin) ensureAgentChoiceModal() {
+	if p.agentChoiceWorktree == nil {
+		return
+	}
+
+	modalW := 50
+	if p.width > 0 && modalW > p.width-4 {
+		modalW = p.width - 4
+	}
+	if modalW < 20 {
+		modalW = 20
+	}
+
+	// Only rebuild if modal doesn't exist or width changed
+	if p.agentChoiceModal != nil && p.agentChoiceModalWidth == modalW {
+		return
+	}
+	p.agentChoiceModalWidth = modalW
+
+	// Build list items for the options
+	items := []modal.ListItem{
+		{ID: "agent-choice-attach", Label: "Attach to session"},
+		{ID: "agent-choice-restart", Label: "Restart agent"},
+	}
+
+	title := fmt.Sprintf("Agent Running: %s", p.agentChoiceWorktree.Name)
+
+	p.agentChoiceModal = modal.New(title,
+		modal.WithWidth(modalW),
+		modal.WithPrimaryAction(agentChoiceActionID),
+		modal.WithHints(false),
+	).
+		AddSection(modal.Text("An agent is already running on this worktree.\nWhat would you like to do?")).
+		AddSection(modal.Spacer()).
+		AddSection(modal.List(agentChoiceListID, items, &p.agentChoiceIdx, modal.WithMaxVisible(2))).
+		AddSection(modal.Spacer()).
+		AddSection(modal.Buttons(
+			modal.Btn(" Confirm ", agentChoiceConfirmID),
+			modal.Btn(" Cancel ", agentChoiceCancelID),
+		))
+}
+
 // renderAgentChoiceModal renders the agent action choice modal.
 func (p *Plugin) renderAgentChoiceModal(width, height int) string {
-	// Render the background (list view)
 	background := p.renderListView(width, height)
 
-	if p.agentChoiceWorktree == nil {
+	p.ensureAgentChoiceModal()
+	if p.agentChoiceModal == nil {
 		return background
 	}
 
-	// Modal dimensions
-	modalW := 50
-	if modalW > width-4 {
-		modalW = width - 4
-	}
+	modalContent := p.agentChoiceModal.Render(width, height, p.mouseHandler)
+	return ui.OverlayModal(background, modalContent, width, height)
+}
 
-	var sb strings.Builder
-	title := fmt.Sprintf("Agent Running: %s", p.agentChoiceWorktree.Name)
-	sb.WriteString(lipgloss.NewStyle().Bold(true).Render(title))
-	sb.WriteString("\n\n")
-	sb.WriteString("An agent is already running on this worktree.\n")
-	sb.WriteString("What would you like to do?\n\n")
-
-	options := []string{"Attach to session", "Restart agent"}
-	for i, opt := range options {
-		prefix := "  "
-		selected := i == p.agentChoiceIdx && p.agentChoiceButtonFocus == 0
-		if selected {
-			prefix = "> "
-			sb.WriteString(lipgloss.NewStyle().Foreground(styles.Primary).Render(prefix + opt))
-		} else {
-			sb.WriteString(dimText(prefix + opt))
-		}
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString("\n")
-
-	// Render buttons with focus/hover states
-	confirmStyle := styles.Button
-	cancelStyle := styles.Button
-	if p.agentChoiceButtonFocus == 1 {
-		confirmStyle = styles.ButtonFocused
-	} else if p.agentChoiceButtonHover == 1 {
-		confirmStyle = styles.ButtonHover
-	}
-	if p.agentChoiceButtonFocus == 2 {
-		cancelStyle = styles.ButtonFocused
-	} else if p.agentChoiceButtonHover == 2 {
-		cancelStyle = styles.ButtonHover
-	}
-	sb.WriteString(confirmStyle.Render(" Confirm "))
-	sb.WriteString("  ")
-	sb.WriteString(cancelStyle.Render(" Cancel "))
-
-	content := sb.String()
-	modal := modalStyle().Width(modalW).Render(content)
-
-	// Register hit regions for the modal
-	// Calculate modal position (centered)
-	modalHeight := lipgloss.Height(modal)
-	modalStartX := (width - modalW) / 2
-	modalStartY := (height - modalHeight) / 2
-
-	// Hit regions for options (inside modal content area)
-	// Content lines: title(1) + blank(1) + message(2) + blank(1) = 5 lines before options
-	// Border offset is 2: border(1) + padding(1)
-	optionY := modalStartY + 2 + 5 // border(1) + padding(1) + header lines
-	optionX := modalStartX + 3     // border + padding + "  " prefix
-	for i := range options {
-		p.mouseHandler.HitMap.AddRect(regionAgentChoiceOption, optionX, optionY+i, modalW-6, 1, i)
-	}
-
-	// Hit regions for buttons
-	// Buttons are after options (2) + empty (1) = 3 more lines
-	buttonY := optionY + 3
-	confirmX := modalStartX + 3 // border + padding
-	// " Confirm " (9) + Padding(0,2) = 13 chars, " Cancel " (8) + Padding(0,2) = 12 chars
-	p.mouseHandler.HitMap.AddRect(regionAgentChoiceConfirm, confirmX, buttonY, 13, 1, nil)
-	cancelX := confirmX + 13 + 2 // confirm width + spacing
-	p.mouseHandler.HitMap.AddRect(regionAgentChoiceCancel, cancelX, buttonY, 12, 1, nil)
-
-	return ui.OverlayModal(background, modal, width, height)
+// clearAgentChoiceModal clears agent choice modal state.
+func (p *Plugin) clearAgentChoiceModal() {
+	p.agentChoiceWorktree = nil
+	p.agentChoiceIdx = 0
+	p.agentChoiceModal = nil
+	p.agentChoiceModalWidth = 0
 }
 
 // renderMergeModal renders the merge workflow modal with dimmed background.

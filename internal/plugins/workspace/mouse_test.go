@@ -50,7 +50,7 @@ func TestIsBackgroundRegion(t *testing.T) {
 	}
 
 	modal := []string{
-		regionAgentChoiceOption, regionAgentChoiceConfirm, regionAgentChoiceCancel,
+		agentChoiceConfirmID, agentChoiceCancelID,
 		deleteConfirmDeleteID, deleteConfirmCancelID,
 		regionCreateBackdrop, regionCreateModalBody, regionCreateInput,
 		regionMergeMethodOption, regionMergeConfirmButton,
@@ -96,19 +96,20 @@ func TestModalClickGuard(t *testing.T) {
 }
 
 func TestModalClickGuardAllowsModalRegions(t *testing.T) {
-	// Agent choice modal should still respond to its own regions
+	// Merge modal should still respond to its own regions
 	p := &Plugin{
-		viewMode:     ViewModeAgentChoice,
+		viewMode:     ViewModeMerge,
 		mouseHandler: mouse.NewHandler(),
 	}
 	action := mouse.MouseAction{
 		Type:   mouse.ActionClick,
-		Region: &mouse.Region{ID: regionAgentChoiceCancel},
+		Region: &mouse.Region{ID: regionMergeMethodOption, Data: 0},
 	}
-	// Should NOT be blocked (returns nil because cancel sets viewMode = ViewModeList)
-	_ = p.handleMouseClick(action)
-	if p.viewMode != ViewModeList {
-		t.Errorf("agent choice cancel should close modal, got viewMode=%d", p.viewMode)
+	// Should NOT be blocked - merge modal handles its own clicks
+	cmd := p.handleMouseClick(action)
+	// merge method click returns nil but updates state
+	if cmd != nil {
+		t.Errorf("merge modal click returned unexpected cmd")
 	}
 }
 

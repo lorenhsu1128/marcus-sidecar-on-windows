@@ -42,9 +42,11 @@ const (
 	regionPaneDivider        = "pane-divider"
 	regionWorktreeItem       = "workspace-item"
 	regionPreviewTab         = "preview-tab"
-	regionAgentChoiceOption  = "agent-choice-option"
-	regionAgentChoiceConfirm = "agent-choice-confirm"
-	regionAgentChoiceCancel  = "agent-choice-cancel"
+	// Agent choice modal IDs (modal library)
+	agentChoiceListID    = "agent-choice-list"
+	agentChoiceConfirmID = "agent-choice-confirm"
+	agentChoiceCancelID  = "agent-choice-cancel"
+	agentChoiceActionID  = "agent-choice-action"
 
 	// Kanban view regions
 	regionKanbanCard   = "kanban-card"
@@ -232,9 +234,9 @@ type Plugin struct {
 
 	// Agent choice modal state (attach vs restart)
 	agentChoiceWorktree    *Worktree
-	agentChoiceIdx         int // 0=attach, 1=restart
-	agentChoiceButtonFocus int // 0=options, 1=confirm, 2=cancel
-	agentChoiceButtonHover int // 0=none, 1=confirm, 2=cancel
+	agentChoiceIdx         int          // 0=attach, 1=restart
+	agentChoiceModal       *modal.Modal // Modal instance
+	agentChoiceModalWidth  int          // Cached width for rebuild detection
 
 	// Delete confirmation modal state
 	deleteConfirmWorktree   *Worktree // Worktree pending deletion

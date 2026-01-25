@@ -52,6 +52,10 @@ func (p *Plugin) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		return p.handlePromptPickerModalMouse(msg)
 	}
 
+	if p.viewMode == ViewModeAgentChoice {
+		return p.handleAgentChoiceModalMouse(msg)
+	}
+
 	action := p.mouseHandler.HandleMouse(msg)
 
 	switch action.Type {
@@ -238,6 +242,26 @@ func (p *Plugin) handlePromptPickerModalMouse(msg tea.MouseMsg) tea.Cmd {
 	return nil
 }
 
+func (p *Plugin) handleAgentChoiceModalMouse(msg tea.MouseMsg) tea.Cmd {
+	p.ensureAgentChoiceModal()
+	if p.agentChoiceModal == nil {
+		return nil
+	}
+
+	action := p.agentChoiceModal.HandleMouse(msg, p.mouseHandler)
+	switch action {
+	case "":
+		return nil
+	case "cancel", agentChoiceCancelID:
+		p.viewMode = ViewModeList
+		p.clearAgentChoiceModal()
+		return nil
+	case agentChoiceActionID, agentChoiceConfirmID, "agent-choice-attach", "agent-choice-restart":
+		return p.executeAgentChoice()
+	}
+	return nil
+}
+
 // handleMouseHover handles hover events for visual feedback.
 func (p *Plugin) handleMouseHover(action mouse.MouseAction) tea.Cmd {
 	// Guard: absorb background region hovers when a modal is open (td-f63097).
@@ -265,18 +289,8 @@ func (p *Plugin) handleMouseHover(action mouse.MouseAction) tea.Cmd {
 			p.createButtonHover = 0
 		}
 	case ViewModeAgentChoice:
-		if action.Region == nil {
-			p.agentChoiceButtonHover = 0
-			return nil
-		}
-		switch action.Region.ID {
-		case regionAgentChoiceConfirm:
-			p.agentChoiceButtonHover = 1
-		case regionAgentChoiceCancel:
-			p.agentChoiceButtonHover = 2
-		default:
-			p.agentChoiceButtonHover = 0
-		}
+		// Modal library handles hover state internally
+		return nil
 	case ViewModeRenameShell:
 		// Modal library handles hover state internally
 		return nil
@@ -340,7 +354,6 @@ func (p *Plugin) handleMouseHover(action mouse.MouseAction) tea.Cmd {
 		}
 	default:
 		p.createButtonHover = 0
-		p.agentChoiceButtonHover = 0
 		p.mergeMethodHover = 0
 		p.mergeConfirmCheckboxHover = 0
 		p.mergeConfirmButtonHover = 0
@@ -477,20 +490,6 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) tea.Cmd {
 				return p.loadTaskDetailsIfNeeded()
 			}
 		}
-	case regionAgentChoiceOption:
-		// Click on agent choice option
-		if idx, ok := action.Region.Data.(int); ok && idx >= 0 && idx <= 1 {
-			p.agentChoiceIdx = idx
-			p.agentChoiceButtonFocus = 0
-		}
-	case regionAgentChoiceConfirm:
-		// Click confirm button
-		return p.executeAgentChoice()
-	case regionAgentChoiceCancel:
-		// Click cancel button
-		p.viewMode = ViewModeList
-		p.agentChoiceWorktree = nil
-		p.agentChoiceButtonFocus = 0
 	case regionKanbanCard:
 		// Click on kanban card - select it
 		if data, ok := action.Region.Data.(kanbanCardData); ok {
