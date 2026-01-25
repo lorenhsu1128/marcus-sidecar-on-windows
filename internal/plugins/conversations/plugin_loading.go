@@ -1,6 +1,7 @@
 package conversations
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -289,6 +290,10 @@ func (p *Plugin) startWatcher() tea.Cmd {
 			return WatchStartedMsg{Channel: nil}
 		}
 
+		// Create context for cancellation (td-eb2699b4)
+		ctx, cancel := context.WithCancel(context.Background())
+		p.watchCancel = cancel
+
 		// Get all related worktree paths (main repo + all worktrees)
 		worktreePaths := app.GetAllRelatedPaths(p.ctx.WorkDir)
 		if len(worktreePaths) == 0 {
@@ -329,10 +334,18 @@ func (p *Plugin) startWatcher() tea.Cmd {
 				wg.Add(1)
 				go func(c <-chan adapter.Event) {
 					defer wg.Done()
-					for evt := range c {
+					for {
 						select {
-						case merged <- evt:
-						default:
+						case <-ctx.Done():
+							return
+						case evt, ok := <-c:
+							if !ok {
+								return
+							}
+							select {
+							case merged <- evt:
+							default:
+							}
 						}
 					}
 				}(ch)
@@ -371,7 +384,11 @@ func (p *Plugin) listenForWatchEvents() tea.Cmd {
 // listenForCoalescedRefresh waits for coalesced refresh messages.
 func (p *Plugin) listenForCoalescedRefresh() tea.Cmd {
 	return func() tea.Msg {
-		return <-p.coalesceChan
+		msg, ok := <-p.coalesceChan
+		if !ok {
+			return nil // Channel closed (td-e2791614)
+		}
+		return msg
 	}
 }
 

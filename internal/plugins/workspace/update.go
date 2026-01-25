@@ -279,7 +279,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 			// Start polling for output
-			cmds = append(cmds, p.scheduleAgentPoll(msg.WorkspaceName, 500*time.Millisecond))
+			cmds = append(cmds, p.scheduleAgentPoll(msg.WorkspaceName, pollIntervalInitial))
 		}
 
 	case pollAgentMsg:

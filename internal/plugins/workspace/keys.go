@@ -1165,14 +1165,28 @@ func (p *Plugin) handleMergeKeys(msg tea.KeyMsg) tea.Cmd {
 			// Manual check for merge status
 			return p.checkPRMerged(p.mergeState.Worktree)
 		case MergeStepPostMergeConfirmation:
-			// User confirmed cleanup options
-			if p.mergeState.ConfirmationFocus == 5 {
+			// Focus 0-3 = checkboxes, 4 = confirm button, 5 = skip all button
+			switch p.mergeState.ConfirmationFocus {
+			case 0:
+				p.mergeState.DeleteLocalWorktree = !p.mergeState.DeleteLocalWorktree
+				return nil
+			case 1:
+				p.mergeState.DeleteLocalBranch = !p.mergeState.DeleteLocalBranch
+				return nil
+			case 2:
+				p.mergeState.DeleteRemoteBranch = !p.mergeState.DeleteRemoteBranch
+				return nil
+			case 3:
+				p.mergeState.PullAfterMerge = !p.mergeState.PullAfterMerge
+				return nil
+			case 5:
 				// Skip All button - uncheck everything
 				p.mergeState.DeleteLocalWorktree = false
 				p.mergeState.DeleteLocalBranch = false
 				p.mergeState.DeleteRemoteBranch = false
 				p.mergeState.PullAfterMerge = false
 			}
+			// Focus 4 (Confirm) or 5 (Skip All) - advance to next step
 			return p.advanceMergeStep()
 		case MergeStepDone:
 			// Close modal

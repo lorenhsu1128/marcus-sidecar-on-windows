@@ -1,6 +1,7 @@
 package conversations
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -139,11 +140,13 @@ type Plugin struct {
 	// Watcher channel
 	watchChan    <-chan adapter.Event
 	watchClosers []io.Closer
+	watchCancel  context.CancelFunc // cancel function for watcher goroutines (td-eb2699b4)
 	stopped      bool
 
 	// Event coalescing for watch events
-	coalescer    *EventCoalescer
-	coalesceChan chan CoalescedRefreshMsg
+	coalescer         *EventCoalescer
+	coalesceChan      chan CoalescedRefreshMsg
+	coalesceChanClose sync.Once
 
 	// Search state
 	searchMode    bool
@@ -289,10 +292,20 @@ func (p *Plugin) Start() tea.Cmd {
 // Stop cleans up plugin resources.
 func (p *Plugin) Stop() {
 	p.stopped = true
+	// Cancel watcher goroutines (td-eb2699b4)
+	if p.watchCancel != nil {
+		p.watchCancel()
+	}
 	// Stop event coalescer
 	if p.coalescer != nil {
 		p.coalescer.Stop()
 	}
+	// Close coalesce channel to unblock any listening goroutines (td-e2791614)
+	p.coalesceChanClose.Do(func() {
+		if p.coalesceChan != nil {
+			close(p.coalesceChan)
+		}
+	})
 	p.closeWatchers()
 	p.watchChan = nil
 }
