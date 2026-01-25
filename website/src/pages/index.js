@@ -5,6 +5,24 @@ import Layout from '@theme/Layout';
 
 const TABS = ['td', 'git', 'files', 'conversations', 'workspaces'];
 
+const MINI_FEATURES = [
+  { icon: 'command', title: 'Command Palette', description: 'Quick access to all commands with fuzzy search. Press Ctrl+P to open.' },
+  { icon: 'folder-kanban', title: 'Project Switcher', description: 'Jump between projects instantly. Your recent projects are always one keystroke away.' },
+  { icon: 'columns-2', title: 'Split Panes', description: 'View two plugins side by side. Great for watching diffs while reviewing tasks.' },
+  { icon: 'activity', title: 'Diagnostics Overlay', description: 'Real-time metrics on memory, goroutines, and render performance. Toggle with F12.' },
+  { icon: 'search', title: 'Fuzzy File Finder', description: 'Find any file by typing part of its name. Respects .gitignore patterns.' },
+  { icon: 'file-search', title: 'Ripgrep Search', description: 'Search file contents across your entire codebase. Results update as you type.' },
+  { icon: 'git-branch', title: 'Git Graph', description: 'Visual branch history showing merges, rebases, and commit relationships.' },
+  { icon: 'trello', title: 'Kanban Workspaces', description: 'Organize workspaces into columns by status: active, paused, ready to merge.' },
+  { icon: 'link', title: 'Task Linking', description: 'Connect td tasks to git branches and PRs. Track work across tools automatically.' },
+  { icon: 'external-link', title: 'External Editor', description: 'Open any file in your $EDITOR with a single keypress. Returns you to Sidecar when done.' },
+  { icon: 'clipboard', title: 'System Clipboard', description: 'Copy file paths, diffs, commit hashes, and more directly to your clipboard.' },
+  { icon: 'move', title: 'Vim Navigation', description: 'h/j/k/l, gg/G, Ctrl+d/u, and more. Navigate like you would in vim.' },
+  { icon: 'git-merge', title: 'Merge Workflow', description: 'Merge PRs, delete branches, and clean up workspaces with guided prompts.' },
+  { icon: 'refresh-cw', title: 'Global Refresh', description: 'Press R to refresh all plugins at once. Git status, files, and tasks update together.' },
+  { icon: 'sun', title: 'Theme Switching', description: 'Cycle through themes or browse the community gallery. Changes apply instantly.' },
+];
+
 // For a cleaner install command, consider setting up a custom domain:
 // - Buy sidecar.dev (or similar) and set up a redirect
 // - Example: curl -fsSL sidecar.dev/install.sh | sh
@@ -750,6 +768,44 @@ function FeatureListItem({ icon, title, description, color }) {
   );
 }
 
+function MiniFeatureItem({ icon, title, description }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleToggle = useCallback(() => {
+    setIsOpen(prev => !prev);
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsOpen(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  return (
+    <div
+      className={`sc-miniFeature ${isOpen ? 'sc-miniFeatureOpen' : ''}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && handleToggle()}
+    >
+      <span className="sc-miniFeatureIcon"><i className={`icon-${icon}`} /></span>
+      <span>{title}</span>
+      {isOpen && (
+        <div className="sc-miniFeatureTooltip">
+          <div className="sc-miniFeatureTooltipContent">
+            {description}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WorkflowSection() {
   return (
     <section className="sc-workflow">
@@ -1125,66 +1181,14 @@ export default function Home() {
           <div className="container">
             <h2 className="sc-featuresTitle" style={{ fontSize: '20px', marginBottom: '24px' }}>Even more features</h2>
             <div className="sc-miniFeaturesGrid">
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-command" /></span>
-                <span>Command Palette</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-folder-kanban" /></span>
-                <span>Project Switcher</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-columns-2" /></span>
-                <span>Split Panes</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-activity" /></span>
-                <span>Diagnostics Overlay</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-search" /></span>
-                <span>Fuzzy File Finder</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-file-search" /></span>
-                <span>Ripgrep Search</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-git-branch" /></span>
-                <span>Git Graph</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-trello" /></span>
-                <span>Kanban Workspaces</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-link" /></span>
-                <span>Task Linking</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-external-link" /></span>
-                <span>External Editor</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-clipboard" /></span>
-                <span>System Clipboard</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-move" /></span>
-                <span>Vim Navigation</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-git-merge" /></span>
-                <span>Merge Workflow</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-refresh-cw" /></span>
-                <span>Global Refresh</span>
-              </div>
-              <div className="sc-miniFeature">
-                <span className="sc-miniFeatureIcon"><i className="icon-sun" /></span>
-                <span>Theme Switching</span>
-              </div>
+              {MINI_FEATURES.map((feature, idx) => (
+                <MiniFeatureItem
+                  key={idx}
+                  icon={feature.icon}
+                  title={feature.title}
+                  description={feature.description}
+                />
+              ))}
             </div>
           </div>
         </section>

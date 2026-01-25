@@ -1660,6 +1660,79 @@ a:hover {
   background: rgba(255, 255, 255, 0.05);
   font-size: 14px;
   color: var(--ifm-color-primary);
+  flex-shrink: 0;
+}
+
+.sc-miniFeature {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sc-miniFeatureOpen {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sc-miniFeatureTooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+  animation: tooltipFadeIn 150ms ease;
+}
+
+.sc-miniFeatureTooltipContent {
+  background: rgba(30, 30, 30, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(232, 232, 227, 0.9);
+  white-space: normal;
+  width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.sc-miniFeatureTooltipContent::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(30, 30, 30, 0.98);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Position tooltips on mobile */
+@media screen and (max-width: 768px) {
+  .sc-miniFeatureTooltip {
+    left: 0;
+    transform: translateX(0);
+    right: auto;
+  }
+
+  .sc-miniFeatureTooltipContent {
+    width: 200px;
+  }
+
+  .sc-miniFeatureTooltipContent::after {
+    left: 24px;
+    transform: translateX(0);
+  }
 }
 
 /* ---------- Agents section ---------- */
