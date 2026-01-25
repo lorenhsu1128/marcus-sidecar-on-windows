@@ -2,7 +2,6 @@ package gitstatus
 
 import (
 	"fmt"
-	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/marcus/sidecar/internal/modal"
@@ -88,9 +87,6 @@ func (p *Plugin) handleDiscardMouse(msg tea.MouseMsg) (plugin.Plugin, tea.Cmd) {
 	}
 
 	action := p.discardModal.HandleMouse(msg, p.mouseHandler)
-
-	// DEBUG
-	log.Printf("[DEBUG] handleDiscardMouse: action=%q mouseType=%v", action, msg.Action)
 
 	switch action {
 	case "discard":

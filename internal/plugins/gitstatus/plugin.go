@@ -240,23 +240,34 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 		return err // Not a git repo, silently degrade
 	}
 
+	// Preserve resources that are expensive to recreate or have no project-specific state
+	mouseHandler := p.mouseHandler
+	truncateCache := p.truncateCache
+	width, height := p.width, p.height
+
+	// Reset ALL state by zeroing the struct, then restore preserved fields
+	*p = Plugin{
+		mouseHandler:   mouseHandler,
+		truncateCache:  truncateCache,
+		width:          width,
+		height:         height,
+		sidebarVisible: true,
+		activePane:     PaneSidebar,
+		sidebarRestore: PaneSidebar,
+	}
+
+	// Set up context and repo
 	p.ctx = ctx
 	p.repoRoot = root
 	p.tree = NewFileTree(root)
 
-	// Load saved diff view mode preference
+	// Load user preferences from state
 	if state.GetGitDiffMode() == "side-by-side" {
 		p.diffViewMode = DiffViewSideBySide
-	} else {
-		p.diffViewMode = DiffViewUnified
 	}
-
-	// Load saved sidebar width from state
 	if saved := state.GetGitStatusSidebarWidth(); saved > 0 {
 		p.sidebarWidth = saved
 	}
-
-	// Load saved commit graph preference
 	p.showCommitGraph = state.GetGitGraphEnabled()
 
 	return nil

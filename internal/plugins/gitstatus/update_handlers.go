@@ -1,7 +1,6 @@
 package gitstatus
 
 import (
-	"log"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -1007,9 +1006,6 @@ func (p *Plugin) updateConfirmDiscard(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	// Route to modal
 	action, cmd := p.discardModal.HandleKey(msg)
 
-	// DEBUG
-	log.Printf("[DEBUG] updateConfirmDiscard: key=%q action=%q focusedID=%q", msg.String(), action, p.discardModal.FocusedID())
-
 	switch action {
 	case "discard":
 		return p.confirmDiscard()
@@ -1022,9 +1018,6 @@ func (p *Plugin) updateConfirmDiscard(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 
 // confirmDiscard executes the discard and closes the modal.
 func (p *Plugin) confirmDiscard() (plugin.Plugin, tea.Cmd) {
-	// DEBUG
-	log.Printf("[DEBUG] confirmDiscard: discardFile=%v", p.discardFile != nil)
-
 	var cmd tea.Cmd
 	if p.discardFile != nil {
 		cmd = p.doDiscard(p.discardFile)
@@ -1037,9 +1030,6 @@ func (p *Plugin) confirmDiscard() (plugin.Plugin, tea.Cmd) {
 
 // cancelDiscard closes the modal without discarding.
 func (p *Plugin) cancelDiscard() (plugin.Plugin, tea.Cmd) {
-	// DEBUG
-	log.Printf("[DEBUG] cancelDiscard called")
-
 	p.viewMode = p.discardReturnMode
 	p.discardFile = nil
 	p.discardModal = nil
