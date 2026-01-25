@@ -434,6 +434,25 @@ func (p *Plugin) handlePullMenuMouse(msg tea.MouseMsg) (*Plugin, tea.Cmd) {
 	return p, nil
 }
 
+// handlePullConflictMouse processes mouse events in the pull conflict modal.
+func (p *Plugin) handlePullConflictMouse(msg tea.MouseMsg) (*Plugin, tea.Cmd) {
+	p.ensurePullConflictModal()
+	if p.pullConflictModal == nil {
+		return p, nil
+	}
+
+	action := p.pullConflictModal.HandleMouse(msg, p.mouseHandler)
+	switch action {
+	case pullConflictAbortID:
+		plug, cmd := p.abortPullConflict()
+		return plug.(*Plugin), cmd
+	case "cancel", pullConflictDismissID:
+		plug, cmd := p.dismissPullConflict()
+		return plug.(*Plugin), cmd
+	}
+	return p, nil
+}
+
 // handleDiffMouse processes mouse events in the full-screen diff view.
 func (p *Plugin) handleDiffMouse(msg tea.MouseMsg) (*Plugin, tea.Cmd) {
 	action := p.mouseHandler.HandleMouse(msg)

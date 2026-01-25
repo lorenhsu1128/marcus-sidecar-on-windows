@@ -119,6 +119,8 @@ type Plugin struct {
 	// Pull conflict state
 	pullConflictFiles []string // Conflicted files from failed pull
 	pullConflictType  string   // "merge" or "rebase"
+	pullConflictModal *modal.Modal
+	pullConflictWidth int
 
 	// View dimensions
 	width  int
@@ -190,6 +192,11 @@ type Plugin struct {
 
 	// Truncation cache to eliminate ANSI parser allocation churn
 	truncateCache *ui.TruncateCache
+}
+
+func (p *Plugin) clearPullConflictModal() {
+	p.pullConflictModal = nil
+	p.pullConflictWidth = 0
 }
 
 // New creates a new git status plugin.
@@ -315,6 +322,8 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			return p.handleCommitMouse(msg)
 		case ViewModePullMenu:
 			return p.handlePullMenuMouse(msg)
+		case ViewModePullConflict:
+			return p.handlePullConflictMouse(msg)
 		case ViewModeConfirmDiscard:
 			return p.handleDiscardMouse(msg)
 		}
@@ -604,6 +613,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.pullConflictFiles = GetConflictedFiles(p.repoRoot)
 			if len(p.pullConflictFiles) > 0 {
 				p.viewMode = ViewModePullConflict
+				p.clearPullConflictModal()
 				return p, nil
 			}
 		}

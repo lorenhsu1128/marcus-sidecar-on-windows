@@ -845,18 +845,41 @@ func (p *Plugin) clearPullModal() {
 
 // updatePullConflict handles key events in the pull conflict modal.
 func (p *Plugin) updatePullConflict(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
+	p.ensurePullConflictModal()
+	if p.pullConflictModal == nil {
+		return p, nil
+	}
+
 	switch msg.String() {
 	case "a":
 		// Abort merge/rebase
-		p.viewMode = ViewModeStatus
-		return p, p.doAbortPull()
+		return p.abortPullConflict()
 	case "esc", "q":
 		// Dismiss modal (conflicts remain, user resolves manually)
-		p.viewMode = ViewModeStatus
-		p.pullConflictFiles = nil
-		return p, p.refresh()
+		return p.dismissPullConflict()
 	}
-	return p, nil
+
+	action, cmd := p.pullConflictModal.HandleKey(msg)
+	switch action {
+	case pullConflictAbortID:
+		return p.abortPullConflict()
+	case "cancel", pullConflictDismissID:
+		return p.dismissPullConflict()
+	}
+	return p, cmd
+}
+
+func (p *Plugin) abortPullConflict() (plugin.Plugin, tea.Cmd) {
+	p.viewMode = ViewModeStatus
+	p.clearPullConflictModal()
+	return p, p.doAbortPull()
+}
+
+func (p *Plugin) dismissPullConflict() (plugin.Plugin, tea.Cmd) {
+	p.viewMode = ViewModeStatus
+	p.pullConflictFiles = nil
+	p.clearPullConflictModal()
+	return p, p.refresh()
 }
 
 // executePushMenuAction executes the push menu action at the given index.
