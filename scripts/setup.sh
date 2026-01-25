@@ -309,6 +309,14 @@ get_sidecar_version() {
     fi
 }
 
+get_tmux_version() {
+    if command -v tmux &> /dev/null; then
+        tmux -V | grep -oE '[0-9]+\.[0-9]+[a-z]*' | head -1
+    else
+        echo ""
+    fi
+}
+
 get_latest_release() {
     local repo="$1"
     local url="https://api.github.com/repos/${repo}/releases/latest"
@@ -382,6 +390,7 @@ main() {
     GO_VERSION=$(get_go_version)
     TD_VERSION=$(get_td_version)
     SIDECAR_VERSION=$(get_sidecar_version)
+    TMUX_VERSION=$(get_tmux_version)
 
     # Fetch latest versions
     echo "Checking latest versions..."
@@ -428,6 +437,13 @@ main() {
         fi
     else
         echo "  sidecar: - not installed"
+    fi
+
+    # tmux status
+    if [[ -n "$TMUX_VERSION" ]]; then
+        style_success "  tmux:    ✓ $TMUX_VERSION"
+    else
+        style_warning "  tmux:    - not installed (recommended)"
     fi
 
     echo "──────────────────────────────────────"
@@ -545,6 +561,51 @@ main() {
         fi
     fi
 
+    # Check tmux
+    if [[ -z "$TMUX_VERSION" ]]; then
+        echo ""
+        style_header "Interactive Terminal Support"
+        echo "Sidecar uses tmux to support the interactive terminal mode."
+        echo "You don't need to know how to use tmux!"
+        echo "We just use it in the background to handle split panes."
+        echo ""
+
+        local tmux_install_cmd=""
+        if command -v brew &> /dev/null; then
+            tmux_install_cmd="brew install tmux"
+        elif command -v apt &> /dev/null; then
+            tmux_install_cmd="sudo apt update && sudo apt install -y tmux"
+        elif command -v dnf &> /dev/null; then
+            tmux_install_cmd="sudo dnf install -y tmux"
+        elif command -v pacman &> /dev/null; then
+            tmux_install_cmd="sudo pacman -S --noconfirm tmux"
+        elif command -v zypper &> /dev/null; then
+            tmux_install_cmd="sudo zypper install -y tmux"
+        elif command -v apk &> /dev/null; then
+            tmux_install_cmd="sudo apk add tmux"
+        fi
+
+        if [[ -n "$tmux_install_cmd" ]]; then
+            echo "Will run:"
+            echo "  $tmux_install_cmd"
+            echo ""
+            if confirm "Install tmux (recommended)?"; then
+                spin "Installing tmux..." bash -c "$tmux_install_cmd"
+                TMUX_VERSION=$(get_tmux_version)
+            else
+                echo ""
+                style_warning "Skipping tmux. Interactive terminal features will be disabled."
+            fi
+        else
+            style_warning "Could not detect package manager for tmux."
+            echo "Please install tmux manually to enable interactive terminal features."
+            echo "  macOS:         brew install tmux"
+            echo "  Ubuntu/Debian: sudo apt install tmux"
+            echo "  Fedora:        sudo dnf install tmux"
+            echo "  Arch:          sudo pacman -S tmux"
+        fi
+    fi
+
     # Install td
     if $install_td; then
         echo ""
@@ -602,6 +663,12 @@ main() {
             style_error "  ✗ sidecar not found"
             all_good=false
         fi
+    fi
+
+    if [[ -n "$TMUX_VERSION" ]]; then
+        style_success "  ✓ tmux $TMUX_VERSION"
+    else
+        style_warning "  ! tmux not found (interactive features disabled)"
     fi
 
     if $install_td; then
