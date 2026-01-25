@@ -284,9 +284,10 @@ If no agent is running, opens a modal to select:
 
 | Key | Action |
 |-----|--------|
-| `enter` | Attach to running agent |
+| `t` | Attach to running agent |
+| `enter` | Enter interactive mode |
 
-Opens the agent's tmux session for direct interaction. Press `ctrl+b` then `d` to detach back to sidecar.
+Press `t` to open the agent's tmux session for direct interaction. Press `ctrl+b` then `d` to detach back to sidecar. Press `enter` to enter interactive mode, which allows typing directly into the terminal while staying in sidecar.
 
 ### Real-Time Output Streaming
 
@@ -359,7 +360,8 @@ Press `D` to delete a shell session. This terminates the underlying tmux session
 | Create shell | `n` + select Shell | Create new terminal session |
 | Rename shell | `R` | Change display name (50 char limit) |
 | Delete shell | `D` | Terminate tmux session |
-| Attach to shell | `enter` | Interactive access to terminal |
+| Interactive mode | `enter` | Enter interactive mode for typing |
+| Attach to shell | `t` | Full-screen tmux access |
 | Kill shell | `K` | Force-terminate session |
 
 ## Workspace Operations
@@ -472,7 +474,7 @@ Link workspaces to TD tasks for context:
 
 | Key | Action |
 |-----|--------|
-| `t` | Link/unlink TD task |
+| `T` | Link/unlink TD task |
 
 Opens task picker to select from open tasks.
 
@@ -667,14 +669,15 @@ All keyboard shortcuts by context:
 | `p` | Push branch |
 | `d` | Show diff |
 | `m` | Merge workflow |
-| `t` | Link task |
+| `T` | Link task |
 | `R` | Rename shell (display name only) |
 | `s` | Start agent |
 | `S` | Stop agent |
 | `y` | Approve action |
 | `Y` | Approve all |
 | `N` | Reject action |
-| `enter` | Attach to agent |
+| `enter` | Interactive mode |
+| `t` | Attach to agent |
 | `[` | Previous tab |
 | `]` | Next tab |
 | `tab` | Focus preview |

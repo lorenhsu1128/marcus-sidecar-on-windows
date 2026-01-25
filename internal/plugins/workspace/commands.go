@@ -141,7 +141,7 @@ func (p *Plugin) Commands() []plugin.Command {
 				}
 				if hasActiveSession {
 					cmds = append(cmds,
-						plugin.Command{ID: "interactive", Name: "Type", Description: "Enter interactive mode (i)", Context: "workspace-preview", Priority: 15},
+						plugin.Command{ID: "interactive", Name: "Type", Description: "Enter interactive mode (enter)", Context: "workspace-preview", Priority: 15},
 					)
 				}
 			}

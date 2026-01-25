@@ -615,6 +615,11 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 			p.activePane = PanePreview
 		}
 	case "enter":
+		// Enter interactive mode (tmux input passthrough) - feature gated
+		// Works from sidebar for selected shell/worktree with active session
+		return p.enterInteractiveMode()
+	case "t":
+		// Attach to tmux session
 		// Shell entry: attach to selected shell session
 		if p.shellSelected {
 			if p.selectedShellIdx >= 0 && p.selectedShellIdx < len(p.shells) {
@@ -696,11 +701,8 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 	case "r":
 		return func() tea.Msg { return RefreshMsg{} }
 	case "i":
-		// Enter interactive mode (tmux input passthrough) - feature gated
-		// Only available in preview pane with output tab when there's an active session
-		if p.activePane == PanePreview && p.previewTab == PreviewTabOutput {
-			return p.enterInteractiveMode()
-		}
+		// Legacy shortcut for interactive mode (enter is now primary)
+		return p.enterInteractiveMode()
 	case "v":
 		// In sidebar: toggle between list and kanban view
 		// In preview pane on diff tab: toggle unified/side-by-side diff view
@@ -823,7 +825,7 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		if wt != nil && wt.Status == StatusWaiting && wt.Agent != nil {
 			return p.Reject(wt)
 		}
-	case "t":
+	case "T":
 		// Link/unlink td task
 		wt := p.selectedWorktree()
 		if wt != nil {

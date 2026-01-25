@@ -412,9 +412,10 @@ All interactive mode keys are configurable in `~/.config/sidecar/config.json` un
 | `D` | delete-workspace | Delete selected workspace |
 | `p` | push | Push branch to remote |
 | `m` | merge-workflow | Start merge workflow |
-| `t` | link-task | Link/unlink task |
+| `T` | link-task | Link/unlink task |
 | `s` | start-agent | Start agent |
-| `enter` | attach | Attach to agent session |
+| `enter` | interactive | Enter interactive mode |
+| `t` | attach | Attach to tmux session |
 | `S` | stop-agent | Stop agent |
 | `y` | approve | Approve agent prompt |
 | `N` | reject | Reject agent prompt |
