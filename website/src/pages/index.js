@@ -765,7 +765,7 @@ function WorkflowSection() {
             <div>
               <h3 className="sc-workflowTitle">1. Plan</h3>
               <p className="sc-workflowDesc">
-                Create tasks in <a href="https://github.com/marcus/td" className="sc-inlineLink">td</a> to give agents clear objectives and context.
+                Create tasks in <a href="https://marcus.github.io/td/" className="sc-inlineLink">td</a> to give agents clear objectives and context.
               </p>
             </div>
           </div>
@@ -847,7 +847,7 @@ export default function Home() {
 
             <p className="sc-subtitle">
               Sidecar puts your entire development workflow in one shell:
-              plan tasks with <a href="https://github.com/marcus/td" className="sc-inlineLink">td</a>, chat with AI agents, review diffs, stage commits, review past conversations, and manage git workspaces—all without leaving Sidecar.
+              plan tasks with <a href="https://marcus.github.io/td/" className="sc-inlineLink">td</a>, chat with AI agents, review diffs, stage commits, review past conversations, and manage git workspaces—all without leaving Sidecar.
             </p>
 
             <div className="sc-heroCta">
@@ -892,7 +892,7 @@ export default function Home() {
               {/* TD Hero Card - double wide */}
               <FeatureCard
                 id="td"
-                title={<>Plan with <a href="https://github.com/marcus/td" className="sc-inlineLink">td</a></>}
+                title={<>Plan with <a href="https://marcus.github.io/td/" className="sc-inlineLink">td</a></>}
                 chip="td"
                 isHero={true}
                 isHighlighted={activeTab === 'td'}
@@ -958,7 +958,7 @@ export default function Home() {
           <div className="sc-showcaseFullWidth">
             <ComponentSection
               id="showcase-td"
-              title={<>Plan with <a href="https://github.com/marcus/td" className="sc-inlineLink">td</a></>}
+              title={<>Plan with <a href="https://marcus.github.io/td/" className="sc-inlineLink">td</a></>}
               gradient="sc-gradientGreen"
               MockupComponent={TdMockup}
               features={[

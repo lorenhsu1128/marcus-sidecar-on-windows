@@ -138,7 +138,7 @@ Unified view of sessions across Claude Code, Cursor, Gemini CLI, OpenCode, Codex
 
 **Task management for AI agents working across context windows.**
 
-Integration with [TD](https://github.com/marcus/td), a purpose-built task system that helps agents maintain context across sessions. View the current focused task, track activity logs, and submit reviews—all synchronized with your agent's workflow.
+Integration with [TD](https://marcus.github.io/td/), a purpose-built task system that helps agents maintain context across sessions. View the current focused task, track activity logs, and submit reviews—all synchronized with your agent's workflow.
 
 ![TD Monitor](../../docs/screenshots/sidecar-td.png)
 

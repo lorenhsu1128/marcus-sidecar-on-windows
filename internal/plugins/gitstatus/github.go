@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/marcus/sidecar/internal/app"
 	"github.com/marcus/sidecar/internal/msg"
 )
 
@@ -76,9 +77,11 @@ func openInBrowser(url string) tea.Cmd {
 		case "linux":
 			cmd = exec.Command("xdg-open", url)
 		default:
-			return nil
+			return app.ToastMsg{Message: "Unsupported platform", Duration: 3 * time.Second, IsError: true}
 		}
-		_ = cmd.Start()
+		if err := cmd.Start(); err != nil {
+			return app.ToastMsg{Message: "Failed to open browser: " + err.Error(), Duration: 3 * time.Second, IsError: true}
+		}
 		return nil
 	}
 }

@@ -1,6 +1,7 @@
 package gitstatus
 
 import (
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -43,9 +44,15 @@ func NewWatcher(workDir string) (*Watcher, error) {
 		return nil, err
 	}
 	// Try to watch index directly (may not exist yet)
-	_ = fsWatcher.Add(indexPath)
-	_ = fsWatcher.Add(headPath)
-	_ = fsWatcher.Add(refsDir)
+	if err := fsWatcher.Add(indexPath); err != nil {
+		slog.Debug("watcher: add index", "err", err)
+	}
+	if err := fsWatcher.Add(headPath); err != nil {
+		slog.Debug("watcher: add HEAD", "err", err)
+	}
+	if err := fsWatcher.Add(refsDir); err != nil {
+		slog.Debug("watcher: add refs", "err", err)
+	}
 
 	go w.run()
 

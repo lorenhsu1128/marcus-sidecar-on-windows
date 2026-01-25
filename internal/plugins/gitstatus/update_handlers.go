@@ -2,8 +2,10 @@ package gitstatus
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/marcus/sidecar/internal/app"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/state"
 )
@@ -132,12 +134,22 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 
 				// Handle folder entries - stage all children
 				if entry.IsFolder {
+					var firstErr error
 					for _, child := range entry.Children {
-						_ = p.tree.StageFile(child.Path)
+						if err := p.tree.StageFile(child.Path); err != nil && firstErr == nil {
+							firstErr = err
+						}
+					}
+					if firstErr != nil {
+						return p, func() tea.Msg {
+							return app.ToastMsg{Message: "Stage failed: " + firstErr.Error(), Duration: 3 * time.Second, IsError: true}
+						}
 					}
 				} else {
 					if err := p.tree.StageFile(entry.Path); err != nil {
-						return p, nil
+						return p, func() tea.Msg {
+							return app.ToastMsg{Message: "Stage failed: " + err.Error(), Duration: 3 * time.Second, IsError: true}
+						}
 					}
 				}
 				// After staging, move cursor to first unstaged file position
@@ -155,9 +167,12 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		if len(entries) > 0 && p.cursor < len(entries) {
 			entry := entries[p.cursor]
 			if entry.Staged {
-				if err := p.tree.UnstageFile(entry.Path); err == nil {
-					return p, tea.Batch(p.refresh(), p.loadRecentCommits())
+				if err := p.tree.UnstageFile(entry.Path); err != nil {
+					return p, func() tea.Msg {
+						return app.ToastMsg{Message: "Unstage failed: " + err.Error(), Duration: 3 * time.Second, IsError: true}
+					}
 				}
+				return p, tea.Batch(p.refresh(), p.loadRecentCommits())
 			}
 		}
 
@@ -205,15 +220,21 @@ func (p *Plugin) updateStatus(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 
 	case "S":
 		// Stage all files
-		if err := p.tree.StageAll(); err == nil {
-			return p, tea.Batch(p.refresh(), p.loadRecentCommits())
+		if err := p.tree.StageAll(); err != nil {
+			return p, func() tea.Msg {
+				return app.ToastMsg{Message: "Stage all failed: " + err.Error(), Duration: 3 * time.Second, IsError: true}
+			}
 		}
+		return p, tea.Batch(p.refresh(), p.loadRecentCommits())
 
 	case "U":
 		// Unstage all files
-		if err := p.tree.UnstageAll(); err == nil {
-			return p, tea.Batch(p.refresh(), p.loadRecentCommits())
+		if err := p.tree.UnstageAll(); err != nil {
+			return p, func() tea.Msg {
+				return app.ToastMsg{Message: "Unstage all failed: " + err.Error(), Duration: 3 * time.Second, IsError: true}
+			}
 		}
+		return p, tea.Batch(p.refresh(), p.loadRecentCommits())
 
 	case "h":
 		// Jump cursor to commits section (show history)

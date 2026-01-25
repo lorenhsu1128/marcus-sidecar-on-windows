@@ -3,6 +3,7 @@ package gitstatus
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -417,28 +418,44 @@ func (t *FileTree) AllEntries() []*FileEntry {
 func (t *FileTree) StageFile(path string) error {
 	cmd := exec.Command("git", "add", path)
 	cmd.Dir = t.workDir
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // UnstageFile unstages a file.
 func (t *FileTree) UnstageFile(path string) error {
 	cmd := exec.Command("git", "restore", "--staged", path)
 	cmd.Dir = t.workDir
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // StageAll stages all modified and untracked files.
 func (t *FileTree) StageAll() error {
 	cmd := exec.Command("git", "add", "-A")
 	cmd.Dir = t.workDir
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // UnstageAll unstages all staged files.
 func (t *FileTree) UnstageAll() error {
 	cmd := exec.Command("git", "reset", "HEAD")
 	cmd.Dir = t.workDir
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // HasStagedFiles returns true if there are any staged files.
