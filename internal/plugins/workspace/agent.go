@@ -626,14 +626,9 @@ func (p *Plugin) AttachToWorktreeDir(wt *Worktree) tea.Cmd {
 	}
 
 	// Attach to the session - resize to full terminal first so no dot borders appear
-	c := exec.Command("tmux", "attach-session", "-t", sessionName)
-	return tea.Sequence(
-		p.resizeForAttachCmd(sessionName),
-		tea.Printf("\nAttaching to %s. Press %s d to return to sidecar.\n", wt.Name, getTmuxPrefix()),
-		tea.ExecProcess(c, func(err error) tea.Msg {
-			return TmuxAttachFinishedMsg{WorkspaceName: wt.Name, Err: err}
-		}),
-	)
+	return p.attachWithResize(sessionName, sessionName, wt.Name, func(err error) tea.Msg {
+		return TmuxAttachFinishedMsg{WorkspaceName: wt.Name, Err: err}
+	})
 }
 
 // getTaskContext fetches task title and description for agent context.
@@ -1269,17 +1264,10 @@ func (p *Plugin) AttachToSession(wt *Worktree) tea.Cmd {
 		target = sessionName
 	}
 
-	// Use tea.ExecProcess to suspend Bubble Tea and run tmux attach
-	c := exec.Command("tmux", "attach-session", "-t", sessionName)
-
 	// Resize to full terminal before attaching so no dot borders appear
-	return tea.Sequence(
-		p.resizeForAttachCmd(target),
-		tea.Printf("\nAttaching to %s. Press %s d to return to sidecar.\n", wt.Name, getTmuxPrefix()),
-		tea.ExecProcess(c, func(err error) tea.Msg {
-			return TmuxAttachFinishedMsg{WorkspaceName: wt.Name, Err: err}
-		}),
-	)
+	return p.attachWithResize(target, sessionName, wt.Name, func(err error) tea.Msg {
+		return TmuxAttachFinishedMsg{WorkspaceName: wt.Name, Err: err}
+	})
 }
 
 // StopAgent stops an agent running in a worktree.

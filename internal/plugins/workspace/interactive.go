@@ -622,6 +622,18 @@ func (p *Plugin) resizeForAttachCmd(target string) tea.Cmd {
 	}
 }
 
+// attachWithResize resizes the tmux pane to full terminal, waits briefly for
+// tmux to process, then attaches. Centralizes resize-before-attach logic.
+func (p *Plugin) attachWithResize(target, sessionName, displayName string, onComplete func(error) tea.Msg) tea.Cmd {
+	c := exec.Command("tmux", "attach-session", "-t", sessionName)
+	return tea.Sequence(
+		p.resizeForAttachCmd(target),
+		tea.Tick(50*time.Millisecond, func(time.Time) tea.Msg { return nil }),
+		tea.Printf("\nAttaching to %s. Press %s d to return to sidecar.\n", displayName, getTmuxPrefix()),
+		tea.ExecProcess(c, onComplete),
+	)
+}
+
 // previewResizeTarget returns the tmux target for the currently selected pane.
 func (p *Plugin) previewResizeTarget() string {
 	if p.shellSelected {
