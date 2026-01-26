@@ -15,6 +15,7 @@ import (
 	"github.com/marcus/sidecar/internal/mouse"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/state"
+	"github.com/marcus/sidecar/internal/ui"
 )
 
 const (
@@ -28,6 +29,7 @@ const (
 
 	previewDebounce     = 150 * time.Millisecond
 	watchReloadDebounce = 200 * time.Millisecond
+	loadSettleDelay     = 300 * time.Millisecond // Wait for sessions to settle before hiding skeleton
 
 	// Divider width for pane separator
 	dividerWidth = 1
@@ -200,6 +202,11 @@ type Plugin struct {
 
 	// Large session warning tracking (td-ee67d8)
 	warnedSessions map[string]bool // session ID -> already warned about size
+
+	// Initial load state (td-6cc19f)
+	initialLoadDone    bool        // true after sessions settle (no new arrivals for settleDelay)
+	skeleton           ui.Skeleton // shimmer loading animation
+	loadSettleToken    int         // token for debounced settle check
 }
 
 // msgLineRange tracks which screen lines a message occupies (after scroll).
@@ -237,6 +244,7 @@ func New() *Plugin {
 		sidebarVisible:      true, // Sidebar visible by default
 		sidebarRestore:      PaneSidebar,
 		warnedSessions:      make(map[string]bool),
+		skeleton:            ui.NewSkeleton(8, nil), // 8 placeholder rows
 	}
 	p.coalescer = NewEventCoalescer(0, coalesceChan)
 	return p
@@ -345,6 +353,11 @@ func (p *Plugin) resetState() {
 	p.coalesceChanClose = sync.Once{}
 	p.coalesceChan = make(chan CoalescedRefreshMsg, 8)
 	p.coalescer = NewEventCoalescer(0, p.coalesceChan)
+
+	// Initial load state (td-6cc19f)
+	p.initialLoadDone = false
+	p.skeleton = ui.NewSkeleton(8, nil)
+	p.loadSettleToken = 0
 }
 
 // Init initializes the plugin with context.
@@ -385,6 +398,7 @@ func (p *Plugin) Start() tea.Cmd {
 		p.loadSessions(),
 		p.startWatcher(),
 		p.listenForCoalescedRefresh(),
+		p.skeleton.Start(), // Start skeleton animation (td-6cc19f)
 	)
 }
 
@@ -426,6 +440,10 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			return p, p.loadSessions()
 		}
 		return p, nil
+
+	case ui.SkeletonTickMsg:
+		// Forward tick to skeleton for animation (td-6cc19f)
+		return p, p.skeleton.Update(msg)
 
 	case tea.MouseMsg:
 		return p.handleMouse(msg)
@@ -475,6 +493,17 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		// Check for large session warnings (td-ee67d8)
 		warningCmd := p.checkLargeSessionWarnings()
 
+		// Schedule settle check for skeleton hide (td-6cc19f)
+		// If more sessions arrive before settle, the token will be invalidated
+		var settleCmd tea.Cmd
+		if !p.initialLoadDone {
+			p.loadSettleToken++
+			token := p.loadSettleToken
+			settleCmd = tea.Tick(loadSettleDelay, func(t time.Time) tea.Msg {
+				return LoadSettledMsg{Token: token}
+			})
+		}
+
 		// Ensure a selection so the right pane can render.
 		if p.selectedSession == "" && len(p.sessions) > 0 {
 			if p.cursor >= len(p.sessions) {
@@ -485,12 +514,30 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			}
 			p.setSelectedSession(p.sessions[p.cursor].ID)
 			previewCmd := p.schedulePreviewLoad(p.selectedSession)
+			cmds := []tea.Cmd{previewCmd}
 			if warningCmd != nil {
-				return p, tea.Batch(previewCmd, warningCmd)
+				cmds = append(cmds, warningCmd)
 			}
-			return p, previewCmd
+			if settleCmd != nil {
+				cmds = append(cmds, settleCmd)
+			}
+			return p, tea.Batch(cmds...)
+		}
+		if settleCmd != nil {
+			if warningCmd != nil {
+				return p, tea.Batch(warningCmd, settleCmd)
+			}
+			return p, settleCmd
 		}
 		return p, warningCmd
+
+	case LoadSettledMsg:
+		// Only settle if token matches (no new sessions arrived) (td-6cc19f)
+		if msg.Token == p.loadSettleToken && !p.initialLoadDone {
+			p.initialLoadDone = true
+			p.skeleton.Stop()
+		}
+		return p, nil
 
 	case PreviewLoadMsg:
 		if msg.Token != p.previewToken {
@@ -868,6 +915,11 @@ type SessionsLoadedMsg struct {
 	// Worktree cache data (td-0e43c080: computed in cmd, stored in Update)
 	WorktreePaths []string
 	WorktreeNames map[string]string
+}
+
+// LoadSettledMsg signals that session loading has settled (no new arrivals).
+type LoadSettledMsg struct {
+	Token int // Must match loadSettleToken to be valid
 }
 
 type MessagesLoadedMsg struct {

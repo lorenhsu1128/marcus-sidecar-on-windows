@@ -36,6 +36,11 @@ func (p *Plugin) renderPreviewContent(width, height int) string {
 		return p.truncateAllLines(content, width)
 	}
 
+	// Main worktree: show informational view instead of normal tabs
+	if wt.IsMain {
+		return p.truncateAllLines(p.renderMainWorktreeView(width, height), width)
+	}
+
 	// Tab header (only for worktrees, not shell)
 	tabs := p.renderTabs(width)
 	lines = append(lines, tabs)
@@ -706,6 +711,53 @@ func (p *Plugin) renderCommitStatusHeader(width int) string {
 	}
 
 	return headerStyle.Render(sb.String())
+}
+
+// renderMainWorktreeView renders a helpful view when the main worktree is selected.
+func (p *Plugin) renderMainWorktreeView(width, height int) string {
+	var lines []string
+
+	// ASCII art tree - thematic for "worktrees"
+	tree := []string{
+		"",
+		"              *",
+		"             /|\\",
+		"            / | \\",
+		"           /  |  \\",
+		"          /   |   \\",
+		"         /___ | ___\\",
+		"             |||",
+		"             |||",
+		"            /|||\\ ",
+		"",
+	}
+
+	// Styles
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
+	treeStyle := lipgloss.NewStyle().Foreground(styles.TextMuted)
+	hintStyle := lipgloss.NewStyle().Foreground(styles.Success)
+
+	// Center the tree
+	for _, line := range tree {
+		centered := treeStyle.Render(line)
+		lines = append(lines, centered)
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, titleStyle.Render("Main Worktree"))
+	lines = append(lines, "")
+	lines = append(lines, dimText("This is your primary working directory—the trunk of the tree."))
+	lines = append(lines, dimText("Workspaces branch off from here as isolated environments."))
+	lines = append(lines, "")
+	lines = append(lines, strings.Repeat("─", min(width-4, 50)))
+	lines = append(lines, "")
+	lines = append(lines, hintStyle.Render("Press 'n' to create a new workspace"))
+	lines = append(lines, "")
+	lines = append(lines, dimText("Each workspace gets its own directory, branch, and"))
+	lines = append(lines, dimText("optional AI agent. Work on multiple features in"))
+	lines = append(lines, dimText("parallel without switching branches."))
+
+	return strings.Join(lines, "\n")
 }
 
 // renderTaskContent renders linked task info.

@@ -524,3 +524,154 @@ func TestSetWorkspaceState_ShellSelection(t *testing.T) {
 		t.Errorf("stored WorkspaceName = %q, want empty", stored.WorkspaceName)
 	}
 }
+
+func TestGetLastWorktreePath_Default(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
+	current = nil
+	result := GetLastWorktreePath("/main/repo")
+	if result != "" {
+		t.Errorf("GetLastWorktreePath() with nil current = %q, want empty", result)
+	}
+}
+
+func TestGetLastWorktreePath_EmptyMap(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
+	current = &State{LastWorktreePath: nil}
+	result := GetLastWorktreePath("/main/repo")
+	if result != "" {
+		t.Errorf("GetLastWorktreePath() with nil map = %q, want empty", result)
+	}
+}
+
+func TestGetLastWorktreePath_Found(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
+	current = &State{
+		LastWorktreePath: map[string]string{
+			"/main/repo": "/worktrees/feature-auth",
+		},
+	}
+	result := GetLastWorktreePath("/main/repo")
+	if result != "/worktrees/feature-auth" {
+		t.Errorf("GetLastWorktreePath() = %q, want /worktrees/feature-auth", result)
+	}
+}
+
+func TestSetLastWorktreePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalPath := path
+	originalCurrent := current
+	defer func() {
+		path = originalPath
+		current = originalCurrent
+	}()
+
+	stateFile := filepath.Join(tmpDir, "state.json")
+	path = stateFile
+	current = &State{}
+
+	err := SetLastWorktreePath("/main/repo", "/worktrees/feature-billing")
+	if err != nil {
+		t.Fatalf("SetLastWorktreePath() failed: %v", err)
+	}
+
+	// Verify in memory
+	if current.LastWorktreePath["/main/repo"] != "/worktrees/feature-billing" {
+		t.Errorf("stored path = %q, want /worktrees/feature-billing", current.LastWorktreePath["/main/repo"])
+	}
+
+	// Verify saved to disk
+	data, _ := os.ReadFile(stateFile)
+	var loaded State
+	_ = json.Unmarshal(data, &loaded)
+	if loaded.LastWorktreePath["/main/repo"] != "/worktrees/feature-billing" {
+		t.Errorf("persisted path = %q, want /worktrees/feature-billing", loaded.LastWorktreePath["/main/repo"])
+	}
+}
+
+func TestSetLastWorktreePath_InitializesNilState(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalPath := path
+	originalCurrent := current
+	defer func() {
+		path = originalPath
+		current = originalCurrent
+	}()
+
+	path = filepath.Join(tmpDir, "state.json")
+	current = nil
+
+	err := SetLastWorktreePath("/main/repo", "/worktrees/feature")
+	if err != nil {
+		t.Fatalf("SetLastWorktreePath() failed: %v", err)
+	}
+
+	if current == nil {
+		t.Error("SetLastWorktreePath() should initialize current state")
+	}
+	if current.LastWorktreePath["/main/repo"] != "/worktrees/feature" {
+		t.Errorf("path = %q, want /worktrees/feature", current.LastWorktreePath["/main/repo"])
+	}
+}
+
+func TestClearLastWorktreePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalPath := path
+	originalCurrent := current
+	defer func() {
+		path = originalPath
+		current = originalCurrent
+	}()
+
+	path = filepath.Join(tmpDir, "state.json")
+	current = &State{
+		LastWorktreePath: map[string]string{
+			"/main/repo": "/worktrees/feature",
+		},
+	}
+
+	err := ClearLastWorktreePath("/main/repo")
+	if err != nil {
+		t.Fatalf("ClearLastWorktreePath() failed: %v", err)
+	}
+
+	// Verify removed
+	if _, exists := current.LastWorktreePath["/main/repo"]; exists {
+		t.Error("ClearLastWorktreePath() should remove the entry")
+	}
+
+	// Verify saved to disk
+	data, _ := os.ReadFile(path)
+	var loaded State
+	_ = json.Unmarshal(data, &loaded)
+	if _, exists := loaded.LastWorktreePath["/main/repo"]; exists {
+		t.Error("ClearLastWorktreePath() should persist removal")
+	}
+}
+
+func TestClearLastWorktreePath_NilState(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
+	current = nil
+	err := ClearLastWorktreePath("/main/repo")
+	if err != nil {
+		t.Fatalf("ClearLastWorktreePath() with nil state should not error: %v", err)
+	}
+}
+
+func TestClearLastWorktreePath_NilMap(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
+	current = &State{LastWorktreePath: nil}
+	err := ClearLastWorktreePath("/main/repo")
+	if err != nil {
+		t.Fatalf("ClearLastWorktreePath() with nil map should not error: %v", err)
+	}
+}

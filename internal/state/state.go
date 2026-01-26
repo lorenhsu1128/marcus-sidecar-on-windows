@@ -23,6 +23,9 @@ type State struct {
 	FileBrowser  map[string]FileBrowserState `json:"fileBrowser,omitempty"`
 	Workspace    map[string]WorkspaceState    `json:"workspace,omitempty"`
 	ActivePlugin map[string]string           `json:"activePlugin,omitempty"`
+
+	// Worktree state: maps main repo path -> last active worktree path
+	LastWorktreePath map[string]string `json:"lastWorktreePath,omitempty"`
 }
 
 // FileBrowserTabState holds persistent tab state for the file browser.
@@ -336,6 +339,42 @@ func SetActivePlugin(workdir, pluginID string) error {
 		current.ActivePlugin = make(map[string]string)
 	}
 	current.ActivePlugin[workdir] = pluginID
+	mu.Unlock()
+	return Save()
+}
+
+// GetLastWorktreePath returns the last active worktree path for a main repo.
+func GetLastWorktreePath(mainRepoPath string) string {
+	mu.RLock()
+	defer mu.RUnlock()
+	if current == nil || current.LastWorktreePath == nil {
+		return ""
+	}
+	return current.LastWorktreePath[mainRepoPath]
+}
+
+// SetLastWorktreePath saves the last active worktree path for a main repo.
+func SetLastWorktreePath(mainRepoPath, worktreePath string) error {
+	mu.Lock()
+	if current == nil {
+		current = &State{}
+	}
+	if current.LastWorktreePath == nil {
+		current.LastWorktreePath = make(map[string]string)
+	}
+	current.LastWorktreePath[mainRepoPath] = worktreePath
+	mu.Unlock()
+	return Save()
+}
+
+// ClearLastWorktreePath removes the saved worktree path for a main repo.
+func ClearLastWorktreePath(mainRepoPath string) error {
+	mu.Lock()
+	if current == nil || current.LastWorktreePath == nil {
+		mu.Unlock()
+		return nil
+	}
+	delete(current.LastWorktreePath, mainRepoPath)
 	mu.Unlock()
 	return Save()
 }

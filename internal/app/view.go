@@ -84,6 +84,8 @@ func (m Model) View() string {
 		return m.renderQuitConfirmOverlay(bg)
 	case ModalProjectSwitcher:
 		return m.renderProjectSwitcherOverlay(bg)
+	case ModalWorktreeSwitcher:
+		return m.renderWorktreeSwitcherModal(bg)
 	case ModalThemeSwitcher:
 		return m.renderThemeSwitcherModal(bg)
 	}
@@ -588,26 +590,38 @@ func (m Model) renderCommunityBrowserOverlay(content string) string {
 
 // renderHeader renders the top bar with title, tabs, and clock.
 func (m Model) renderHeader() string {
-	// Calculate final title width (with repo name) - used for tab positioning
+	// Check if we're in a worktree for the indicator
+	worktreeIndicator := ""
+	if wtInfo := m.currentWorktreeInfo(); wtInfo != nil && !wtInfo.IsMain {
+		// Show worktree branch name as indicator
+		branchName := wtInfo.Branch
+		if branchName == "" {
+			branchName = "worktree"
+		}
+		worktreeIndicator = styles.WorktreeIndicator.Render(" [" + branchName + "]")
+	}
+
+	// Calculate final title width (with repo name and worktree indicator) - used for tab positioning
 	finalTitleWidth := lipgloss.Width(styles.BarTitle.Render(" Sidecar"))
 	if m.intro.RepoName != "" {
 		finalTitleWidth += lipgloss.Width(styles.Subtitle.Render(" / " + m.intro.RepoName))
 	}
+	finalTitleWidth += lipgloss.Width(worktreeIndicator)
 	finalTitleWidth += 1 // trailing space
 
-	// Title with optional repo name
+	// Title with optional repo name and worktree indicator
 	var title string
 	if m.intro.Active {
 		// During animation, render into fixed-width container to keep tabs stable
-		titleContent := styles.BarTitle.Render(" "+m.intro.View()) + m.intro.RepoNameView() + " "
+		titleContent := styles.BarTitle.Render(" "+m.intro.View()) + m.intro.RepoNameView() + worktreeIndicator + " "
 		title = lipgloss.NewStyle().Width(finalTitleWidth).Render(titleContent)
 	} else {
-		// Static title with repo name
+		// Static title with repo name and worktree indicator
 		repoSuffix := ""
 		if m.intro.RepoName != "" {
 			repoSuffix = styles.Subtitle.Render(" / " + m.intro.RepoName)
 		}
-		title = styles.BarTitle.Render(" Sidecar") + repoSuffix + " "
+		title = styles.BarTitle.Render(" Sidecar") + repoSuffix + worktreeIndicator + " "
 	}
 
 	// Plugin tabs (themed)
@@ -645,6 +659,14 @@ func (m Model) getTabBounds() []TabBounds {
 	titleWidth := lipgloss.Width(styles.BarTitle.Render(" Sidecar"))
 	if m.intro.RepoName != "" {
 		titleWidth += lipgloss.Width(styles.Subtitle.Render(" / " + m.intro.RepoName))
+	}
+	// Add worktree indicator width if applicable
+	if wtInfo := m.currentWorktreeInfo(); wtInfo != nil && !wtInfo.IsMain {
+		branchName := wtInfo.Branch
+		if branchName == "" {
+			branchName = "worktree"
+		}
+		titleWidth += lipgloss.Width(styles.WorktreeIndicator.Render(" [" + branchName + "]"))
 	}
 	titleWidth += 1 // trailing space
 

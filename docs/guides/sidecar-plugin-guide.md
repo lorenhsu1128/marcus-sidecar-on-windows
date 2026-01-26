@@ -23,6 +23,13 @@ A practical, code-oriented guide for building first-class Sidecar plugins. Use t
 - `Stop()`: Idempotent cleanup of goroutines, watchers, channels.
 - Optional `Diagnostics() []plugin.Diagnostic`: Implement when you want `!` (diagnostics overlay) to show health.
 
+## Worktree switching
+
+Sidecar supports switching between git worktrees. When this happens, all plugins are stopped, reinitialized with the new WorkDir, and restarted. See `worktree-switching-guide.md` for details on:
+- How `registry.Reinit()` works
+- Persisting per-worktree state
+- Detecting deleted worktrees and requesting fallback to main
+
 ## Lifecycle order (and what to do in each stage)
 1. **Registration** (`cmd/sidecar/main.go`): `registry.Register(myplugin.New())`. Do not perform work here.
 2. **Init**: Detect prerequisites (repos, adapters, env vars). Use `ctx.Logger` for warnings; return an error to degrade gracefully (shows in “Unavailable plugins”).

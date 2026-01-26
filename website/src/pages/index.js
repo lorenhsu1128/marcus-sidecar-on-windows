@@ -19,6 +19,7 @@ const MINI_FEATURES = [
   { icon: 'clipboard', title: 'System Clipboard', description: 'Copy file paths, diffs, commit hashes, and more directly to your clipboard.' },
   { icon: 'move', title: 'Vim Navigation', description: 'h/j/k/l, gg/G, Ctrl+d/u, and more. Navigate like you would in vim.' },
   { icon: 'git-merge', title: 'Merge Workflow', description: 'Merge PRs, delete branches, and clean up workspaces with guided prompts.' },
+  { icon: 'git-fork', title: 'Worktree Switcher', description: 'Switch between git worktrees instantly. Keep multiple branches checked out simultaneously.' },
   { icon: 'refresh-cw', title: 'Global Refresh', description: 'Press R to refresh all plugins at once. Git status, files, and tasks update together.' },
   { icon: 'sun', title: 'Theme Switching', description: 'Cycle through themes or browse the community gallery. Changes apply instantly.' },
 ];

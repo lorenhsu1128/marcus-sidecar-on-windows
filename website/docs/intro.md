@@ -178,6 +178,9 @@ These shortcuts work across all plugins:
 | `q`, `ctrl+c` | Quit sidecar |
 | `tab` / `shift+tab` | Switch between plugins |
 | `1-5` | Jump to plugin by number |
+| `@` | Open project switcher |
+| `W` | Open worktree switcher |
+| `#` | Open theme switcher |
 | `j/k`, `↓/↑` | Navigate items in lists |
 | `ctrl+d/u` | Page down/up |
 | `g` / `G` | Jump to top/bottom |
@@ -186,6 +189,12 @@ These shortcuts work across all plugins:
 | `!` | Open diagnostics modal |
 
 Each plugin adds its own context-specific shortcuts shown in the footer bar.
+
+### Worktree Switcher
+
+Press `W` to switch between git worktrees within the current repository. This is useful when you're working with multiple worktrees for parallel development.
+
+Sidecar remembers your last active worktree per project. When you switch away and later return, sidecar automatically restores the worktree you were working in—no need to manually navigate back.
 
 ## Themes
 

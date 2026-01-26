@@ -917,6 +917,11 @@ func rebuildStyles() {
 	Subtitle = lipgloss.NewStyle().
 		Foreground(TextHighlight)
 
+	// WorktreeIndicator shows the current worktree branch in the header
+	WorktreeIndicator = lipgloss.NewStyle().
+		Foreground(Warning).
+		Bold(true)
+
 	Body = lipgloss.NewStyle().
 		Foreground(TextPrimary)
 

@@ -768,6 +768,12 @@ func (p *Plugin) handleListKeys(msg tea.KeyMsg) tea.Cmd {
 		if wt != nil {
 			return p.startMergeWorkflow(wt)
 		}
+	case "O":
+		// Open selected worktree in git tab - switch to worktree and focus git plugin
+		wt := p.selectedWorktree()
+		if wt != nil {
+			return p.openInGitTab(wt)
+		}
 	default:
 		// Unhandled key in preview pane - flash to indicate attach is needed
 		// Only flash if there's something to attach to (shell or worktree with agent)

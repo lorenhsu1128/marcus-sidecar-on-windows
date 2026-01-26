@@ -175,6 +175,10 @@ Press `@` to switch between configured projects without restarting sidecar.
 
 All plugins reinitialize with the new project context. State (active plugin, cursor positions) is remembered per project.
 
+## Worktree Switcher
+
+Press `W` to switch between git worktrees within the current repository. When you switch away from a project and return later, sidecar remembers which worktree you were working in and restores it automatically.
+
 ## Themes
 
 Press `#` to open the theme switcher. Choose from built-in themes (default, dracula) or press `Tab` to browse 453 community color schemes derived from iTerm2-Color-Schemes.
@@ -189,6 +193,7 @@ See [Theme Creator Guide](docs/guides/theme-creator-guide.md) for custom theme c
 | ------------------- | -------------------------------- |
 | `q`, `ctrl+c`       | Quit                             |
 | `@`                 | Open project switcher            |
+| `W`                 | Open worktree switcher           |
 | `#`                 | Open theme switcher              |
 | `tab` / `shift+tab` | Navigate plugins                 |
 | `1-9`               | Focus plugin by number           |

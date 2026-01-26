@@ -90,6 +90,39 @@ type FocusPluginByIDMsg struct {
 	PluginID string
 }
 
+// SwitchWorktreeMsg requests switching to a different worktree.
+// Used by the worktree switcher modal and workspace plugin "Open in Git Tab" command.
+type SwitchWorktreeMsg struct {
+	WorktreePath string // Absolute path to the worktree
+}
+
+// SwitchWorktree returns a command that requests switching to a worktree by path.
+func SwitchWorktree(path string) tea.Cmd {
+	return func() tea.Msg {
+		return SwitchWorktreeMsg{WorktreePath: path}
+	}
+}
+
+// WorktreeDeletedMsg is sent when the current worktree has been deleted.
+type WorktreeDeletedMsg struct {
+	DeletedPath string // Path of the deleted worktree
+	MainPath    string // Path to switch to (main worktree)
+}
+
+// checkWorktreeExists returns a command that checks if the current worktree still exists.
+func checkWorktreeExists(workDir string) tea.Cmd {
+	return func() tea.Msg {
+		exists, mainPath := CheckCurrentWorktree(workDir)
+		if !exists && mainPath != "" {
+			return WorktreeDeletedMsg{
+				DeletedPath: workDir,
+				MainPath:    mainPath,
+			}
+		}
+		return nil
+	}
+}
+
 // FocusPlugin returns a command that requests focusing a plugin by ID.
 func FocusPlugin(pluginID string) tea.Cmd {
 	return func() tea.Msg {

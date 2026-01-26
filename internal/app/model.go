@@ -28,13 +28,14 @@ import (
 type ModalKind int
 
 const (
-	ModalNone            ModalKind = iota // No modal open
-	ModalPalette                          // Command palette (highest priority)
-	ModalHelp                             // Help overlay
-	ModalDiagnostics                      // Diagnostics/version info
-	ModalQuitConfirm                      // Quit confirmation dialog
-	ModalProjectSwitcher                  // Project switcher
-	ModalThemeSwitcher                    // Theme switcher (lowest priority)
+	ModalNone             ModalKind = iota // No modal open
+	ModalPalette                           // Command palette (highest priority)
+	ModalHelp                              // Help overlay
+	ModalDiagnostics                       // Diagnostics/version info
+	ModalQuitConfirm                       // Quit confirmation dialog
+	ModalProjectSwitcher                   // Project switcher
+	ModalWorktreeSwitcher                  // Worktree switcher
+	ModalThemeSwitcher                     // Theme switcher (lowest priority)
 )
 
 // activeModal returns the highest-priority open modal.
@@ -51,6 +52,8 @@ func (m *Model) activeModal() ModalKind {
 		return ModalQuitConfirm
 	case m.showProjectSwitcher:
 		return ModalProjectSwitcher
+	case m.showWorktreeSwitcher:
+		return ModalWorktreeSwitcher
 	case m.showThemeSwitcher:
 		return ModalThemeSwitcher
 	default:
@@ -128,6 +131,19 @@ type Model struct {
 	projectAddCommunityList   []string // filtered community scheme names
 	projectAddCommunityCursor int
 	projectAddCommunityScroll int
+
+	// Worktree switcher modal
+	showWorktreeSwitcher         bool
+	worktreeSwitcherCursor       int
+	worktreeSwitcherScroll       int
+	worktreeSwitcherInput        textinput.Model
+	worktreeSwitcherFiltered     []WorktreeInfo
+	worktreeSwitcherAll          []WorktreeInfo
+	worktreeSwitcherModal        *modal.Modal
+	worktreeSwitcherModalWidth   int
+	worktreeSwitcherMouseHandler *mouse.Handler
+	activeWorktreePath           string // Currently active worktree path (empty = main repo)
+	worktreeCheckCounter         int    // Counter for periodic worktree existence check
 
 	// Theme switcher modal
 	showThemeSwitcher          bool
@@ -480,17 +496,50 @@ func (m *Model) switchProject(projectPath string) tea.Cmd {
 		state.SetActivePlugin(oldWorkDir, activePlugin.ID())
 	}
 
+	// Normalize old workdir for comparisons
+	normalizedOldWorkDir, _ := normalizePath(oldWorkDir)
+
+	// Check if target project has a saved worktree we should restore.
+	// Only restore if projectPath is the main repo - if user explicitly chose a
+	// specific worktree path (via worktree switcher), respect that choice.
+	targetPath := projectPath
+	if targetMainRepo := GetMainWorktreePath(projectPath); targetMainRepo != "" {
+		normalizedProject, _ := normalizePath(projectPath)
+		normalizedTargetMain, _ := normalizePath(targetMainRepo)
+
+		// Only restore saved worktree if switching to the main repo path
+		if normalizedProject == normalizedTargetMain {
+			if savedWorktree := state.GetLastWorktreePath(normalizedTargetMain); savedWorktree != "" {
+				// Don't restore if the saved worktree is where we're coming FROM
+				// (user is explicitly leaving that worktree)
+				if savedWorktree != normalizedOldWorkDir {
+					// Verify saved worktree still exists
+					if WorktreeExists(savedWorktree) {
+						targetPath = savedWorktree
+					} else {
+						// Stale entry - clear it
+						state.ClearLastWorktreePath(normalizedTargetMain)
+					}
+				}
+			}
+		}
+
+		// Save the final target as last active worktree for this repo
+		normalizedTarget, _ := normalizePath(targetPath)
+		state.SetLastWorktreePath(normalizedTargetMain, normalizedTarget)
+	}
+
 	// Update the UI state
-	m.ui.WorkDir = projectPath
-	m.intro.RepoName = GetRepoName(projectPath)
+	m.ui.WorkDir = targetPath
+	m.intro.RepoName = GetRepoName(targetPath)
 
 	// Apply project-specific theme (or global fallback)
-	resolved := theme.ResolveTheme(m.cfg, projectPath)
+	resolved := theme.ResolveTheme(m.cfg, targetPath)
 	theme.ApplyResolved(resolved)
 
 	// Reinitialize all plugins with the new working directory
 	// This stops all plugins, updates the context, and starts them again
-	startCmds := m.registry.Reinit(projectPath)
+	startCmds := m.registry.Reinit(targetPath)
 
 	// Send WindowSizeMsg to all plugins so they recalculate layout/bounds.
 	// Without this, plugins like td-monitor lose mouse interactivity because
@@ -510,7 +559,7 @@ func (m *Model) switchProject(projectPath string) tea.Cmd {
 	}
 
 	// Restore active plugin for the new workdir if saved, otherwise keep current
-	newActivePluginID := state.GetActivePlugin(projectPath)
+	newActivePluginID := state.GetActivePlugin(targetPath)
 	if newActivePluginID != "" {
 		m.FocusPluginByID(newActivePluginID)
 	}
@@ -520,7 +569,7 @@ func (m *Model) switchProject(projectPath string) tea.Cmd {
 		tea.Batch(startCmds...),
 		func() tea.Msg {
 			return ToastMsg{
-				Message:  fmt.Sprintf("Switched to %s", GetRepoName(projectPath)),
+				Message:  fmt.Sprintf("Switched to %s", GetRepoName(targetPath)),
 				Duration: 3 * time.Second,
 			}
 		},

@@ -311,6 +311,7 @@ func DefaultBindings() []Binding {
 		{Key: "Y", Command: "approve-all", Context: "workspace-list"},
 		{Key: "N", Command: "reject", Context: "workspace-list"},
 		{Key: "K", Command: "kill-shell", Context: "workspace-list"},
+		{Key: "O", Command: "open-in-git", Context: "workspace-list"},
 		{Key: "l", Command: "focus-right", Context: "workspace-list"},
 		{Key: "right", Command: "focus-right", Context: "workspace-list"},
 		{Key: "tab", Command: "switch-pane", Context: "workspace-list"},

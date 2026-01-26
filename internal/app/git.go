@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -191,4 +192,52 @@ func parseRepoNameFromURL(url string) string {
 	}
 
 	return url
+}
+
+// WorktreeExists checks if the given worktree path still exists and is valid.
+// Returns false if the directory doesn't exist or is not a valid git worktree.
+func WorktreeExists(worktreePath string) bool {
+	// Check if directory exists
+	info, err := os.Stat(worktreePath)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+
+	// Verify it's still a valid git worktree by checking for .git file/directory
+	gitPath := filepath.Join(worktreePath, ".git")
+	_, err = os.Stat(gitPath)
+	return err == nil
+}
+
+// CheckCurrentWorktree checks if the current working directory is still a valid worktree.
+// Returns (exists, mainPath) where mainPath is the path to switch to if worktree was deleted.
+func CheckCurrentWorktree(workDir string) (exists bool, mainPath string) {
+	if WorktreeExists(workDir) {
+		return true, ""
+	}
+
+	// Current worktree doesn't exist - find the main worktree
+	// We need to use a different approach since workDir doesn't exist
+	// Try to get the main worktree from the .git file if it still exists elsewhere
+
+	// Look for any worktree that still exists by checking parent directory
+	parentDir := filepath.Dir(workDir)
+	entries, err := os.ReadDir(parentDir)
+	if err != nil {
+		return false, ""
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			candidatePath := filepath.Join(parentDir, entry.Name())
+			if WorktreeExists(candidatePath) {
+				main := GetMainWorktreePath(candidatePath)
+				if main != "" {
+					return false, main
+				}
+			}
+		}
+	}
+
+	return false, ""
 }

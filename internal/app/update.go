@@ -75,6 +75,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleProjectAddModalMouse(msg)
 			}
 			return m.handleProjectSwitcherMouse(msg)
+		case ModalWorktreeSwitcher:
+			return m.handleWorktreeSwitcherMouse(msg)
 		case ModalThemeSwitcher:
 			if m.showCommunityBrowser {
 				return m.handleCommunityBrowserMouse(msg)
@@ -139,6 +141,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ui.UpdateClock()
 		m.ui.ClearExpiredToast()
 		m.ClearToast()
+		// Periodically check if current worktree still exists (every 10 seconds)
+		m.worktreeCheckCounter++
+		if m.worktreeCheckCounter >= 10 {
+			m.worktreeCheckCounter = 0
+			return m, tea.Batch(tickCmd(), checkWorktreeExists(m.ui.WorkDir))
+		}
 		return m, tickCmd()
 
 	case UpdateSpinnerTickMsg:
@@ -197,8 +205,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Switch to requested plugin
 		return m, m.FocusPluginByID(msg.PluginID)
 
+	case SwitchWorktreeMsg:
+		// Switch to the requested worktree
+		return m, m.switchWorktree(msg.WorktreePath)
+
+	case WorktreeDeletedMsg:
+		// Current worktree was deleted (detected by periodic check) - switch to main
+		return m, tea.Batch(
+			m.switchWorktree(msg.MainPath),
+			ShowToast("Worktree deleted, switched to main", 3*time.Second),
+		)
+
 	case SwitchToMainWorktreeMsg:
-		// Current worktree was deleted - switch to main worktree
+		// Current worktree was deleted (detected by workspace plugin) - switch to main
 		if msg.MainWorktreePath != "" && msg.MainWorktreePath != m.ui.WorkDir {
 			return m, tea.Batch(
 				m.switchProject(msg.MainWorktreePath),
@@ -320,6 +339,18 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.resetProjectSwitcher()
+			m.updateContext()
+			return m, nil
+		case ModalWorktreeSwitcher:
+			// Esc: clear filter if set, otherwise close
+			if m.worktreeSwitcherInput.Value() != "" {
+				m.worktreeSwitcherInput.SetValue("")
+				m.worktreeSwitcherFiltered = m.worktreeSwitcherAll
+				m.worktreeSwitcherCursor = 0
+				m.worktreeSwitcherScroll = 0
+				return m, nil
+			}
+			m.resetWorktreeSwitcher()
 			m.updateContext()
 			return m, nil
 		case ModalThemeSwitcher:
@@ -460,6 +491,89 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.doUpdate(), updateSpinnerTick())
 		}
 		return m, nil
+	}
+
+	// Handle worktree switcher modal keys (Esc handled above)
+	if m.showWorktreeSwitcher {
+		worktrees := m.worktreeSwitcherFiltered
+
+		switch msg.Type {
+		case tea.KeyEnter:
+			// Select worktree and switch to it
+			if m.worktreeSwitcherCursor >= 0 && m.worktreeSwitcherCursor < len(worktrees) {
+				selectedPath := worktrees[m.worktreeSwitcherCursor].Path
+				m.resetWorktreeSwitcher()
+				m.updateContext()
+				return m, m.switchWorktree(selectedPath)
+			}
+			return m, nil
+
+		case tea.KeyUp:
+			m.worktreeSwitcherCursor--
+			if m.worktreeSwitcherCursor < 0 {
+				m.worktreeSwitcherCursor = 0
+			}
+			m.worktreeSwitcherScroll = worktreeSwitcherEnsureCursorVisible(m.worktreeSwitcherCursor, m.worktreeSwitcherScroll, 8)
+			return m, nil
+
+		case tea.KeyDown:
+			m.worktreeSwitcherCursor++
+			if m.worktreeSwitcherCursor >= len(worktrees) {
+				m.worktreeSwitcherCursor = len(worktrees) - 1
+			}
+			if m.worktreeSwitcherCursor < 0 {
+				m.worktreeSwitcherCursor = 0
+			}
+			m.worktreeSwitcherScroll = worktreeSwitcherEnsureCursorVisible(m.worktreeSwitcherCursor, m.worktreeSwitcherScroll, 8)
+			return m, nil
+		}
+
+		// Handle non-text shortcuts
+		switch msg.String() {
+		case "ctrl+n":
+			m.worktreeSwitcherCursor++
+			if m.worktreeSwitcherCursor >= len(worktrees) {
+				m.worktreeSwitcherCursor = len(worktrees) - 1
+			}
+			if m.worktreeSwitcherCursor < 0 {
+				m.worktreeSwitcherCursor = 0
+			}
+			m.worktreeSwitcherScroll = worktreeSwitcherEnsureCursorVisible(m.worktreeSwitcherCursor, m.worktreeSwitcherScroll, 8)
+			return m, nil
+
+		case "ctrl+p":
+			m.worktreeSwitcherCursor--
+			if m.worktreeSwitcherCursor < 0 {
+				m.worktreeSwitcherCursor = 0
+			}
+			m.worktreeSwitcherScroll = worktreeSwitcherEnsureCursorVisible(m.worktreeSwitcherCursor, m.worktreeSwitcherScroll, 8)
+			return m, nil
+
+		case "W":
+			// Close modal with same key
+			m.resetWorktreeSwitcher()
+			m.updateContext()
+			return m, nil
+		}
+
+		// Forward other keys to text input for filtering
+		var cmd tea.Cmd
+		m.worktreeSwitcherInput, cmd = m.worktreeSwitcherInput.Update(msg)
+
+		// Re-filter on input change
+		m.worktreeSwitcherFiltered = filterWorktrees(m.worktreeSwitcherAll, m.worktreeSwitcherInput.Value())
+		m.clearWorktreeSwitcherModal() // Clear modal cache on filter change
+		// Reset cursor if it's beyond filtered list
+		if m.worktreeSwitcherCursor >= len(m.worktreeSwitcherFiltered) {
+			m.worktreeSwitcherCursor = len(m.worktreeSwitcherFiltered) - 1
+		}
+		if m.worktreeSwitcherCursor < 0 {
+			m.worktreeSwitcherCursor = 0
+		}
+		m.worktreeSwitcherScroll = 0
+		m.worktreeSwitcherScroll = worktreeSwitcherEnsureCursorVisible(m.worktreeSwitcherCursor, m.worktreeSwitcherScroll, 8)
+
+		return m, cmd
 	}
 
 	// Handle project switcher modal keys (Esc handled above)
@@ -785,6 +899,25 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.initProjectSwitcher()
 		} else {
 			m.resetProjectSwitcher()
+			m.updateContext()
+		}
+		return m, nil
+	case "W":
+		// Toggle worktree switcher modal (capital W)
+		// Only enable if we're in a git repo with worktrees
+		worktrees := GetWorktrees(m.ui.WorkDir)
+		if len(worktrees) <= 1 {
+			// No worktrees or only main repo - show toast
+			return m, func() tea.Msg {
+				return ToastMsg{Message: "No worktrees found", Duration: 2 * time.Second}
+			}
+		}
+		m.showWorktreeSwitcher = !m.showWorktreeSwitcher
+		if m.showWorktreeSwitcher {
+			m.activeContext = "worktree-switcher"
+			m.initWorktreeSwitcher()
+		} else {
+			m.resetWorktreeSwitcher()
 			m.updateContext()
 		}
 		return m, nil

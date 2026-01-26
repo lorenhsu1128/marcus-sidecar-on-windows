@@ -327,6 +327,15 @@ func (p *Plugin) renderSidebarPane(height int) string {
 
 	// Session list
 	if len(sessions) == 0 {
+		// Show skeleton while loading, "No sessions" when done (td-6cc19f)
+		if !p.initialLoadDone {
+			contentHeight := height - linesUsed
+			if contentHeight < 1 {
+				contentHeight = 1
+			}
+			sb.WriteString(p.skeleton.View(contentWidth))
+			return sb.String()
+		}
 		if p.searchMode {
 			sb.WriteString(styles.Muted.Render("No matching sessions"))
 		} else {

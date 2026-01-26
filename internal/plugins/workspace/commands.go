@@ -203,6 +203,7 @@ func (p *Plugin) Commands() []plugin.Command {
 				plugin.Command{ID: "delete-workspace", Name: "Delete", Description: "Delete selected workspace", Context: "workspace-list", Priority: 5},
 				plugin.Command{ID: "push", Name: "Push", Description: "Push branch to remote", Context: "workspace-list", Priority: 6},
 				plugin.Command{ID: "merge-workflow", Name: "Merge", Description: "Start merge workflow", Context: "workspace-list", Priority: 7},
+				plugin.Command{ID: "open-in-git", Name: "Git", Description: "Open in Git tab", Context: "workspace-list", Priority: 16},
 			)
 			// Task linking
 			if wt.TaskID != "" {

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/marcus/sidecar/internal/plugin"
@@ -322,16 +323,16 @@ func TestTabs_DuplicateFilenames(t *testing.T) {
 	if labels[0] == labels[1] {
 		t.Errorf("duplicate filenames should have different labels: %q vs %q", labels[0], labels[1])
 	}
-	// One should include parent dir
-	found := false
+	// At least one should include parent dir to distinguish from the other
+	hasParentDir := false
 	for _, label := range labels[:2] {
-		if label == "src/main.go" || label == "./main.go" || label != "main.go" {
-			found = true
+		if strings.Contains(label, "/") {
+			hasParentDir = true
 			break
 		}
 	}
-	if !found {
-		t.Errorf("expected at least one main.go label to include parent, got: %v", labels[:2])
+	if !hasParentDir {
+		t.Errorf("expected duplicate filenames to show parent dir, got: %v", labels[:2])
 	}
 }
 
