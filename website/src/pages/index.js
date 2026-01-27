@@ -1306,6 +1306,33 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Sister Projects */}
+        <section className="sc-sisterProjects">
+          <div className="container">
+            <h2 className="sc-sisterTitle">Sister Projects</h2>
+            <div className="sc-sisterGrid">
+              <a href="https://marcus.github.io/sidecar/" className="sc-sisterCard sc-sisterCardGreen sc-sisterCardCurrent">
+                <div className="sc-sisterLogoWrapper">
+                  <img src={useBaseUrl('/img/sidecar-logo.png')} alt="Sidecar" className="sc-sisterLogo" />
+                </div>
+                <p>You might never open your editor again.</p>
+              </a>
+              <a href="https://marcus.github.io/betamax/" className="sc-sisterCard sc-sisterCardBlue">
+                <div className="sc-sisterLogoWrapper">
+                  <img src={useBaseUrl('/img/betamax-logo-fuzzy.png')} alt="Betamax" className="sc-sisterLogo" />
+                </div>
+                <p>Record anything you see in your terminal.</p>
+              </a>
+              <a href="https://marcus.github.io/td/" className="sc-sisterCard sc-sisterCardPurple">
+                <div className="sc-sisterLogoWrapper">
+                  <img src={useBaseUrl('/img/td-logo.png')} alt="td" className="sc-sisterLogo" />
+                </div>
+                <p>Task management for AI-assisted development.</p>
+              </a>
+            </div>
+          </div>
+        </section>
       </main>
     </Layout>
   );

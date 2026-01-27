@@ -20,6 +20,14 @@ import (
 	"github.com/marcus/sidecar/internal/adapter"
 )
 
+// sqlitePoolSettings configures connection pool to prevent FD leaks (td-649ba4).
+// Read-only queries only need 1 connection; no idle connections prevents FD buildup.
+func sqlitePoolSettings(db *sql.DB) {
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(0)
+	db.SetConnMaxLifetime(time.Second)
+}
+
 const (
 	adapterID   = "cursor-cli"
 	adapterName = "Cursor CLI"
@@ -281,6 +289,7 @@ func (a *Adapter) readSessionMeta(dbPath string) (*SessionMeta, error) {
 	if err != nil {
 		return nil, err
 	}
+	sqlitePoolSettings(db) // Prevent FD leaks (td-649ba4)
 	defer db.Close()
 
 	var hexValue string
@@ -328,11 +337,21 @@ func (a *Adapter) parseMessages(dbPath string) ([]adapter.Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	sqlitePoolSettings(db) // Prevent FD leaks (td-649ba4)
 	defer db.Close()
 
-	// Read session metadata to get root blob ID
-	meta, err := a.readSessionMeta(dbPath)
+	// Read session metadata inline to avoid opening second connection (td-649ba4)
+	var hexValue string
+	err = db.QueryRow("SELECT value FROM meta WHERE key = '0'").Scan(&hexValue)
 	if err != nil {
+		return nil, err
+	}
+	jsonBytes, err := hex.DecodeString(hexValue)
+	if err != nil {
+		return nil, err
+	}
+	var meta SessionMeta
+	if err := json.Unmarshal(jsonBytes, &meta); err != nil {
 		return nil, err
 	}
 

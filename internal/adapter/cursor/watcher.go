@@ -2,7 +2,6 @@ package cursor
 
 import (
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,28 +12,19 @@ import (
 )
 
 // NewWatcher creates a watcher for Cursor CLI session changes.
-// It watches the workspace directory for changes to store.db files.
+// It watches only the workspace directory - fsnotify on macOS reports events
+// for files in subdirectories when watching the parent (td-0f0e68).
 func NewWatcher(workspaceDir string) (<-chan adapter.Event, io.Closer, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Watch the workspace directory and all session subdirectories
+	// Only watch workspace directory to reduce FD count (td-0f0e68)
+	// fsnotify on macOS propagates events from subdirectories
 	if err := watcher.Add(workspaceDir); err != nil {
 		watcher.Close()
 		return nil, nil, err
-	}
-
-	// Add existing session directories
-	entries, err := os.ReadDir(workspaceDir)
-	if err == nil {
-		for _, e := range entries {
-			if e.IsDir() {
-				sessionDir := filepath.Join(workspaceDir, e.Name())
-				_ = watcher.Add(sessionDir)
-			}
-		}
 	}
 
 	events := make(chan adapter.Event, 32)
@@ -109,13 +99,8 @@ func NewWatcher(workspaceDir string) (<-chan adapter.Event, io.Closer, error) {
 						}
 					})
 					mu.Unlock()
-				} else if event.Op&fsnotify.Create != 0 {
-					// New session directory created, add to watcher
-					info, err := os.Stat(event.Name)
-					if err == nil && info.IsDir() {
-						_ = watcher.Add(event.Name)
-					}
 				}
+				// Don't add per-session directory watches - parent watch suffices (td-0f0e68)
 
 			case _, ok := <-watcher.Errors:
 				if !ok {

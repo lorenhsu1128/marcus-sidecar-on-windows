@@ -13,23 +13,25 @@ import (
 )
 
 // NewWatcher creates a watcher for Codex session changes.
-// Only watches recent month directories to reduce resource usage (td-ae05cd6a).
+// Only watches root and month directories to reduce FD count (td-0f0e68).
+// fsnotify on macOS propagates events from subdirectories.
 func NewWatcher(root string) (<-chan adapter.Event, io.Closer, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Watch root for new year/month directories
+	// Watch root for new year directories
 	if err := watcher.Add(root); err != nil {
 		watcher.Close()
 		return nil, nil, err
 	}
 
-	// Watch only recent month directories (td-ae05cd6a)
-	for _, dir := range recentSessionDirs(root) {
-		// Ignore errors - directories may not exist yet
-		_ = addWatchTree(watcher, dir)
+	// Watch only month directories (not recursive) to reduce FD count (td-0f0e68)
+	for _, monthDir := range recentSessionDirs(root) {
+		if info, err := os.Stat(monthDir); err == nil && info.IsDir() {
+			_ = watcher.Add(monthDir)
+		}
 	}
 
 	events := make(chan adapter.Event, 32)
@@ -62,12 +64,13 @@ func NewWatcher(root string) (<-chan adapter.Event, io.Closer, error) {
 
 				if event.Op&fsnotify.Create != 0 {
 					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
-						// Scan-watch-scan pattern to avoid race condition (td-459b822a):
-						// 1. First scan: capture files that exist now
-						// 2. Add watch: register for future events
-						// 3. Second scan: capture files created during steps 1-2
-						scanNewDirForSessions(event.Name, events)
-						_ = addWatchTree(watcher, event.Name)
+						// Only watch year/month directories, not day dirs (td-0f0e68)
+						rel, _ := filepath.Rel(root, event.Name)
+						depth := len(strings.Split(rel, string(filepath.Separator)))
+						if depth <= 2 { // year or year/month
+							_ = watcher.Add(event.Name)
+						}
+						// Scan for sessions in new directory
 						scanNewDirForSessions(event.Name, events)
 						continue
 					}
@@ -135,26 +138,6 @@ func recentSessionDirs(root string) []string {
 	dirs = append(dirs, filepath.Join(root, prev.Format("2006"), prev.Format("01")))
 
 	return dirs
-}
-
-func addWatchTree(watcher *fsnotify.Watcher, root string) error {
-	info, err := os.Stat(root)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return nil
-	}
-
-	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			_ = watcher.Add(path)
-		}
-		return nil
-	})
 }
 
 // scanNewDirForSessions checks for JSONL files in a newly created directory
