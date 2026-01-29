@@ -782,6 +782,9 @@ func (m *Model) previewProjectTheme() {
 // If the current workdir is a worktree, it also checks if the main worktree path
 // matches a registered project (so theme scope selector works from worktrees).
 func (m *Model) currentProjectConfig() *config.ProjectConfig {
+	if m.cfg == nil {
+		return nil
+	}
 	// First, check direct match
 	for i := range m.cfg.Projects.List {
 		if m.cfg.Projects.List[i].Path == m.ui.WorkDir {

@@ -24,7 +24,7 @@ func themeSwitcherItemID(idx int) string {
 
 // ensureThemeSwitcherModal builds/rebuilds the theme switcher modal.
 func (m *Model) ensureThemeSwitcherModal() {
-	modalW := 50
+	modalW := 58
 	if modalW > m.width-4 {
 		modalW = m.width - 4
 	}
@@ -70,7 +70,7 @@ func (m *Model) themeSwitcherCountSection() modal.Section {
 		}
 
 		if text == "" {
-			return modal.RenderedSection{Content: " "}
+			return modal.RenderedSection{Content: ""}
 		}
 		return modal.RenderedSection{Content: styles.Muted.Render(text)}
 	}, nil)
@@ -251,16 +251,13 @@ func (m *Model) themeSwitcherScopeSection() modal.Section {
 		scopeProject := "This project"
 		if m.themeSwitcherScope == "project" {
 			sb.WriteString(styles.Muted.Render(scopeGlobal))
-			sb.WriteString(styles.Muted.Render("  "))
+			sb.WriteString(styles.Muted.Render("  │  "))
 			sb.WriteString(activeStyle.Render(scopeProject))
 		} else {
 			sb.WriteString(activeStyle.Render(scopeGlobal))
-			sb.WriteString(styles.Muted.Render("  "))
+			sb.WriteString(styles.Muted.Render("  │  "))
 			sb.WriteString(styles.Muted.Render(scopeProject))
 		}
-		sb.WriteString(styles.Muted.Render("    "))
-		sb.WriteString(styles.KeyHint.Render("←/→"))
-		sb.WriteString(styles.Muted.Render(" switch"))
 
 		return modal.RenderedSection{Content: sb.String()}
 	}, nil)
@@ -282,7 +279,13 @@ func (m *Model) themeSwitcherHintsSection() modal.Section {
 			sb.WriteString(styles.KeyHint.Render("↑/↓"))
 			sb.WriteString(styles.Muted.Render(" navigate  "))
 			sb.WriteString(styles.KeyHint.Render("tab"))
-			sb.WriteString(styles.Muted.Render(" community  "))
+			sb.WriteString(styles.Muted.Render(" community"))
+			if m.currentProjectConfig() != nil {
+				sb.WriteString(styles.Muted.Render("  "))
+				sb.WriteString(styles.KeyHint.Render("←/→"))
+				sb.WriteString(styles.Muted.Render(" scope"))
+			}
+			sb.WriteString(styles.Muted.Render("  "))
 			sb.WriteString(styles.KeyHint.Render("esc"))
 			sb.WriteString(styles.Muted.Render(" cancel"))
 		}

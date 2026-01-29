@@ -480,6 +480,21 @@ func (m Model) renderCommunityBrowserOverlay(content string) string {
 	b.WriteString(styles.ModalTitle.Render(fmt.Sprintf("Community Themes (%d)", len(allSchemes))))
 	b.WriteString("\n\n")
 
+	// Scope selector (above search input)
+	if m.currentProjectConfig() != nil {
+		activeStyle := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true)
+		if m.themeSwitcherScope == "project" {
+			b.WriteString(styles.Muted.Render("Global"))
+			b.WriteString(styles.Muted.Render("  │  "))
+			b.WriteString(activeStyle.Render("This project"))
+		} else {
+			b.WriteString(activeStyle.Render("Global"))
+			b.WriteString(styles.Muted.Render("  │  "))
+			b.WriteString(styles.Muted.Render("This project"))
+		}
+		b.WriteString("\n\n")
+	}
+
 	// Search input
 	b.WriteString(m.communityBrowserInput.View())
 	b.WriteString("\n")
@@ -566,37 +581,19 @@ func (m Model) renderCommunityBrowserOverlay(content string) string {
 
 	b.WriteString("\n")
 
-	// Scope selector (shared with theme switcher)
-	if m.currentProjectConfig() != nil {
-		scopeGlobal := "Set globally"
-		scopeProject := "Set for this project"
-		if m.themeSwitcherScope == "project" {
-			b.WriteString(styles.Muted.Render("  scope: "))
-			b.WriteString(styles.Muted.Render(scopeGlobal))
-			b.WriteString(styles.Muted.Render(" | "))
-			b.WriteString(lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render(scopeProject))
-		} else {
-			b.WriteString(styles.Muted.Render("  scope: "))
-			b.WriteString(lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render(scopeGlobal))
-			b.WriteString(styles.Muted.Render(" | "))
-			b.WriteString(styles.Muted.Render(scopeProject))
-		}
-		b.WriteString("\n")
-		b.WriteString(styles.Subtle.Render("  (projects with own themes unaffected)"))
-		b.WriteString("\n\n")
-	}
-
 	// Help text
 	b.WriteString(styles.KeyHint.Render("enter"))
 	b.WriteString(styles.Muted.Render(" select  "))
 	b.WriteString(styles.KeyHint.Render("↑/↓"))
 	b.WriteString(styles.Muted.Render(" navigate  "))
 	b.WriteString(styles.KeyHint.Render("tab"))
-	b.WriteString(styles.Muted.Render(" built-in  "))
+	b.WriteString(styles.Muted.Render(" built-in"))
 	if m.currentProjectConfig() != nil {
+		b.WriteString(styles.Muted.Render("  "))
 		b.WriteString(styles.KeyHint.Render("←/→"))
-		b.WriteString(styles.Muted.Render(" scope  "))
+		b.WriteString(styles.Muted.Render(" scope"))
 	}
+	b.WriteString(styles.Muted.Render("  "))
 	b.WriteString(styles.KeyHint.Render("esc"))
 	b.WriteString(styles.Muted.Render(" back"))
 
