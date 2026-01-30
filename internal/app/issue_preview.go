@@ -2,8 +2,10 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -102,7 +104,17 @@ func fetchIssuePreviewCmd(workDir, issueID string) tea.Cmd {
 		cmd.Dir = workDir
 		out, err := cmd.Output()
 		if err != nil {
-			return IssuePreviewResultMsg{Error: err}
+			// stdout may contain "ERROR: <message>" from td CLI
+			if msg := extractTdError(string(out)); msg != "" {
+				return IssuePreviewResultMsg{Error: fmt.Errorf("%s", msg)}
+			}
+			// stderr may contain usage help + "Error: <message>" on last line
+			if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
+				if msg := extractTdError(string(exitErr.Stderr)); msg != "" {
+					return IssuePreviewResultMsg{Error: fmt.Errorf("%s", msg)}
+				}
+			}
+			return IssuePreviewResultMsg{Error: fmt.Errorf("issue %q not found", issueID)}
 		}
 		var data IssuePreviewData
 		if err := json.Unmarshal(out, &data); err != nil {
@@ -110,4 +122,23 @@ func fetchIssuePreviewCmd(workDir, issueID string) tea.Cmd {
 		}
 		return IssuePreviewResultMsg{Data: &data}
 	}
+}
+
+// extractTdError finds the last "ERROR: ..." or "Error: ..." line in td output.
+func extractTdError(output string) string {
+	for _, line := range reverseLines(strings.TrimSpace(output)) {
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "error:") {
+			return strings.TrimSpace(line[len("error:"):])
+		}
+	}
+	return ""
+}
+
+func reverseLines(s string) []string {
+	lines := strings.Split(s, "\n")
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+	return lines
 }

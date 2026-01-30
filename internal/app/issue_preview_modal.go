@@ -259,7 +259,7 @@ func (m *Model) ensureIssuePreviewModal() {
 	}
 
 	if m.issuePreviewError != nil {
-		m.issuePreviewModal = modal.New("Error",
+		m.issuePreviewModal = modal.New("Issue Not Found",
 			modal.WithWidth(modalW),
 			modal.WithVariant(modal.VariantDanger),
 			modal.WithHints(false),
