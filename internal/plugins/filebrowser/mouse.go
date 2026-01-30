@@ -355,7 +355,7 @@ func (p *Plugin) handleMouseDoubleClick(action mouse.MouseAction) (*Plugin, tea.
 	cmd := p.openTab(node.Path, TabOpenReplace)
 	p.pinTab(p.activeTab)
 	if p.isInlineEditSupported(node.Path) {
-		return p, tea.Batch(cmd, p.enterInlineEditMode(node.Path))
+		return p, tea.Batch(cmd, p.enterInlineEditMode(node.Path, 0))
 	}
 	return p, tea.Batch(cmd, p.openFile(node.Path))
 }

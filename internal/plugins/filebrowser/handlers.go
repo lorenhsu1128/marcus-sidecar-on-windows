@@ -182,7 +182,7 @@ func (p *Plugin) handleTreeKey(key string) (plugin.Plugin, tea.Cmd) {
 			p.pinTab(p.activeTab)
 			// Use inline editing if supported, otherwise open in external editor
 			if p.isInlineEditSupported(node.Path) {
-				return p, tea.Batch(cmd, p.enterInlineEditMode(node.Path))
+				return p, tea.Batch(cmd, p.enterInlineEditMode(node.Path, 0))
 			}
 			return p, tea.Batch(cmd, p.openFile(node.Path))
 		}
@@ -468,19 +468,19 @@ func (p *Plugin) handlePreviewKey(key string) (plugin.Plugin, tea.Cmd) {
 		p.clearTextSelection()
 
 	case "e":
-		// Open previewed file in editor
+		// Open previewed file in editor at current line position
 		if p.previewFile != "" {
 			// Use inline editing if supported, otherwise open in external editor
 			if p.isInlineEditSupported(p.previewFile) {
-				return p, p.enterInlineEditMode(p.previewFile)
+				return p, p.enterInlineEditModeAtCurrentLine(p.previewFile)
 			}
-			return p, p.openFile(p.previewFile)
+			return p, p.openFileAtCurrentLine(p.previewFile)
 		}
 
 	case "E":
-		// Open in external editor (full terminal, bypasses inline edit)
+		// Open in external editor at current line position (bypasses inline edit)
 		if p.previewFile != "" {
-			return p, p.openFile(p.previewFile)
+			return p, p.openFileAtCurrentLine(p.previewFile)
 		}
 
 	case ":":

@@ -31,7 +31,8 @@ type InlineEditExitedMsg struct {
 
 // enterInlineEditMode starts inline editing for the specified file.
 // Creates a tmux session running the user's editor and delegates to tty.Model.
-func (p *Plugin) enterInlineEditMode(path string) tea.Cmd {
+// lineNo is 0-indexed; converted to 1-indexed for editor.
+func (p *Plugin) enterInlineEditMode(path string, lineNo int) tea.Cmd {
 	// Check feature flag
 	if !features.IsEnabled(features.TmuxInlineEdit.Name) {
 		return p.openFile(path)
@@ -73,8 +74,19 @@ func (p *Plugin) enterInlineEditMode(path string) tea.Cmd {
 		// Create a detached tmux session with the editor
 		// Use -x and -y to set initial size (will be resized later)
 		// Pass TERM environment for proper color/theme support
-		cmd := exec.Command("tmux", "new-session", "-d", "-s", sessionName,
-			"-x", "80", "-y", "24", "-e", "TERM="+term, editor, fullPath)
+		// Include +lineNo for editors that support it (vim, nano, emacs, helix, etc.)
+		editorArgs := []string{editor}
+		if lineNo > 0 {
+			// Convert 0-indexed to 1-indexed for editor
+			editorArgs = append(editorArgs, fmt.Sprintf("+%d", lineNo+1))
+		}
+		editorArgs = append(editorArgs, fullPath)
+
+		tmuxArgs := []string{"new-session", "-d", "-s", sessionName,
+			"-x", "80", "-y", "24", "-e", "TERM=" + term}
+		tmuxArgs = append(tmuxArgs, editorArgs...)
+
+		cmd := exec.Command("tmux", tmuxArgs...)
 		if err := cmd.Run(); err != nil {
 			return msg.ToastMsg{
 				Message:  fmt.Sprintf("Failed to start editor: %v", err),
@@ -667,5 +679,11 @@ func (p *Plugin) selectTreeItem(idx int) (*Plugin, tea.Cmd) {
 	}
 
 	return p, LoadPreview(p.ctx.WorkDir, node.Path, p.ctx.Epoch)
+}
+
+// enterInlineEditModeAtCurrentLine starts inline editing at the current preview line.
+func (p *Plugin) enterInlineEditModeAtCurrentLine(path string) tea.Cmd {
+	lineNo := p.getCurrentPreviewLine()
+	return p.enterInlineEditMode(path, lineNo)
 }
 

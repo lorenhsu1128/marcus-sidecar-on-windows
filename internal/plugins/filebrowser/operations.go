@@ -40,6 +40,44 @@ func (p *Plugin) openFileAtLine(path string, lineNo int) tea.Cmd {
 	}
 }
 
+// getCurrentPreviewLine returns the 0-indexed line number to use when opening the current
+// preview file in an editor. Uses middle of visible viewport by default, or selection start
+// if text is selected.
+func (p *Plugin) getCurrentPreviewLine() int {
+	// If text is selected, use selection start
+	if p.hasTextSelection() {
+		return p.textSelectionStart
+	}
+
+	// Calculate middle of viewport
+	visibleHeight := p.visibleContentHeight()
+	if visibleHeight <= 0 {
+		return p.previewScroll
+	}
+
+	targetLine := p.previewScroll + (visibleHeight / 2)
+
+	// Clamp to valid range
+	maxLine := len(p.previewLines) - 1
+	if maxLine < 0 {
+		maxLine = 0
+	}
+	if targetLine > maxLine {
+		targetLine = maxLine
+	}
+	if targetLine < 0 {
+		targetLine = 0
+	}
+
+	return targetLine
+}
+
+// openFileAtCurrentLine opens the current preview file at the current preview position.
+func (p *Plugin) openFileAtCurrentLine(path string) tea.Cmd {
+	lineNo := p.getCurrentPreviewLine()
+	return p.openFileAtLine(path, lineNo)
+}
+
 // revealInFileManager reveals the file/directory in the system file manager.
 func (p *Plugin) revealInFileManager(path string) tea.Cmd {
 	return func() tea.Msg {
