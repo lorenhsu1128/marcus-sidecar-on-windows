@@ -18,16 +18,6 @@ import (
 func (p *Plugin) handleKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	key := msg.String()
 
-	// Quick open can be triggered from any context (except when already open)
-	if key == "ctrl+p" && !p.quickOpenMode && !p.projectSearchMode {
-		return p.openQuickOpen()
-	}
-
-	// Project search can be triggered from any context (except when already open)
-	if key == "f" && !p.projectSearchMode && !p.quickOpenMode {
-		return p.openProjectSearch()
-	}
-
 	// Handle project search mode
 	if p.projectSearchMode {
 		return p.handleProjectSearchKey(msg)
@@ -66,6 +56,14 @@ func (p *Plugin) handleKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	// Handle tree search mode input
 	if p.searchMode {
 		return p.handleSearchKey(msg)
+	}
+
+	// Quick open and project search only from tree/preview (not during text input modes)
+	if key == "ctrl+p" {
+		return p.openQuickOpen()
+	}
+	if key == "f" {
+		return p.openProjectSearch()
 	}
 
 	// Handle keys based on active pane

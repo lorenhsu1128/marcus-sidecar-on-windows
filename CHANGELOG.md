@@ -2,6 +2,12 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.60.0] - 2026-01-30
+
+### Bug Fixes
+
+- Fix file browser shortcuts (f, ctrl+p) intercepting text input during file creation, search, and other input modes
+
 ## [v0.59.0] - 2026-01-30
 
 ### Features
