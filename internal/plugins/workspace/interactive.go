@@ -799,14 +799,22 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 	// Must be checked BEFORE forwarding pending escape, since the ESC was part
 	// of the mouse sequence, not a real user keypress.
 	// td-e2ce50: Use lenient check to catch truncated/split sequences during fast scrolling.
-	// Note: bare "[" is NEVER filtered. With tea.WithMouseAllMotion(), leaked mouse ESC bytes
-	// frequently set EscapePressed, making EscapePressed unreliable for gating "[".
 	// Multi-char fragments like "[<35;10;20M" are caught by LooksLikeMouseFragment.
 	if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
 		if tty.LooksLikeMouseFragment(string(msg.Runes)) {
 			// Cancel the pending escape — it was the leading byte of this mouse event
 			p.interactiveState.EscapePressed = false
 			return nil // Drop mouse sequence fragments
+		}
+	}
+
+	// Time-gate bare "[" after ESC to catch split CSI from mouse motion.
+	// A split-read CSI "[" arrives within microseconds of its ESC; a human
+	// typing "[" after ESC takes 50ms+. 5ms threshold is safe.
+	if msg.Type == tea.KeyRunes && string(msg.Runes) == "[" && p.interactiveState.EscapePressed {
+		if time.Since(p.interactiveState.EscapeTime) < 5*time.Millisecond {
+			p.interactiveState.EscapePressed = false
+			return nil
 		}
 	}
 

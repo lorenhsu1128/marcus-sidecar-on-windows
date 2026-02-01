@@ -235,7 +235,7 @@ func TestLooksLikeMouseFragment(t *testing.T) {
 		{"m[<64;107;16M", true, "sequence starting with m (split boundary)"},
 
 		// Split CSI sequences (just brackets arriving separately)
-		{"[", false, "single bracket is a normal typeable character (callers gate on EscapePressed)"},
+		{"[", false, "single bracket is a normal typeable character (callers use time-gating)"},
 		{"[[", true, "double brackets"},
 		{"[[[", true, "triple brackets"},
 		{"[[[[[[[[[[", true, "many brackets (burst of split CSI)"},
