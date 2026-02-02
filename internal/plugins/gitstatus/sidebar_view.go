@@ -450,7 +450,7 @@ func (p *Plugin) renderRecentCommits(currentY *int, maxVisible int) string {
 
 	// Cursor selection: cursor indexes files first, then commits
 	fileCount := len(p.tree.AllEntries())
-	maxWidth := p.sidebarWidth - 4
+	maxWidth := p.sidebarWidth - 5
 
 	// Calculate visible range based on scroll offset
 	startIdx := p.commitScrollOff
@@ -467,6 +467,7 @@ func (p *Plugin) renderRecentCommits(currentY *int, maxVisible int) string {
 	if endIdx > len(commits) {
 		endIdx = len(commits)
 	}
+	var commitsSB strings.Builder
 
 	for i := startIdx; i < endIdx; i++ {
 		commit := commits[i]
@@ -502,7 +503,7 @@ func (p *Plugin) renderRecentCommits(currentY *int, maxVisible int) string {
 		}
 
 		// Register hit region for this commit with ABSOLUTE index
-		p.mouseHandler.HitMap.AddRect(regionCommit, 1, *currentY, p.sidebarWidth-2, 1, i)
+		p.mouseHandler.HitMap.AddRect(regionCommit, 1, *currentY, p.sidebarWidth-3, 1, i)
 
 		if selected {
 			plainIndicator := "  "
@@ -520,16 +521,28 @@ func (p *Plugin) renderRecentCommits(currentY *int, maxVisible int) string {
 			if lineWidth < maxWidth {
 				plainLine += strings.Repeat(" ", maxWidth-lineWidth)
 			}
-			sb.WriteString(styles.ListItemSelected.Render(plainLine))
+			commitsSB.WriteString(styles.ListItemSelected.Render(plainLine))
 		} else {
 			line := fmt.Sprintf("%s%s%s %s", graphStr, indicator, hash, msg)
-			sb.WriteString(styles.ListItemNormal.Render(line))
+			commitsSB.WriteString(styles.ListItemNormal.Render(line))
 		}
 		*currentY++
 		if i < endIdx-1 {
-			sb.WriteString("\n")
+			commitsSB.WriteString("\n")
 		}
 	}
+
+
+	// Join commits with scrollbar
+	commitsContent := strings.TrimRight(commitsSB.String(), "\n")
+	visibleCommits := endIdx - startIdx
+	scrollbar := ui.RenderScrollbar(ui.ScrollbarParams{
+		TotalItems:   len(commits),
+		ScrollOffset: p.commitScrollOff,
+		VisibleItems: visibleCommits,
+		TrackHeight:  visibleCommits,
+	})
+	sb.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, commitsContent, scrollbar))
 
 	return sb.String()
 }
