@@ -823,7 +823,9 @@ func (p *Plugin) renderMainPane(paneWidth, height int) string {
 		}
 	}
 
-	return sb.String()
+	// Fill each line's background to prevent splotchy colors from ANSI resets
+	// in inner styled elements (model badges, glamour markdown, etc.)
+	return styles.FillBackground(sb.String(), contentWidth, styles.BgPrimary)
 }
 
 // renderDetailPaneContent renders the turn detail in the right pane (two-pane mode).

@@ -146,7 +146,7 @@ func (m *Modal) buildLayout(screenW, screenH int, handler *mouse.Handler) string
 	// Inner elements with ANSI resets clear the parent's background, leaving
 	// terminal-default black for the remaining width. Explicitly padding each
 	// line with BgSecondary ensures a uniform background.
-	viewport = fillBackground(viewport, contentWidth)
+	viewport = styles.FillBackground(viewport, contentWidth, styles.BgSecondary)
 
 	// 6. Build modal content
 	var inner strings.Builder
@@ -366,51 +366,6 @@ func intersectsViewport(y, h, viewportY, viewportH int) bool {
 	viewportBottom := viewportY + viewportH
 
 	return elementTop < viewportBottom && elementBottom > viewportTop
-}
-
-// fillBackground ensures each viewport line has a uniform BgSecondary
-// background. Inner styled elements emit ANSI resets (\x1b[0m) that clear
-// all attributes including the parent modal's background, leaving
-// terminal-default black for the remainder of the line. We fix this by
-// re-applying the background ANSI sequence after every reset, then padding
-// short lines with background-colored spaces.
-func fillBackground(content string, width int) string {
-	bgSeq := bgANSISeq()
-	if bgSeq == "" {
-		return content
-	}
-
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		// Re-apply background after every ANSI reset within the line
-		line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+bgSeq)
-
-		// Pad short lines to target width with background-colored spaces
-		w := lipgloss.Width(line)
-		if w < width {
-			line += strings.Repeat(" ", width-w)
-		}
-
-		// Ensure clean reset at end of line
-		if !strings.HasSuffix(line, "\x1b[0m") {
-			line += "\x1b[0m"
-		}
-
-		lines[i] = line
-	}
-	return strings.Join(lines, "\n")
-}
-
-// bgANSISeq extracts the raw ANSI escape sequence for BgSecondary by
-// rendering a marker character and taking everything before it.
-func bgANSISeq() string {
-	const marker = "\x01"
-	s := lipgloss.NewStyle().Background(styles.BgSecondary).Render(marker)
-	idx := strings.Index(s, marker)
-	if idx > 0 {
-		return s[:idx]
-	}
-	return ""
 }
 
 // clamp constrains a value between min and max.
