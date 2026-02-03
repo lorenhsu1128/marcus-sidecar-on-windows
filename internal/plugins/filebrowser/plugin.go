@@ -251,6 +251,9 @@ type Plugin struct {
 
 	// Inline edit copy/paste hint state
 	inlineEditCopyPasteHintShown bool // True after showing copy/paste hint toast
+
+	// Selection copy hint state
+	selectionCopyHintShown bool // True after showing selection copy hint toast
 }
 
 // New creates a new File Browser plugin.

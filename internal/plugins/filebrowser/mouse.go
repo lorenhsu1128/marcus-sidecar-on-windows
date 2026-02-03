@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/marcus/sidecar/internal/mouse"
+	"github.com/marcus/sidecar/internal/msg"
 	"github.com/marcus/sidecar/internal/state"
 	"github.com/marcus/sidecar/internal/ui"
 )
@@ -486,6 +487,11 @@ func (p *Plugin) handleMouseDragEnd() (*Plugin, tea.Cmd) {
 	case regionPreviewLine:
 		// Selection complete - finalize drag
 		p.selection.FinishDrag()
+		// Show copy hint on first selection
+		if p.selection.HasSelection() && !p.selectionCopyHintShown {
+			p.selectionCopyHintShown = true
+			return p, msg.ShowToast("Press alt+c or y to copy selection", 3*time.Second)
+		}
 	}
 	return p, nil
 }
