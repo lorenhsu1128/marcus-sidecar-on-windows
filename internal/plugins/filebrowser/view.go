@@ -930,6 +930,135 @@ func (p *Plugin) wrapPreviewLine(line string, width int) []string {
 	return wrapped
 }
 
+func (p *Plugin) previewSelectionAtXY(x, y int) (int, int, bool) {
+	lines, showLineNumbers := p.previewRenderLines()
+	if !showLineNumbers || len(lines) == 0 {
+		return 0, 0, false
+	}
+	if len(p.previewLines) == 0 {
+		return 0, 0, false
+	}
+
+	// Must match renderNormalPanes() inputBarHeight calculation exactly
+	inputBarHeight := 0
+	if p.contentSearchMode || p.fileOpMode != FileOpNone || p.lineJumpMode {
+		inputBarHeight = 1
+		if p.fileOpMode != FileOpNone && p.fileOpError != "" {
+			inputBarHeight = 2
+		}
+	}
+	previewContentStartY := inputBarHeight + 3 // border + header
+	row := y - previewContentStartY
+	if row < 0 {
+		return 0, 0, false
+	}
+
+	// Inner content height (excluding borders)
+	paneHeight := p.height - inputBarHeight
+	if paneHeight < 4 {
+		paneHeight = 4
+	}
+	innerHeight := paneHeight - 2
+	if innerHeight < 1 {
+		innerHeight = 1
+	}
+	if row >= innerHeight {
+		row = innerHeight - 1
+	}
+
+	lineNumWidth := 5
+	maxLineWidth := p.previewWidth - lineNumWidth - 4
+	if maxLineWidth < 10 {
+		maxLineWidth = 10
+	}
+
+	if !p.previewWrapEnabled {
+		lineIdx := p.previewScroll + row
+		if lineIdx < 0 {
+			lineIdx = 0
+		}
+		if lineIdx >= len(p.previewLines) {
+			lineIdx = len(p.previewLines) - 1
+		}
+		if lineIdx < 0 {
+			return 0, 0, false
+		}
+		col := p.previewColAtScreenX(x, lineIdx)
+		return lineIdx, col, true
+	}
+
+	remainingRow := row
+	lineIdx := p.previewScroll
+	for lineIdx < len(lines) {
+		lineContent := lines[lineIdx]
+		segments := p.wrapPreviewLine(lineContent, maxLineWidth)
+		if len(segments) == 0 {
+			segments = []string{""}
+		}
+		if remainingRow < len(segments) {
+			segIdx := remainingRow
+			segStart := 0
+			for i := 0; i < segIdx; i++ {
+				segStart += ansi.StringWidth(segments[i])
+			}
+
+			relX := x - p.previewContentStartX(lineNumWidth)
+			if relX < 0 {
+				relX = 0
+			}
+
+			rawLine := lineContent
+			if lineIdx < len(p.previewLines) {
+				rawLine = p.previewLines[lineIdx]
+			}
+			expanded := ui.ExpandTabs(rawLine, 8)
+			segmentText := ui.VisualSubstring(expanded, segStart, -1)
+			colInSeg := ui.VisualColAtRelativeX(segmentText, relX)
+			col := segStart + colInSeg
+
+			lineWidth := ansi.StringWidth(ansi.Strip(expanded))
+			if lineWidth <= 0 {
+				col = 0
+			} else if col > lineWidth-1 {
+				col = lineWidth - 1
+			}
+
+			return lineIdx, col, true
+		}
+		remainingRow -= len(segments)
+		lineIdx++
+	}
+
+	lastLine := len(p.previewLines) - 1
+	if lastLine < 0 {
+		return 0, 0, false
+	}
+	col := p.previewColAtScreenX(x, lastLine)
+	return lastLine, col, true
+}
+
+func (p *Plugin) previewContentStartX(lineNumWidth int) int {
+	if p.treeVisible {
+		return p.treeWidth + dividerWidth + 1 + lineNumWidth
+	}
+	return 1 + lineNumWidth
+}
+
+func (p *Plugin) previewRenderLines() ([]string, bool) {
+	showLineNumbers := true
+	if p.markdownRenderMode && p.isMarkdownFile() && len(p.markdownRendered) > 0 {
+		showLineNumbers = false
+	}
+
+	if showLineNumbers {
+		if len(p.previewHighlighted) > 0 {
+			return p.previewHighlighted, showLineNumbers
+		}
+		return p.previewLines, showLineNumbers
+	}
+	return p.markdownRendered, showLineNumbers
+}
+
 // highlightLineMatches applies search match highlighting to a line.
 func (p *Plugin) highlightLineMatches(lineNo int) string {
 	// Get raw line (not syntax highlighted)

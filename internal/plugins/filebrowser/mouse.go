@@ -268,15 +268,15 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) (*Plugin, tea.Cmd) {
 		return p, nil
 
 	case regionPreviewLine:
-		if lineIdx, ok := action.Region.Data.(int); ok {
-			p.activePane = PanePreview
-			// Map click X to character column
-			col := p.previewColAtScreenX(action.X, lineIdx)
-			// Prepare drag tracking with character-level anchor
-			p.selection.PrepareDrag(lineIdx, col, action.Region.Rect)
-			// Start drag tracking for potential drag-select
-			p.mouseHandler.StartDrag(action.X, action.Y, regionPreviewLine, lineIdx)
+		lineIdx, col, ok := p.previewSelectionAtXY(action.X, action.Y)
+		if !ok {
+			return p, nil
 		}
+		p.activePane = PanePreview
+		// Prepare drag tracking with character-level anchor
+		p.selection.PrepareDrag(lineIdx, col, action.Region.Rect)
+		// Start drag tracking for potential drag-select
+		p.mouseHandler.StartDrag(action.X, action.Y, regionPreviewLine, lineIdx)
 		return p, nil
 
 	case regionPreviewTab:
@@ -442,37 +442,13 @@ func (p *Plugin) handlePaneDividerDrag(action mouse.MouseAction) (*Plugin, tea.C
 
 // handlePreviewSelectionDrag handles drag-to-select in the preview pane.
 func (p *Plugin) handlePreviewSelectionDrag(action mouse.MouseAction) (*Plugin, tea.Cmd) {
-	// Calculate Y offset to preview content
-	// Must match renderNormalPanes() inputBarHeight calculation exactly
-	inputBarHeight := 0
-	if p.contentSearchMode || p.fileOpMode != FileOpNone || p.lineJumpMode {
-		inputBarHeight = 1
-		if p.fileOpMode != FileOpNone && p.fileOpError != "" {
-			inputBarHeight = 2
-		}
-	}
-	previewContentStartY := inputBarHeight + 3 // border + header
-
-	// Map Y coordinate to line index
-	currentLine := (action.Y - previewContentStartY) + p.previewScroll
-
-	// Clamp to valid range
-	if currentLine < 0 {
-		currentLine = 0
-	}
-	maxLine := len(p.previewLines) - 1
-	if maxLine < 0 {
+	lineIdx, col, ok := p.previewSelectionAtXY(action.X, action.Y)
+	if !ok {
 		return p, nil
 	}
-	if currentLine > maxLine {
-		currentLine = maxLine
-	}
-
-	// Map X to character column
-	col := p.previewColAtScreenX(action.X, currentLine)
 
 	// Update character-level selection via shared package
-	p.selection.HandleDrag(currentLine, col)
+	p.selection.HandleDrag(lineIdx, col)
 
 	return p, nil
 }
