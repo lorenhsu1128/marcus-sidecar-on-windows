@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/marcus/sidecar/internal/app"
+	"github.com/marcus/sidecar/internal/ui"
 	"github.com/marcus/sidecar/internal/image"
 	"github.com/marcus/sidecar/internal/markdown"
 	"github.com/marcus/sidecar/internal/modal"
@@ -167,11 +168,8 @@ type Plugin struct {
 	contentSearchMatches   []ContentMatch
 	contentSearchCursor    int // Index into contentSearchMatches
 
-	// Text selection state (preview pane)
-	textSelectionActive bool // True when user is actively dragging
-	textSelectionStart  int  // First line selected (0-indexed into previewLines)
-	textSelectionEnd    int  // Last line selected (0-indexed, inclusive)
-	textSelectionAnchor int  // Line where selection started (for drag direction)
+	// Text selection state (preview pane) - character-level via shared ui package
+	selection ui.SelectionState
 
 	// Quick open state
 	quickOpenMode    bool

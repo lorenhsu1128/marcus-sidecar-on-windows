@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/marcus/sidecar/internal/mouse"
 	"github.com/marcus/sidecar/internal/state"
+	"github.com/marcus/sidecar/internal/ui"
 )
 
 // dragForwardThrottle is the minimum interval between forwarding mouse drag
@@ -263,17 +264,16 @@ func (p *Plugin) handleMouseClick(action mouse.MouseAction) (*Plugin, tea.Cmd) {
 
 	case regionPreviewPane:
 		p.activePane = PanePreview
-		p.clearTextSelection() // Clear selection when clicking empty area
+		p.selection.Clear() // Clear selection when clicking empty area
 		return p, nil
 
 	case regionPreviewLine:
 		if lineIdx, ok := action.Region.Data.(int); ok {
 			p.activePane = PanePreview
-			// Initialize selection on this single line
-			p.textSelectionActive = false
-			p.textSelectionStart = lineIdx
-			p.textSelectionEnd = lineIdx
-			p.textSelectionAnchor = lineIdx
+			// Map click X to character column
+			col := p.previewColAtScreenX(action.X, lineIdx)
+			// Prepare drag tracking with character-level anchor
+			p.selection.PrepareDrag(lineIdx, col, action.Region.Rect)
 			// Start drag tracking for potential drag-select
 			p.mouseHandler.StartDrag(action.X, action.Y, regionPreviewLine, lineIdx)
 		}
@@ -442,8 +442,6 @@ func (p *Plugin) handlePaneDividerDrag(action mouse.MouseAction) (*Plugin, tea.C
 
 // handlePreviewSelectionDrag handles drag-to-select in the preview pane.
 func (p *Plugin) handlePreviewSelectionDrag(action mouse.MouseAction) (*Plugin, tea.Cmd) {
-	p.textSelectionActive = true
-
 	// Calculate Y offset to preview content
 	inputBarHeight := 0
 	if p.searchMode || p.contentSearchMode || p.fileOpMode != FileOpNone {
@@ -469,16 +467,37 @@ func (p *Plugin) handlePreviewSelectionDrag(action mouse.MouseAction) (*Plugin, 
 		currentLine = maxLine
 	}
 
-	// Update selection based on anchor
-	if currentLine < p.textSelectionAnchor {
-		p.textSelectionStart = currentLine
-		p.textSelectionEnd = p.textSelectionAnchor
-	} else {
-		p.textSelectionStart = p.textSelectionAnchor
-		p.textSelectionEnd = currentLine
-	}
+	// Map X to character column
+	col := p.previewColAtScreenX(action.X, currentLine)
+
+	// Update character-level selection via shared package
+	p.selection.HandleDrag(currentLine, col)
 
 	return p, nil
+}
+
+// previewColAtScreenX maps a screen X coordinate to a visual column within
+// the preview content for the given line index.
+func (p *Plugin) previewColAtScreenX(x, lineIdx int) int {
+	// Calculate the X offset where preview content starts:
+	// tree pane width + divider(1) + preview border(1) + line number width(5)
+	previewContentX := 0
+	if p.treeVisible {
+		previewContentX = p.treeWidth + dividerWidth + 1 + 5 // tree + divider + border + line numbers
+	} else {
+		previewContentX = 1 + 5 // border + line numbers
+	}
+	relX := x - previewContentX
+	if relX < 0 {
+		relX = 0
+	}
+
+	// Get the raw line and expand tabs
+	if lineIdx < 0 || lineIdx >= len(p.previewLines) {
+		return 0
+	}
+	expanded := ui.ExpandTabs(p.previewLines[lineIdx], 8)
+	return ui.VisualColAtRelativeX(expanded, relX)
 }
 
 // handleMouseDragEnd handles the end of a drag operation.
@@ -488,8 +507,8 @@ func (p *Plugin) handleMouseDragEnd() (*Plugin, tea.Cmd) {
 		// Save the current tree width to state
 		_ = state.SetFileBrowserTreeWidth(p.treeWidth)
 	case regionPreviewLine:
-		// Selection complete - keep selection visible but mark as inactive
-		p.textSelectionActive = false
+		// Selection complete - finalize drag
+		p.selection.FinishDrag()
 	}
 	return p, nil
 }

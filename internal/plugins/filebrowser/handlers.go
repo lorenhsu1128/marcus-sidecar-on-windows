@@ -467,7 +467,7 @@ func (p *Plugin) handlePreviewKey(key string) (plugin.Plugin, tea.Cmd) {
 			p.treeVisible = true
 		}
 		p.activePane = PaneTree
-		p.clearTextSelection()
+		p.selection.Clear()
 
 	case "e":
 		// Open previewed file in editor at current line position
@@ -492,7 +492,7 @@ func (p *Plugin) handlePreviewKey(key string) (plugin.Plugin, tea.Cmd) {
 	case "/":
 		// Enter content search mode if we have content to search
 		if len(p.previewLines) > 0 && !p.isBinary {
-			p.clearTextSelection() // Clear selection before entering search
+			p.selection.Clear() // Clear selection before entering search
 			p.contentSearchMode = true
 			p.contentSearchCommitted = false
 			p.contentSearchQuery = ""
@@ -539,7 +539,7 @@ func (p *Plugin) handlePreviewKey(key string) (plugin.Plugin, tea.Cmd) {
 
 	case "y":
 		// Copy selected text to clipboard, or entire file contents if no selection
-		if p.hasTextSelection() {
+		if p.selection.HasSelection() {
 			return p, p.copySelectedTextToClipboard()
 		}
 		return p, p.copyFileContentsToClipboard()

@@ -306,7 +306,7 @@ func (p *Plugin) syncTreeSelection(path string) {
 }
 
 func (p *Plugin) applyPreviewResult(result PreviewResult) {
-	p.clearTextSelection()
+	p.selection.Clear()
 	p.previewLines = result.Lines
 	p.previewHighlighted = result.HighlightedLines
 	p.isBinary = result.IsBinary
@@ -344,7 +344,7 @@ func (p *Plugin) clampPreviewScroll() {
 }
 
 func (p *Plugin) resetPreviewModes() {
-	p.clearTextSelection()
+	p.selection.Clear()
 	p.contentSearchMode = false
 	p.contentSearchCommitted = false
 	p.contentSearchQuery = ""

@@ -3,7 +3,6 @@ package filebrowser
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -11,36 +10,6 @@ import (
 	"github.com/marcus/sidecar/internal/styles"
 	"github.com/marcus/sidecar/internal/ui"
 )
-
-// ansiResetRe matches ANSI reset sequences (both \x1b[0m and \x1b[m)
-var ansiResetRe = regexp.MustCompile(`\x1b\[0?m`)
-
-// getSelectionBgANSI returns the ANSI 24-bit background code for selection highlight
-// based on the current theme's BgTertiary color.
-func getSelectionBgANSI() string {
-	// Get BgTertiary hex color from theme and convert to ANSI escape
-	theme := styles.GetCurrentTheme()
-	hex := theme.Colors.BgTertiary
-	// Parse hex color (assumes #RRGGBB format)
-	var r, g, b int
-	if _, err := fmt.Sscanf(hex, "#%02x%02x%02x", &r, &g, &b); err != nil {
-		// Fallback to default dark gray background if parsing fails
-		r, g, b = 55, 65, 81
-	}
-	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", r, g, b)
-}
-
-// injectSelectionBackground injects selection background color into an ANSI-styled string.
-// It prepends the background at the start and re-injects after any reset sequences.
-func injectSelectionBackground(s string) string {
-	selectionBg := getSelectionBgANSI()
-	// Prepend background color
-	result := selectionBg + s
-	// Re-inject background after any reset sequences
-	result = ansiResetRe.ReplaceAllString(result, "${0}"+selectionBg)
-	// Append reset at end to not bleed into next line
-	return result + "\x1b[0m"
-}
 
 // FocusPane represents which pane is active.
 type FocusPane int
@@ -783,25 +752,29 @@ func (p *Plugin) renderPreviewPane(visibleHeight int) string {
 		}
 
 		// Check if this line is selected for text selection highlighting
-		if p.isLineSelected(i) && showLineNumbers {
+		startCol, endCol := p.selection.GetLineSelectionCols(i)
+		if startCol >= 0 && showLineNumbers {
 			// Line number with selection background
 			lineNumStr := fmt.Sprintf("%4d ", i+1)
-			sb.WriteString(injectSelectionBackground(lineNumStr))
+			sb.WriteString(ui.InjectSelectionBackground(lineNumStr))
 
-			// Get syntax-highlighted content and inject selection background
+			// Get syntax-highlighted content and inject character-level selection background
 			var lineContent string
 			if i < len(lines) {
 				lineContent = lines[i]
 			}
 			// Truncate using lipgloss (handles ANSI codes properly)
 			lineContent = lipgloss.NewStyle().MaxWidth(maxLineWidth).Render(lineContent)
-			sb.WriteString(injectSelectionBackground(lineContent))
+			lineContent = ui.InjectCharacterRangeBackground(lineContent, startCol, endCol)
+			sb.WriteString(lineContent)
 
-			// Pad remaining width with selection background
-			contentWidth := lipgloss.Width(lineNumStr) + lipgloss.Width(lineContent)
-			if contentWidth < p.previewWidth-4 {
-				padding := strings.Repeat(" ", p.previewWidth-4-contentWidth)
-				sb.WriteString(injectSelectionBackground(padding))
+			// Pad remaining width with selection background if full-line selection
+			if startCol == 0 && endCol == -1 {
+				contentWidth := lipgloss.Width(lineNumStr) + lipgloss.Width(lineContent)
+				if contentWidth < p.previewWidth-4 {
+					padding := strings.Repeat(" ", p.previewWidth-4-contentWidth)
+					sb.WriteString(ui.InjectSelectionBackground(padding))
+				}
 			}
 			visualLinesRendered++
 		} else {

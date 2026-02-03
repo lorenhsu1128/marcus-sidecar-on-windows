@@ -45,8 +45,8 @@ func (p *Plugin) openFileAtLine(path string, lineNo int) tea.Cmd {
 // if text is selected.
 func (p *Plugin) getCurrentPreviewLine() int {
 	// If text is selected, use selection start
-	if p.hasTextSelection() {
-		return p.textSelectionStart
+	if p.selection.HasSelection() {
+		return p.selection.Start.Line
 	}
 
 	// Calculate middle of viewport
@@ -1168,63 +1168,39 @@ func (p *Plugin) navigateToFile(path string) (plugin.Plugin, tea.Cmd) {
 	return p, p.openTab(path, TabOpenNew)
 }
 
-// clearTextSelection resets all text selection state.
-func (p *Plugin) clearTextSelection() {
-	p.textSelectionActive = false
-	p.textSelectionStart = 0
-	p.textSelectionEnd = 0
-	p.textSelectionAnchor = 0
-}
-
-// hasTextSelection returns true if there is an active or completed selection.
-func (p *Plugin) hasTextSelection() bool {
-	return p.textSelectionStart != p.textSelectionEnd ||
-		p.textSelectionActive ||
-		(p.textSelectionStart == 0 && p.textSelectionEnd > 0)
-}
-
-// isLineSelected returns true if the given line is within the selection range.
-func (p *Plugin) isLineSelected(lineNo int) bool {
-	if !p.hasTextSelection() {
-		return false
-	}
-	return lineNo >= p.textSelectionStart && lineNo <= p.textSelectionEnd
-}
-
-// copySelectedTextToClipboard copies the selected lines to the system clipboard.
+// copySelectedTextToClipboard copies the selected text to the system clipboard
+// with character-level precision using the shared ui.SelectionState.
 func (p *Plugin) copySelectedTextToClipboard() tea.Cmd {
 	return func() tea.Msg {
-		if !p.hasTextSelection() {
+		if !p.selection.HasSelection() {
+			return nil
+		}
+		startLine := p.selection.Start.Line
+		endLine := p.selection.End.Line
+		if startLine > endLine {
+			startLine, endLine = endLine, startLine
+		}
+		if startLine < 0 {
+			startLine = 0
+		}
+		if endLine >= len(p.previewLines) {
+			endLine = len(p.previewLines) - 1
+		}
+		if endLine < startLine {
 			return nil
 		}
 
-		start := p.textSelectionStart
-		end := p.textSelectionEnd
-		if start > end {
-			start, end = end, start
-		}
-
-		// Build selected text from raw lines (not syntax-highlighted)
-		var sb strings.Builder
-		for i := start; i <= end; i++ {
-			if i < len(p.previewLines) {
-				sb.WriteString(p.previewLines[i])
-				if i < end {
-					sb.WriteString("\n")
-				}
-			}
-		}
-
-		text := sb.String()
-		if text == "" {
+		lines := p.previewLines[startLine : endLine+1]
+		result := p.selection.SelectedText(lines, startLine, 8)
+		if len(result) == 0 {
 			return nil
 		}
 
+		text := strings.Join(result, "\n")
 		if err := clipboard.WriteAll(text); err != nil {
 			return msg.ShowToast("Copy failed: "+err.Error(), 2*time.Second)
 		}
-
-		lineCount := end - start + 1
+		lineCount := endLine - startLine + 1
 		return msg.ShowToast(fmt.Sprintf("Copied %d line(s)", lineCount), 2*time.Second)
 	}
 }
