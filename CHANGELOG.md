@@ -2,6 +2,14 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.65.1] - 2026-02-04
+
+### Bug Fixes
+
+- Fix Claude Code adapter not detecting sessions in paths with dots or underscores (#96)
+  - Paths like `/home/user/github.com/project` now correctly match
+  - Paths like `/home/user/my_project` now correctly match
+
 ## [v0.65.0] - 2026-02-03
 
 ### Performance
