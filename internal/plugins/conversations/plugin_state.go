@@ -43,8 +43,13 @@ func (p *Plugin) setSelectedSession(sessionID string) {
 	p.hitRegionsDirty = true
 	// Promote selected session to HOT tier for real-time watching (td-dca6fe)
 	if p.tieredManager != nil {
-		p.tieredManager.PromoteSession(sessionID)
+		adapterID := ""
+		if s := p.findSelectedSession(); s != nil {
+			adapterID = s.AdapterID
+		}
+		p.tieredManager.PromoteSession(adapterID, sessionID)
 	}
+	p.updateTieredHotTargets()
 }
 
 // findSelectedSession returns the currently selected session.

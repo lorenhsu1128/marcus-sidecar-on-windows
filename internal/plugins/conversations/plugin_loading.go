@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -323,7 +324,7 @@ func (p *Plugin) loadMessages(sessionID string) tea.Cmd {
 
 // startWatcher starts watching for session changes.
 // Uses tiered watching (td-dca6fe) to reduce FD count:
-// - HOT tier: 1-3 most recently active sessions use real-time fsnotify
+// - HOT tier: recently active sessions use real-time fsnotify
 // - COLD tier: All other sessions use periodic polling (every 30s)
 // File-based adapters (claudecode, codex, geminicli, opencode) use tiered watcher.
 // Database adapters (cursor, warp) still use their own Watch() methods.
@@ -354,7 +355,12 @@ func (p *Plugin) startWatcher() tea.Cmd {
 
 		// Collect all file-based sessions for tiered watching (td-dca6fe)
 		// Sessions with a Path field use the tiered watcher
-		var tieredSessions []tieredwatcher.SessionInfo
+		type adapterTieredConfig struct {
+			sessions    []tieredwatcher.SessionInfo
+			exts        map[string]bool
+			activeCount int
+		}
+		adapterConfigs := make(map[string]*adapterTieredConfig)
 		fileBasedAdapters := make(map[string]bool) // adapters with file paths
 
 		for adapterID, a := range p.adapters {
@@ -376,10 +382,25 @@ func (p *Plugin) startWatcher() tea.Cmd {
 				for _, s := range sessions {
 					if s.Path != "" {
 						hasFilePaths = true
-						tieredSessions = append(tieredSessions, tieredwatcher.SessionInfo{
+						cfg := adapterConfigs[adapterID]
+						if cfg == nil {
+							cfg = &adapterTieredConfig{
+								exts: make(map[string]bool),
+							}
+							adapterConfigs[adapterID] = cfg
+						}
+						ext := filepath.Ext(s.Path)
+						cfg.exts[ext] = true
+						lastHot := time.Time{}
+						if s.IsActive {
+							lastHot = s.UpdatedAt
+							cfg.activeCount++
+						}
+						cfg.sessions = append(cfg.sessions, tieredwatcher.SessionInfo{
 							ID:       s.ID,
 							Path:     s.Path,
 							ModTime:  s.UpdatedAt,
+							LastHot:  lastHot,
 							FileSize: s.FileSize,
 						})
 					}
@@ -392,39 +413,70 @@ func (p *Plugin) startWatcher() tea.Cmd {
 
 		// Create tiered watchers for file-based sessions (td-dca6fe)
 		// This replaces a.Watch() calls for file-based adapters
-		if len(tieredSessions) > 0 {
-			// Group sessions by directory for efficient watching
-			// Also track the file extension for each directory
-			dirToSessions := make(map[string][]tieredwatcher.SessionInfo)
-			dirToExt := make(map[string]string) // directory -> file extension
-			for _, s := range tieredSessions {
-				dir := filepath.Dir(s.Path)
-				dirToSessions[dir] = append(dirToSessions[dir], s)
-				if _, ok := dirToExt[dir]; !ok {
-					dirToExt[dir] = filepath.Ext(s.Path) // e.g., ".jsonl" or ".json"
-				}
+		if len(adapterConfigs) > 0 {
+			extractID := func(path string) string {
+				base := filepath.Base(path)
+				// Strip known prefixes for gemini-cli sessions
+				base = strings.TrimPrefix(base, "session-")
+				return strings.TrimSuffix(base, filepath.Ext(base))
 			}
+			scale := p.hotTargetScale()
 
-			// Create one tiered watcher per unique session directory
-			for rootDir, sessions := range dirToSessions {
-				ext := dirToExt[rootDir]
+			for adapterID, cfg := range adapterConfigs {
+				if len(cfg.sessions) == 0 {
+					continue
+				}
+
+				extFilter := func(path string) bool { return true }
+				if len(cfg.exts) > 0 {
+					extFilter = func(path string) bool {
+						return cfg.exts[filepath.Ext(path)]
+					}
+				}
+
+				scanDir := func(dir string) ([]tieredwatcher.SessionInfo, error) {
+					entries, err := os.ReadDir(dir)
+					if err != nil {
+						return nil, err
+					}
+					result := make([]tieredwatcher.SessionInfo, 0, len(entries))
+					for _, entry := range entries {
+						if entry.IsDir() {
+							continue
+						}
+						name := entry.Name()
+						path := filepath.Join(dir, name)
+						if !extFilter(path) {
+							continue
+						}
+						info, err := entry.Info()
+						if err != nil {
+							continue
+						}
+						result = append(result, tieredwatcher.SessionInfo{
+							ID:       extractID(path),
+							Path:     path,
+							ModTime:  info.ModTime(),
+							FileSize: info.Size(),
+						})
+					}
+					return result, nil
+				}
+
 				tw, ch, err := tieredwatcher.New(tieredwatcher.Config{
-					RootDir:     rootDir,
-					FilePattern: ext,
-					ExtractID: func(path string) string {
-						base := filepath.Base(path)
-						// Strip known prefixes for gemini-cli sessions
-						base = strings.TrimPrefix(base, "session-")
-						return strings.TrimSuffix(base, filepath.Ext(base))
-					},
+					FilePattern: "",
+					Filter:      extFilter,
+					ExtractID:   extractID,
+					ScanDir:     scanDir,
 				})
 				if err != nil {
 					continue
 				}
 
 				// Register all sessions with this watcher
-				tw.RegisterSessions(sessions)
-				manager.AddWatcher(rootDir, tw, ch)
+				tw.RegisterSessions(cfg.sessions)
+				manager.AddWatcher(adapterID, tw, ch)
+				manager.SetHotTarget(adapterID, applyHotTargetScale(cfg.activeCount, scale))
 				watchCount++
 			}
 
@@ -574,6 +626,81 @@ func (p *Plugin) listenForCoalescedRefresh() tea.Cmd {
 			return nil // Channel closed (td-e2791614)
 		}
 		return msg
+	}
+}
+
+const hotTargetMinScale = 0.25
+
+func (p *Plugin) hotTargetScale() float64 {
+	count := fdmonitor.Count()
+	if count < 0 {
+		return 1.0
+	}
+	warn, crit := fdmonitor.Thresholds()
+	if warn <= 0 || crit <= warn {
+		return 1.0
+	}
+	if count < warn {
+		return 1.0
+	}
+	if count >= crit {
+		return hotTargetMinScale
+	}
+	progress := float64(count-warn) / float64(crit-warn)
+	return 1.0 - (1.0-hotTargetMinScale)*progress
+}
+
+func applyHotTargetScale(activeCount int, scale float64) int {
+	if activeCount <= 0 {
+		return 0
+	}
+	if scale >= 0.999 {
+		return activeCount
+	}
+	target := int(math.Ceil(float64(activeCount) * scale))
+	if target < 1 {
+		target = 1
+	}
+	if target > activeCount {
+		target = activeCount
+	}
+	return target
+}
+
+func (p *Plugin) updateTieredHotTargets() {
+	if p.tieredManager == nil || len(p.sessions) == 0 {
+		return
+	}
+
+	activeCounts := make(map[string]int)
+	hasSessions := make(map[string]bool)
+
+	selectedAdapter := ""
+	selectedActive := false
+
+	for _, s := range p.sessions {
+		if s.AdapterID == "" || s.Path == "" {
+			continue
+		}
+		hasSessions[s.AdapterID] = true
+		if s.IsActive {
+			activeCounts[s.AdapterID]++
+		}
+		if s.ID == p.selectedSession {
+			selectedAdapter = s.AdapterID
+			selectedActive = s.IsActive
+		}
+	}
+
+	if selectedAdapter != "" && !selectedActive {
+		activeCounts[selectedAdapter]++
+		hasSessions[selectedAdapter] = true
+	}
+
+	scale := p.hotTargetScale()
+	for adapterID := range hasSessions {
+		target := applyHotTargetScale(activeCounts[adapterID], scale)
+		p.tieredManager.SetHotTarget(adapterID, target)
 	}
 }
 

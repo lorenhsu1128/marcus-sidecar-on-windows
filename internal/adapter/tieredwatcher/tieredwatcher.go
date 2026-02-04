@@ -1,5 +1,5 @@
 // Package tieredwatcher implements tiered file watching to reduce file descriptor count.
-// HOT tier: 1-3 most recently active sessions use real-time fsnotify
+// HOT tier: recently active sessions use real-time fsnotify
 // COLD tier: All other sessions use periodic polling (every 30s)
 // Reduces FD count from ~9K to <500 (td-dca6fe).
 package tieredwatcher
@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	// MaxHotSessions is the maximum number of sessions in the HOT tier with fsnotify.
-	MaxHotSessions = 3
 	// ColdPollInterval is how often COLD tier sessions are polled for changes.
 	ColdPollInterval = 30 * time.Second
 	// HotInactivityTimeout demotes sessions to COLD after this period without activity.
@@ -39,12 +37,16 @@ type TieredWatcher struct {
 	mu sync.Mutex
 
 	// Session tracking
-	sessions map[string]*SessionInfo // session ID -> info
-	hotIDs   []string                // session IDs currently in HOT tier
+	sessions  map[string]*SessionInfo // session ID -> info
+	pathIndex map[string]string       // path -> session ID (for fast lookups)
+	hotIDs    []string                // session IDs currently in HOT tier
+	hotTarget int                     // desired HOT session count
 
 	// fsnotify watcher for HOT tier (watches directory, not individual files)
 	watcher   *fsnotify.Watcher
 	watchDirs map[string]bool // directories being watched
+	rootDirs  map[string]bool // directories that should stay watched
+	knownDirs map[string]bool // directories with registered sessions
 
 	// Polling for COLD tier
 	pollTicker *time.Ticker
@@ -55,10 +57,11 @@ type TieredWatcher struct {
 	closed bool
 
 	// Configuration
-	rootDir     string                              // Root directory to watch
-	filePattern string                              // File extension pattern (e.g., ".jsonl")
-	extractID   func(path string) string            // Extract session ID from path
+	rootDir     string                                  // Root directory to watch
+	filePattern string                                  // File extension pattern (e.g., ".jsonl")
+	extractID   func(path string) string                // Extract session ID from path
 	scanDir     func(dir string) ([]SessionInfo, error) // Scan directory for sessions
+	filter      func(path string) bool                  // Optional filter for watched paths
 }
 
 // Config holds configuration for creating a TieredWatcher.
@@ -71,6 +74,8 @@ type Config struct {
 	ExtractID func(path string) string
 	// ScanDir scans a directory and returns session info (optional, for COLD tier)
 	ScanDir func(dir string) ([]SessionInfo, error)
+	// Filter optionally filters watched paths (overrides FilePattern if set)
+	Filter func(path string) bool
 }
 
 // New creates a new TieredWatcher.
@@ -82,22 +87,31 @@ func New(cfg Config) (*TieredWatcher, <-chan adapter.Event, error) {
 
 	tw := &TieredWatcher{
 		sessions:    make(map[string]*SessionInfo),
-		hotIDs:      make([]string, 0, MaxHotSessions),
+		pathIndex:   make(map[string]string),
+		hotIDs:      make([]string, 0),
+		hotTarget:   0,
 		watcher:     watcher,
 		watchDirs:   make(map[string]bool),
+		rootDirs:    make(map[string]bool),
+		knownDirs:   make(map[string]bool),
 		events:      make(chan adapter.Event, 32),
 		rootDir:     cfg.RootDir,
 		filePattern: cfg.FilePattern,
 		extractID:   cfg.ExtractID,
 		scanDir:     cfg.ScanDir,
+		filter:      cfg.Filter,
 	}
 
-	// Watch the root directory
-	if err := watcher.Add(cfg.RootDir); err != nil {
-		watcher.Close()
-		return nil, nil, err
+	// Watch the root directory if provided
+	if cfg.RootDir != "" {
+		if err := watcher.Add(cfg.RootDir); err != nil {
+			watcher.Close()
+			return nil, nil, err
+		}
+		tw.watchDirs[cfg.RootDir] = true
+		tw.rootDirs[cfg.RootDir] = true
+		tw.knownDirs[cfg.RootDir] = true
 	}
-	tw.watchDirs[cfg.RootDir] = true
 
 	// Start background goroutines
 	tw.pollDone = make(chan struct{})
@@ -120,29 +134,18 @@ func (tw *TieredWatcher) PromoteToHot(sessionID string) {
 		return
 	}
 	info.LastHot = time.Now()
+	if tw.hotTarget < 1 {
+		tw.hotTarget = 1
+	}
 
 	// Check if already in HOT tier
-	for _, id := range tw.hotIDs {
-		if id == sessionID {
-			return
-		}
+	if !tw.isHotLocked(sessionID) {
+		// Add to HOT tier
+		tw.hotIDs = append(tw.hotIDs, sessionID)
 	}
 
-	// Add to HOT tier
-	tw.hotIDs = append(tw.hotIDs, sessionID)
-
-	// If we have too many HOT sessions, demote the oldest
-	if len(tw.hotIDs) > MaxHotSessions {
-		tw.demoteOldestLocked()
-	}
-
-	// Watch the session's directory if not already watched
-	dir := filepath.Dir(info.Path)
-	if !tw.watchDirs[dir] {
-		if err := tw.watcher.Add(dir); err == nil {
-			tw.watchDirs[dir] = true
-		}
-	}
+	tw.trimToHotTargetLocked()
+	tw.syncHotDirsLocked()
 }
 
 // RegisterSession adds a session to tracking (starts in COLD tier).
@@ -166,6 +169,11 @@ func (tw *TieredWatcher) RegisterSession(id, path string) {
 	}
 
 	tw.sessions[id] = info
+	tw.pathIndex[path] = id
+	tw.knownDirs[filepath.Dir(path)] = true
+	if tw.hotTarget > 0 {
+		tw.rebuildHotSetLocked()
+	}
 }
 
 // RegisterSessions adds multiple sessions to tracking.
@@ -181,61 +189,62 @@ func (tw *TieredWatcher) RegisterSessions(sessions []SessionInfo) {
 			ID:       s.ID,
 			Path:     s.Path,
 			ModTime:  s.ModTime,
+			LastHot:  s.LastHot,
 			FileSize: s.FileSize,
 		}
 		tw.sessions[s.ID] = info
+		tw.pathIndex[s.Path] = s.ID
+		tw.knownDirs[filepath.Dir(s.Path)] = true
 	}
 
-	// Auto-promote the N most recently modified sessions to HOT
-	tw.autoPromoteRecentLocked()
+	tw.rebuildHotSetLocked()
 }
 
-// autoPromoteRecentLocked promotes the most recently modified sessions to HOT tier.
+// SetHotTarget sets the desired number of HOT sessions and rebuilds the HOT set.
+func (tw *TieredWatcher) SetHotTarget(target int) {
+	tw.mu.Lock()
+	defer tw.mu.Unlock()
+	tw.hotTarget = target
+	tw.rebuildHotSetLocked()
+}
+
+// rebuildHotSetLocked rebuilds the HOT set based on recent activity.
 // Must be called with tw.mu held.
-func (tw *TieredWatcher) autoPromoteRecentLocked() {
-	if len(tw.sessions) == 0 {
+func (tw *TieredWatcher) rebuildHotSetLocked() {
+	if len(tw.sessions) == 0 || tw.hotTarget <= 0 {
+		tw.hotIDs = nil
+		tw.syncHotDirsLocked()
 		return
 	}
 
-	// Sort sessions by ModTime descending
-	type sessionTime struct {
-		id      string
-		modTime time.Time
+	target := tw.hotTarget
+	if target > len(tw.sessions) {
+		target = len(tw.sessions)
 	}
-	sorted := make([]sessionTime, 0, len(tw.sessions))
+
+	type sessionActivity struct {
+		id   string
+		when time.Time
+	}
+	sorted := make([]sessionActivity, 0, len(tw.sessions))
 	for id, info := range tw.sessions {
-		sorted = append(sorted, sessionTime{id: id, modTime: info.ModTime})
+		sorted = append(sorted, sessionActivity{id: id, when: tw.activityTime(info)})
 	}
 	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].modTime.After(sorted[j].modTime)
+		return sorted[i].when.After(sorted[j].when)
 	})
 
-	// Promote top N to HOT
-	for i := 0; i < MaxHotSessions && i < len(sorted); i++ {
+	tw.hotIDs = tw.hotIDs[:0]
+	for i := 0; i < target && i < len(sorted); i++ {
 		id := sorted[i].id
 		info := tw.sessions[id]
-		info.LastHot = time.Now()
-
-		// Add to HOT tier if not already there
-		found := false
-		for _, hotID := range tw.hotIDs {
-			if hotID == id {
-				found = true
-				break
-			}
+		if info.LastHot.IsZero() {
+			info.LastHot = info.ModTime
 		}
-		if !found {
-			tw.hotIDs = append(tw.hotIDs, id)
-		}
-
-		// Watch the session's directory
-		dir := filepath.Dir(info.Path)
-		if !tw.watchDirs[dir] {
-			if err := tw.watcher.Add(dir); err == nil {
-				tw.watchDirs[dir] = true
-			}
-		}
+		tw.hotIDs = append(tw.hotIDs, id)
 	}
+
+	tw.syncHotDirsLocked()
 }
 
 // demoteOldestLocked removes the oldest session from HOT tier.
@@ -245,18 +254,60 @@ func (tw *TieredWatcher) demoteOldestLocked() {
 		return
 	}
 
-	// Find oldest by LastHot time
+	// Find oldest by activity time
 	oldestIdx := 0
 	oldestTime := time.Now()
 	for i, id := range tw.hotIDs {
-		if info, ok := tw.sessions[id]; ok && info.LastHot.Before(oldestTime) {
-			oldestTime = info.LastHot
+		if info, ok := tw.sessions[id]; ok && tw.activityTime(info).Before(oldestTime) {
+			oldestTime = tw.activityTime(info)
 			oldestIdx = i
 		}
 	}
 
 	// Remove from HOT tier
 	tw.hotIDs = append(tw.hotIDs[:oldestIdx], tw.hotIDs[oldestIdx+1:]...)
+}
+
+func (tw *TieredWatcher) trimToHotTargetLocked() {
+	if tw.hotTarget <= 0 {
+		tw.hotIDs = nil
+		return
+	}
+	for len(tw.hotIDs) > tw.hotTarget {
+		tw.demoteOldestLocked()
+	}
+}
+
+func (tw *TieredWatcher) isHotLocked(sessionID string) bool {
+	for _, id := range tw.hotIDs {
+		if id == sessionID {
+			return true
+		}
+	}
+	return false
+}
+
+func (tw *TieredWatcher) activityTime(info *SessionInfo) time.Time {
+	if info.LastHot.IsZero() {
+		return info.ModTime
+	}
+	return info.LastHot
+}
+
+func (tw *TieredWatcher) noteActivityLocked(sessionID string) {
+	info := tw.sessions[sessionID]
+	if info == nil {
+		return
+	}
+	info.LastHot = time.Now()
+	if tw.hotTarget <= 0 {
+		return
+	}
+	if !tw.isHotLocked(sessionID) {
+		tw.hotIDs = append(tw.hotIDs, sessionID)
+	}
+	tw.trimToHotTargetLocked()
+	tw.syncHotDirsLocked()
 }
 
 // watchLoop handles fsnotify events for HOT tier sessions.
@@ -285,7 +336,11 @@ func (tw *TieredWatcher) watchLoop() {
 			}
 
 			// Check if this is a file we care about
-			if tw.filePattern != "" && filepath.Ext(event.Name) != tw.filePattern {
+			if tw.filter != nil {
+				if !tw.filter(event.Name) {
+					continue
+				}
+			} else if tw.filePattern != "" && filepath.Ext(event.Name) != tw.filePattern {
 				continue
 			}
 
@@ -303,7 +358,10 @@ func (tw *TieredWatcher) watchLoop() {
 				}
 
 				tw.mu.Lock()
-				sessionID := tw.extractID(lastPath)
+				sessionID := tw.pathIndex[lastPath]
+				if sessionID == "" && tw.extractID != nil {
+					sessionID = tw.extractID(lastPath)
+				}
 				info := tw.sessions[sessionID]
 
 				// Update mod time if this is a known session
@@ -312,6 +370,7 @@ func (tw *TieredWatcher) watchLoop() {
 						info.ModTime = stat.ModTime()
 						info.FileSize = stat.Size()
 					}
+					tw.noteActivityLocked(sessionID)
 				}
 				tw.mu.Unlock()
 
@@ -399,6 +458,7 @@ func (tw *TieredWatcher) pollColdSessions() {
 			if info := tw.sessions[c.id]; info != nil {
 				info.ModTime = stat.ModTime()
 				info.FileSize = stat.Size()
+				tw.noteActivityLocked(c.id)
 			}
 			tw.mu.Unlock()
 
@@ -406,6 +466,66 @@ func (tw *TieredWatcher) pollColdSessions() {
 			case tw.events <- adapter.Event{
 				Type:      adapter.EventSessionUpdated,
 				SessionID: c.id,
+			}:
+			default:
+			}
+		}
+	}
+
+	// Look for new sessions in known directories (optional)
+	tw.scanForNewSessions()
+}
+
+// scanForNewSessions discovers new sessions in known directories.
+// It only runs when a scanDir function is provided.
+func (tw *TieredWatcher) scanForNewSessions() {
+	if tw.scanDir == nil {
+		return
+	}
+
+	tw.mu.Lock()
+	dirs := make([]string, 0, len(tw.knownDirs))
+	for dir := range tw.knownDirs {
+		dirs = append(dirs, dir)
+	}
+	tw.mu.Unlock()
+
+	for _, dir := range dirs {
+		sessions, err := tw.scanDir(dir)
+		if err != nil {
+			continue
+		}
+
+		var newIDs []string
+		needsRebuild := false
+		tw.mu.Lock()
+		for _, s := range sessions {
+			if tw.sessions[s.ID] != nil {
+				continue
+			}
+			info := &SessionInfo{
+				ID:       s.ID,
+				Path:     s.Path,
+				ModTime:  s.ModTime,
+				LastHot:  time.Now(),
+				FileSize: s.FileSize,
+			}
+			tw.sessions[s.ID] = info
+			tw.pathIndex[s.Path] = s.ID
+			tw.knownDirs[filepath.Dir(s.Path)] = true
+			newIDs = append(newIDs, s.ID)
+			needsRebuild = true
+		}
+		if needsRebuild {
+			tw.rebuildHotSetLocked()
+		}
+		tw.mu.Unlock()
+
+		for _, id := range newIDs {
+			select {
+			case tw.events <- adapter.Event{
+				Type:      adapter.EventSessionCreated,
+				SessionID: id,
 			}:
 			default:
 			}
@@ -441,6 +561,40 @@ func (tw *TieredWatcher) demoteInactive() {
 		}
 	}
 	tw.hotIDs = remaining
+	tw.syncHotDirsLocked()
+}
+
+// syncHotDirsLocked ensures only directories containing HOT sessions are watched,
+// while preserving any root directories configured at creation.
+// Must be called with tw.mu held.
+func (tw *TieredWatcher) syncHotDirsLocked() {
+	desired := make(map[string]bool, len(tw.hotIDs))
+	for _, id := range tw.hotIDs {
+		if info, ok := tw.sessions[id]; ok {
+			desired[filepath.Dir(info.Path)] = true
+		}
+	}
+
+	// Add missing watches
+	for dir := range desired {
+		if !tw.watchDirs[dir] {
+			if err := tw.watcher.Add(dir); err == nil {
+				tw.watchDirs[dir] = true
+			}
+		}
+	}
+
+	// Remove watches no longer needed (except root dirs)
+	for dir := range tw.watchDirs {
+		if tw.rootDirs[dir] {
+			continue
+		}
+		if !desired[dir] {
+			if err := tw.watcher.Remove(dir); err == nil {
+				delete(tw.watchDirs, dir)
+			}
+		}
+	}
 }
 
 // Close shuts down the watcher.
@@ -546,13 +700,31 @@ func (m *Manager) Events() <-chan adapter.Event {
 	return m.events
 }
 
-// PromoteSession promotes a session to HOT tier across all watchers.
-func (m *Manager) PromoteSession(sessionID string) {
+// PromoteSession promotes a session to HOT tier for a specific adapter.
+// If adapterID is empty, promotes across all watchers.
+func (m *Manager) PromoteSession(adapterID, sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if adapterID != "" {
+		if tw, ok := m.watchers[adapterID]; ok {
+			tw.PromoteToHot(sessionID)
+		}
+		return
+	}
+
 	for _, tw := range m.watchers {
 		tw.PromoteToHot(sessionID)
+	}
+}
+
+// SetHotTarget sets the desired HOT session count for a specific adapter.
+func (m *Manager) SetHotTarget(adapterID string, target int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if tw, ok := m.watchers[adapterID]; ok {
+		tw.SetHotTarget(target)
 	}
 }
 

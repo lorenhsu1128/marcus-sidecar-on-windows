@@ -22,9 +22,9 @@ const (
 )
 
 var (
-	lastCheck       time.Time
-	lastCount       int
-	lastCheckMu     sync.Mutex
+	lastCheck         time.Time
+	lastCount         int
+	lastCheckMu       sync.Mutex
 	warningThreshold  = DefaultWarningThreshold
 	criticalThreshold = DefaultCriticalThreshold
 )
@@ -33,6 +33,11 @@ var (
 func SetThresholds(warning, critical int) {
 	warningThreshold = warning
 	criticalThreshold = critical
+}
+
+// Thresholds returns the current warning and critical thresholds.
+func Thresholds() (warning, critical int) {
+	return warningThreshold, criticalThreshold
 }
 
 // Count returns the current number of open file descriptors for this process.

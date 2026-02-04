@@ -52,6 +52,7 @@ func TestRegisterSession(t *testing.T) {
 		t.Fatalf("New() error: %v", err)
 	}
 	defer tw.Close()
+	tw.SetHotTarget(3)
 
 	tw.RegisterSession("test-session", sessionPath)
 
@@ -99,7 +100,7 @@ func TestPromoteToHot(t *testing.T) {
 		tw.RegisterSession(id, path)
 	}
 
-	// Promote more than MaxHotSessions
+	// Promote more than the hot target
 	tw.PromoteToHot("session-a")
 	tw.PromoteToHot("session-b")
 	tw.PromoteToHot("session-c")
@@ -109,8 +110,8 @@ func TestPromoteToHot(t *testing.T) {
 	hotCount := len(tw.hotIDs)
 	tw.mu.Unlock()
 
-	if hotCount > MaxHotSessions {
-		t.Errorf("hot sessions = %d, want <= %d", hotCount, MaxHotSessions)
+	if hotCount > 3 {
+		t.Errorf("hot sessions = %d, want <= 3", hotCount)
 	}
 }
 
@@ -130,6 +131,7 @@ func TestStats(t *testing.T) {
 		t.Fatalf("New() error: %v", err)
 	}
 	defer tw.Close()
+	tw.SetHotTarget(2)
 
 	// Create and register sessions
 	for i := 0; i < 5; i++ {
@@ -225,7 +227,7 @@ func TestManagerPromoteSession(t *testing.T) {
 	}
 
 	// Promote a session through the manager
-	manager.PromoteSession("session-a")
+	manager.PromoteSession("test-adapter", "session-a")
 
 	tw.mu.Lock()
 	found := false
@@ -281,14 +283,15 @@ func TestRegisterSessions(t *testing.T) {
 
 	// Register all sessions at once
 	tw.RegisterSessions(sessions)
+	tw.SetHotTarget(3)
 
 	hot, cold, _ := tw.Stats()
 
-	// Should auto-promote most recent sessions to HOT
-	if hot != MaxHotSessions {
-		t.Errorf("hot = %d, want %d (auto-promoted)", hot, MaxHotSessions)
+	// Should promote most recent sessions to HOT
+	if hot != 3 {
+		t.Errorf("hot = %d, want 3", hot)
 	}
-	if cold != 5-MaxHotSessions {
-		t.Errorf("cold = %d, want %d", cold, 5-MaxHotSessions)
+	if cold != 2 {
+		t.Errorf("cold = %d, want 2", cold)
 	}
 }

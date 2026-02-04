@@ -221,9 +221,9 @@ type Plugin struct {
 	warnedSessions map[string]bool // session ID -> already warned about size
 
 	// Initial load state (td-6cc19f)
-	initialLoadDone    bool        // true after sessions settle (no new arrivals for settleDelay)
-	skeleton           ui.Skeleton // shimmer loading animation
-	loadSettleToken    int         // token for debounced settle check
+	initialLoadDone bool        // true after sessions settle (no new arrivals for settleDelay)
+	skeleton        ui.Skeleton // shimmer loading animation
+	loadSettleToken int         // token for debounced settle check
 
 	// Resume modal state (td-aa4136)
 	showResumeModal       bool
@@ -640,6 +640,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			}
 		}
 
+		p.updateTieredHotTargets()
 		return p, tea.Batch(cmds...)
 
 	case SessionsLoadedMsg:
@@ -695,6 +696,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		}
 
 		// Ensure a selection so the right pane can render.
+		var cmds []tea.Cmd
 		if p.selectedSession == "" && len(p.sessions) > 0 {
 			if p.cursor >= len(p.sessions) {
 				p.cursor = len(p.sessions) - 1
@@ -703,23 +705,19 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 				p.cursor = 0
 			}
 			p.setSelectedSession(p.sessions[p.cursor].ID)
-			previewCmd := p.schedulePreviewLoad(p.selectedSession)
-			cmds := []tea.Cmd{previewCmd}
-			if warningCmd != nil {
-				cmds = append(cmds, warningCmd)
-			}
-			if settleCmd != nil {
-				cmds = append(cmds, settleCmd)
-			}
-			return p, tea.Batch(cmds...)
+			cmds = append(cmds, p.schedulePreviewLoad(p.selectedSession))
+		}
+		if warningCmd != nil {
+			cmds = append(cmds, warningCmd)
 		}
 		if settleCmd != nil {
-			if warningCmd != nil {
-				return p, tea.Batch(warningCmd, settleCmd)
-			}
-			return p, settleCmd
+			cmds = append(cmds, settleCmd)
 		}
-		return p, warningCmd
+		p.updateTieredHotTargets()
+		if len(cmds) > 0 {
+			return p, tea.Batch(cmds...)
+		}
+		return p, nil
 
 	case LoadSettledMsg:
 		// Only settle if token matches (no new sessions arrived) (td-6cc19f)
@@ -999,9 +997,9 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			}
 			p.contentSearchState.Results = msg.Results
 			p.contentSearchState.IsSearching = false
-			p.contentSearchState.Skeleton.Stop() // Stop skeleton animation (td-e740e4)
-			p.contentSearchState.Cursor = 0       // Reset cursor to first result
-			p.contentSearchState.ScrollOffset = 0 // Reset scroll
+			p.contentSearchState.Skeleton.Stop()               // Stop skeleton animation (td-e740e4)
+			p.contentSearchState.Cursor = 0                    // Reset cursor to first result
+			p.contentSearchState.ScrollOffset = 0              // Reset scroll
 			p.contentSearchState.TotalFound = msg.TotalMatches // (td-8e1a2b)
 			p.contentSearchState.Truncated = msg.Truncated     // (td-8e1a2b)
 			if msg.Error != nil {
@@ -1278,7 +1276,6 @@ type MessageReloadMsg struct {
 
 // GetEpoch implements plugin.EpochMessage.
 func (m MessageReloadMsg) GetEpoch() uint64 { return m.Epoch }
-
 
 // checkLargeSessionWarnings returns toast warnings for any large sessions not yet warned.
 // Marks sessions as warned to avoid duplicate notifications.
