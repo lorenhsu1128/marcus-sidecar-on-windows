@@ -451,12 +451,12 @@ func renderModelBadge(model string) string {
 	return badgeStyle.Render(short)
 }
 
-// renderTokenFlow returns a compact token flow indicator (in→out).
+// renderTokenFlow returns a compact token flow indicator (in:X out:Y).
 func renderTokenFlow(in, out int) string {
 	if in == 0 && out == 0 {
 		return ""
 	}
-	return styles.Muted.Render(fmt.Sprintf("%s→%s", formatK(in), formatK(out)))
+	return styles.Muted.Render(fmt.Sprintf("in:%s out:%s", formatK(in), formatK(out)))
 }
 
 // formatSessionDuration formats session duration for display.
@@ -687,7 +687,7 @@ func (p *Plugin) renderMessageBubble(msg adapter.Message, msgIndex int, maxWidth
 			}
 			// Add plain token flow
 			if msg.InputTokens > 0 || msg.OutputTokens > 0 {
-				headerLine += " " + fmt.Sprintf("%s→%s", formatK(msg.InputTokens), formatK(msg.OutputTokens))
+				headerLine += " " + fmt.Sprintf("in:%s out:%s", formatK(msg.InputTokens), formatK(msg.OutputTokens))
 			}
 		}
 	} else {

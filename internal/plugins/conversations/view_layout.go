@@ -733,7 +733,7 @@ func (p *Plugin) renderMainPane(paneWidth, height int) string {
 		statsParts = append(statsParts, fmt.Sprintf("%d msgs", s.MessageCount))
 
 		// Token flow
-		statsParts = append(statsParts, fmt.Sprintf("%s→%s", formatK(s.TotalTokensIn), formatK(s.TotalTokensOut)))
+		statsParts = append(statsParts, fmt.Sprintf("in:%s out:%s", formatK(s.TotalTokensIn), formatK(s.TotalTokensOut)))
 
 		// Cost estimate
 		if session != nil && session.EstCost > 0 {
@@ -866,10 +866,19 @@ func (p *Plugin) renderDetailPaneContent(contentWidth, height int) string {
 	turn := p.detailTurn
 	msgCount := len(turn.Messages)
 
+	// Get friendly role name
+	session := p.findSelectedSession()
+	roleName := turn.Role
+	if turn.Role == "user" {
+		roleName = "you"
+	} else {
+		roleName = adapterShortName(session)
+	}
+
 	// Header: Turn Role (with message count if > 1)
-	roleLabel := turn.Role
+	roleLabel := roleName
 	if msgCount > 1 {
-		roleLabel = fmt.Sprintf("%s (%d messages)", turn.Role, msgCount)
+		roleLabel = fmt.Sprintf("%s (%d messages)", roleName, msgCount)
 	}
 	header := fmt.Sprintf("%s Turn", strings.Title(roleLabel))
 	if len(header) > contentWidth-10 {
@@ -883,7 +892,7 @@ func (p *Plugin) renderDetailPaneContent(contentWidth, height int) string {
 	// Stats line
 	var stats []string
 	if turn.TotalTokensIn > 0 || turn.TotalTokensOut > 0 {
-		stats = append(stats, fmt.Sprintf("%s→%s tokens", formatK(turn.TotalTokensIn), formatK(turn.TotalTokensOut)))
+		stats = append(stats, fmt.Sprintf("in:%s out:%s", formatK(turn.TotalTokensIn), formatK(turn.TotalTokensOut)))
 	}
 	if turn.ThinkingTokens > 0 {
 		stats = append(stats, fmt.Sprintf("%s thinking", formatK(turn.ThinkingTokens)))
@@ -1033,17 +1042,26 @@ func (p *Plugin) renderCompactTurn(turn Turn, turnIndex int, maxWidth int) []str
 		stats = append(stats, fmt.Sprintf("%d msgs", msgCount))
 	}
 	if turn.TotalTokensIn > 0 || turn.TotalTokensOut > 0 {
-		stats = append(stats, fmt.Sprintf("%s→%s", formatK(turn.TotalTokensIn), formatK(turn.TotalTokensOut)))
+		stats = append(stats, fmt.Sprintf("in:%s out:%s", formatK(turn.TotalTokensIn), formatK(turn.TotalTokensOut)))
 	}
 	statsStr := ""
 	if len(stats) > 0 {
 		statsStr = " (" + strings.Join(stats, ", ") + ")"
 	}
 
+	// Get friendly role name
+	session := p.findSelectedSession()
+	roleName := turn.Role
+	if turn.Role == "user" {
+		roleName = "you"
+	} else {
+		roleName = adapterShortName(session)
+	}
+
 	// Build header line
 	if selected {
 		// For selected: plain text with background highlight
-		headerContent := fmt.Sprintf("[%s] %s%s", ts, turn.Role, statsStr)
+		headerContent := fmt.Sprintf("[%s] %s%s", ts, roleName, statsStr)
 		lines = append(lines, p.styleTurnLine(headerContent, true, maxWidth))
 	} else {
 		// For unselected: colored role badge with muted styling
@@ -1055,7 +1073,7 @@ func (p *Plugin) renderCompactTurn(turn Turn, turnIndex int, maxWidth int) []str
 		}
 		styledHeader := fmt.Sprintf("[%s] %s%s",
 			styles.Muted.Render(ts),
-			roleStyle.Render(turn.Role),
+			roleStyle.Render(roleName),
 			styles.Muted.Render(statsStr))
 		lines = append(lines, styledHeader)
 	}
@@ -1112,6 +1130,15 @@ func (p *Plugin) renderCompactMessage(msg adapter.Message, msgIndex int, maxWidt
 		roleStyle = styles.StatusStaged
 	}
 
+	// Get friendly role name
+	session := p.findSelectedSession()
+	roleName := msg.Role
+	if msg.Role == "user" {
+		roleName = "you"
+	} else {
+		roleName = adapterShortName(session)
+	}
+
 	// Cursor indicator
 	var styledCursor string
 	if msgIndex == p.msgCursor {
@@ -1127,18 +1154,17 @@ func (p *Plugin) renderCompactMessage(msg adapter.Message, msgIndex int, maxWidt
 	}
 
 	// Calculate if we need to truncate role (rune-safe for Unicode)
-	role := msg.Role
-	roleRunes := []rune(role)
+	roleRunes := []rune(roleName)
 	// Account for: cursor(2) + [](2) + ts(5) + space(1) + role + tokens
 	usedWidth := 2 + 2 + len(ts) + 1 + len(roleRunes) + len(tokens)
 	if usedWidth > maxWidth && len(roleRunes) > 4 {
-		role = string(roleRunes[:4])
+		roleName = string(roleRunes[:4])
 	}
 
 	// Build styled header
 	styledHeader := styledCursor + fmt.Sprintf("[%s] %s%s",
 		styles.Muted.Render(ts),
-		roleStyle.Render(role),
+		roleStyle.Render(roleName),
 		styles.Muted.Render(tokens))
 	lines = append(lines, styledHeader)
 
