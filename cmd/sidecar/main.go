@@ -119,6 +119,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Resolve project root (main worktree for linked worktrees, same as workDir otherwise)
+	projectRootPath := app.GetMainWorktreePath(workDir)
+	if projectRootPath == "" {
+		projectRootPath = workDir
+	}
+
 	// Apply theme from config (after workDir is known for per-project themes)
 	resolved := theme.ResolveTheme(cfg, workDir)
 	theme.ApplyResolved(resolved)
@@ -132,17 +138,18 @@ func main() {
 
 	// Create plugin context with keymap for dynamic binding registration
 	pluginCtx := &plugin.Context{
-		WorkDir:   workDir,
-		ConfigDir: config.ConfigPath(),
-		Config:    cfg,
-		Adapters:  make(map[string]adapter.Adapter),
-		EventBus:  dispatcher,
-		Logger:    logger,
-		Keymap:    km,
+		WorkDir:     workDir,
+		ProjectRoot: projectRootPath,
+		ConfigDir:   config.ConfigPath(),
+		Config:      cfg,
+		Adapters:    make(map[string]adapter.Adapter),
+		EventBus:    dispatcher,
+		Logger:      logger,
+		Keymap:      km,
 	}
 
 	// Detect adapters
-	adapters, err := adapter.DetectAdapters(workDir)
+	adapters, err := adapter.DetectAdapters(projectRootPath)
 	if err != nil {
 		logger.Warn("adapter detection failed", "err", err)
 	}
@@ -171,8 +178,8 @@ func main() {
 
 	// Create and run application
 	currentVersion := effectiveVersion(Version)
-	initialPluginID := state.GetActivePlugin(workDir)
-	model := app.New(registry, km, cfg, currentVersion, workDir, initialPluginID)
+	initialPluginID := state.GetActivePlugin(projectRootPath)
+	model := app.New(registry, km, cfg, currentVersion, workDir, projectRootPath, initialPluginID)
 
 	// Guard against non-interactive terminal (e.g. piped stdout)
 	if !term.IsTerminal(int(os.Stdout.Fd())) {

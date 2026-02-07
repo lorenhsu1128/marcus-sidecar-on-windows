@@ -439,7 +439,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 
 	p.adapters = make(map[string]adapter.Adapter)
 	for id, a := range ctx.Adapters {
-		found, err := a.Detect(ctx.WorkDir)
+		found, err := a.Detect(ctx.ProjectRoot)
 		if err != nil || !found {
 			continue
 		}

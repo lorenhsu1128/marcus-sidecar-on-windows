@@ -9,6 +9,7 @@ type UIState struct {
 	ToastMessage string
 	ToastExpiry  time.Time
 	WorkDir      string
+	ProjectRoot  string // Main repo root for shared state (same as WorkDir for non-worktrees)
 }
 
 // NewUIState creates a new UI state.

@@ -16,8 +16,9 @@ type BindingRegistrar interface {
 
 // Context provides shared resources to plugins during initialization.
 type Context struct {
-	WorkDir   string
-	ConfigDir string
+	WorkDir     string // Actual working directory (worktree path for linked worktrees)
+	ProjectRoot string // Main repo root for shared state (same as WorkDir for non-worktrees)
+	ConfigDir   string
 	Config    *config.Config
 	Adapters  map[string]adapter.Adapter
 	EventBus  *event.Dispatcher

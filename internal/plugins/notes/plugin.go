@@ -218,7 +218,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.activePane = PaneList
 	p.viewFilter = FilterActive
 	// Load persisted list width
-	notesState := state.GetNotesState(ctx.WorkDir)
+	notesState := state.GetNotesState(ctx.ProjectRoot)
 	if notesState.ListWidth > 0 {
 		p.listWidth = notesState.ListWidth
 	} else {
@@ -265,7 +265,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 
 	// Initialize store - session ID resolved by store from TD_SESSION_ID env var
 	// or falls back to "sidecar" if not set
-	dbPath := DefaultDBPath(ctx.WorkDir)
+	dbPath := DefaultDBPath(ctx.ProjectRoot)
 	store, err := NewStore(dbPath, "")
 	if err != nil {
 		// Store initialization may fail if .todos directory doesn't exist

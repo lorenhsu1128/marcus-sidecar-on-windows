@@ -525,7 +525,7 @@ func (p *Plugin) saveSelectionState() {
 		return
 	}
 
-	wtState := state.GetWorkspaceState(p.ctx.WorkDir)
+	wtState := state.GetWorkspaceState(p.ctx.ProjectRoot)
 	wtState.WorkspaceName = ""
 	wtState.ShellTmuxName = ""
 
@@ -544,7 +544,7 @@ func (p *Plugin) saveSelectionState() {
 	// td-f88fdd: Shell display names now persisted in .sidecar/shells.json manifest
 	// Only save selection state (which worktree/shell is selected)
 	if wtState.WorkspaceName != "" || wtState.ShellTmuxName != "" {
-		_ = state.SetWorkspaceState(p.ctx.WorkDir, wtState)
+		_ = state.SetWorkspaceState(p.ctx.ProjectRoot, wtState)
 	}
 }
 
@@ -555,7 +555,7 @@ func (p *Plugin) restoreSelectionState() bool {
 		return false
 	}
 
-	wtState := state.GetWorkspaceState(p.ctx.WorkDir)
+	wtState := state.GetWorkspaceState(p.ctx.ProjectRoot)
 
 	// No saved state
 	if wtState.WorkspaceName == "" && wtState.ShellTmuxName == "" {

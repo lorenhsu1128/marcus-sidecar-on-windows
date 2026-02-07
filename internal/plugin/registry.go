@@ -136,9 +136,9 @@ func (r *Registry) Unavailable() map[string]string {
 	return result
 }
 
-// Reinit stops all plugins, updates the context with a new WorkDir, and reinitializes all plugins.
-// Returns the start commands for all plugins.
-func (r *Registry) Reinit(newWorkDir string) []tea.Cmd {
+// Reinit stops all plugins, updates the context with a new WorkDir and ProjectRoot,
+// and reinitializes all plugins. Returns the start commands for all plugins.
+func (r *Registry) Reinit(newWorkDir, newProjectRoot string) []tea.Cmd {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -147,8 +147,9 @@ func (r *Registry) Reinit(newWorkDir string) []tea.Cmd {
 		r.safeStop(r.plugins[i])
 	}
 
-	// Update context with new working directory
+	// Update context with new working directory and project root
 	r.ctx.WorkDir = newWorkDir
+	r.ctx.ProjectRoot = newProjectRoot
 
 	// Increment epoch to invalidate all pending async messages from previous project
 	r.ctx.Epoch++

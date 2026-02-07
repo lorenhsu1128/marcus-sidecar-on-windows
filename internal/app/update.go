@@ -514,7 +514,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "quit":
 			// Save active plugin before quitting
 			if activePlugin := m.ActivePlugin(); activePlugin != nil {
-				state.SetActivePlugin(m.ui.WorkDir, activePlugin.ID())
+				state.SetActivePlugin(m.ui.ProjectRoot, activePlugin.ID())
 			}
 			m.registry.Stop()
 			return m, tea.Quit
@@ -1595,7 +1595,7 @@ func (m *Model) handleUpdateModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Handle 'q' specially for quit
 		if key == "q" {
 			if activePlugin := m.ActivePlugin(); activePlugin != nil {
-				state.SetActivePlugin(m.ui.WorkDir, activePlugin.ID())
+				state.SetActivePlugin(m.ui.ProjectRoot, activePlugin.ID())
 			}
 			m.registry.Stop()
 			return m, tea.Quit
@@ -1607,7 +1607,7 @@ func (m *Model) handleUpdateModalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch action {
 			case "quit":
 				if activePlugin := m.ActivePlugin(); activePlugin != nil {
-					state.SetActivePlugin(m.ui.WorkDir, activePlugin.ID())
+					state.SetActivePlugin(m.ui.ProjectRoot, activePlugin.ID())
 				}
 				m.registry.Stop()
 				return m, tea.Quit
@@ -1734,7 +1734,7 @@ func (m *Model) handleUpdateModalMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		switch action {
 		case "quit":
 			if activePlugin := m.ActivePlugin(); activePlugin != nil {
-				state.SetActivePlugin(m.ui.WorkDir, activePlugin.ID())
+				state.SetActivePlugin(m.ui.ProjectRoot, activePlugin.ID())
 			}
 			m.registry.Stop()
 			return m, tea.Quit
@@ -1776,7 +1776,7 @@ func (m *Model) handleQuitConfirmMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case "quit":
 		// Save active plugin before quitting
 		if activePlugin := m.ActivePlugin(); activePlugin != nil {
-			state.SetActivePlugin(m.ui.WorkDir, activePlugin.ID())
+			state.SetActivePlugin(m.ui.ProjectRoot, activePlugin.ID())
 		}
 		m.registry.Stop()
 		return m, tea.Quit

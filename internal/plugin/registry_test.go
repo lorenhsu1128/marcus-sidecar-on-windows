@@ -191,11 +191,15 @@ func TestRegistry_Reinit(t *testing.T) {
 
 	// Now reinitialize with a new path
 	newPath := "/new/project/path"
-	cmds := r.Reinit(newPath)
+	newProjectRoot := "/new/project/root"
+	cmds := r.Reinit(newPath, newProjectRoot)
 
 	// Check that context was updated
 	if r.ctx.WorkDir != newPath {
 		t.Errorf("context WorkDir = %q, want %q", r.ctx.WorkDir, newPath)
+	}
+	if r.ctx.ProjectRoot != newProjectRoot {
+		t.Errorf("context ProjectRoot = %q, want %q", r.ctx.ProjectRoot, newProjectRoot)
 	}
 
 	// Check that plugins were stopped and reinitialized

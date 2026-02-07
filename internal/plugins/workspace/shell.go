@@ -417,7 +417,7 @@ func (p *Plugin) restoreShellDisplayNames() {
 		return
 	}
 
-	wtState := state.GetWorkspaceState(p.ctx.WorkDir)
+	wtState := state.GetWorkspaceState(p.ctx.ProjectRoot)
 	if len(wtState.ShellDisplayNames) == 0 {
 		return
 	}
@@ -441,7 +441,7 @@ func (p *Plugin) restoreShellDisplayNames() {
 	// Clear from state.json after migration to avoid re-migration
 	if migrated {
 		wtState.ShellDisplayNames = nil
-		_ = state.SetWorkspaceState(p.ctx.WorkDir, wtState)
+		_ = state.SetWorkspaceState(p.ctx.ProjectRoot, wtState)
 	}
 }
 // nextShellIndex returns the next available shell index based on existing sessions.

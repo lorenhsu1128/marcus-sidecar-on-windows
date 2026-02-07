@@ -255,10 +255,11 @@ type Model struct {
 
 // New creates a new application model.
 // initialPluginID optionally specifies which plugin to focus on startup (empty = first plugin).
-func New(reg *plugin.Registry, km *keymap.Registry, cfg *config.Config, currentVersion, workDir, initialPluginID string) Model {
+func New(reg *plugin.Registry, km *keymap.Registry, cfg *config.Config, currentVersion, workDir, projectRoot, initialPluginID string) Model {
 	repoName := GetRepoName(workDir)
 	ui := NewUIState()
 	ui.WorkDir = workDir
+	ui.ProjectRoot = projectRoot
 
 	// Determine initial active plugin index
 	activeIdx := 0
@@ -657,10 +658,11 @@ func (m *Model) switchProject(projectPath string) tea.Cmd {
 		}
 	}
 
-	// Save the active plugin state for the old workdir
+	// Save the active plugin state for the old project root
 	oldWorkDir := m.ui.WorkDir
+	oldProjectRoot := m.ui.ProjectRoot
 	if activePlugin := m.ActivePlugin(); activePlugin != nil {
-		state.SetActivePlugin(oldWorkDir, activePlugin.ID())
+		state.SetActivePlugin(oldProjectRoot, activePlugin.ID())
 	}
 
 	// Normalize old workdir for comparisons
@@ -700,13 +702,20 @@ func (m *Model) switchProject(projectPath string) tea.Cmd {
 	m.ui.WorkDir = targetPath
 	m.intro.RepoName = GetRepoName(targetPath)
 
+	// Resolve project root (main worktree for linked worktrees, same as targetPath otherwise)
+	newProjectRoot := GetMainWorktreePath(targetPath)
+	if newProjectRoot == "" {
+		newProjectRoot = targetPath
+	}
+	m.ui.ProjectRoot = newProjectRoot
+
 	// Apply project-specific theme (or global fallback)
 	resolved := theme.ResolveTheme(m.cfg, targetPath)
 	theme.ApplyResolved(resolved)
 
-	// Reinitialize all plugins with the new working directory
+	// Reinitialize all plugins with the new working directory and project root
 	// This stops all plugins, updates the context, and starts them again
-	startCmds := m.registry.Reinit(targetPath)
+	startCmds := m.registry.Reinit(targetPath, newProjectRoot)
 
 	// Send WindowSizeMsg to all plugins so they recalculate layout/bounds.
 	// Without this, plugins like td-monitor lose mouse interactivity because
@@ -722,8 +731,8 @@ func (m *Model) switchProject(projectPath string) tea.Cmd {
 		}
 	}
 
-	// Restore active plugin for the new workdir if saved, otherwise keep current
-	newActivePluginID := state.GetActivePlugin(targetPath)
+	// Restore active plugin for the new project root if saved, otherwise keep current
+	newActivePluginID := state.GetActivePlugin(newProjectRoot)
 	if newActivePluginID != "" {
 		m.FocusPluginByID(newActivePluginID)
 	}
