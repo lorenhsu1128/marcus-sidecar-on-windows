@@ -240,8 +240,10 @@ type FetchPRListMsg struct {
 
 // FetchPRDoneMsg signals that a PR branch was fetched and worktree created.
 type FetchPRDoneMsg struct {
-	Worktree *Worktree
-	Err      error
+	Worktree     *Worktree
+	AlreadyLocal bool   // branch already existed locally
+	Branch       string // for finding existing worktree when Worktree is nil
+	Err          error
 }
 
 // PRListItem represents an open pull request for the fetch modal.

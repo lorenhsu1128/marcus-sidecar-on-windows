@@ -139,6 +139,7 @@ type Plugin struct {
 	// Inline editor state (for reading back content after editor exits)
 	pendingInlineEditID   string // Note ID being edited
 	pendingInlineEditPath string // Temp file path
+	pendingEditorSyncID   string // One-shot sync after out-of-band editor saves
 
 	// Inline tty editor state (for true inline editing)
 	inlineEditor      *tty.Model
@@ -239,6 +240,9 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.previewCursorLine = 0
 	p.previewScrollOff = 0
 	p.previewWrapEnabled = state.GetLineWrapEnabled()
+	p.pendingInlineEditID = ""
+	p.pendingInlineEditPath = ""
+	p.pendingEditorSyncID = ""
 
 	// Initialize textarea
 	ta := textarea.New()
@@ -390,6 +394,11 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 						p.cursor = i
 						// Update editorNote reference to get latest content
 						p.editorNote = &p.notes[i]
+						// Out-of-band editor writes bypass textarea state, so force one sync.
+						if p.pendingEditorSyncID == n.ID {
+							p.syncEditorFromNote(p.editorNote)
+							p.pendingEditorSyncID = ""
+						}
 						break
 					}
 				}
@@ -962,6 +971,26 @@ func (p *Plugin) syncPreviewFromTextarea() {
 	}
 }
 
+// syncEditorFromNote refreshes editor/preview buffers from the note content.
+func (p *Plugin) syncEditorFromNote(note *Note) {
+	if note == nil {
+		return
+	}
+	p.editorTextarea.SetValue(note.Content)
+	p.previewLines = strings.Split(note.Content, "\n")
+	if len(p.previewLines) == 0 {
+		p.previewLines = []string{""}
+	}
+	if p.previewCursorLine < 0 {
+		p.previewCursorLine = 0
+	}
+	if p.previewCursorLine >= len(p.previewLines) {
+		p.previewCursorLine = len(p.previewLines) - 1
+	}
+	p.ensurePreviewCursorVisible()
+	p.editorDirty = false
+}
+
 // loadNoteIntoEditor loads the currently selected note into the editor pane.
 // Cursor is positioned at the end of the content.
 func (p *Plugin) loadNoteIntoEditor() {
@@ -1112,6 +1141,9 @@ func (p *Plugin) readBackInlineEdit() tea.Cmd {
 	if noteID == "" || notePath == "" || p.store == nil {
 		return p.loadNotes()
 	}
+
+	// External editor writes bypass textarea state; sync buffers on the next reload.
+	p.pendingEditorSyncID = noteID
 
 	return func() tea.Msg {
 		// Read back the edited content from temp file

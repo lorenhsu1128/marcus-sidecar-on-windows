@@ -73,9 +73,39 @@ func (p *Plugin) fetchAndCreateWorktree(pr PRListItem) tea.Cmd {
 		addCmd.Dir = workDir
 		if output, err := addCmd.CombinedOutput(); err != nil {
 			outStr := strings.TrimSpace(string(output))
-			// Check if branch already exists locally
 			if strings.Contains(outStr, "already exists") {
-				return FetchPRDoneMsg{Err: fmt.Errorf("branch %q already exists locally", branch)}
+				// Branch exists locally. Try creating worktree without -b.
+				addCmd2 := exec.Command("git", "worktree", "add", wtPath, branch)
+				addCmd2.Dir = workDir
+				if output2, err2 := addCmd2.CombinedOutput(); err2 != nil {
+					outStr2 := strings.TrimSpace(string(output2))
+					// Worktree already checked out — find and focus it
+					if strings.Contains(outStr2, "already") {
+						existingPath := findWorktreePathForBranch(workDir, branch)
+						if existingPath != "" {
+							_ = savePRURL(existingPath, pr.URL)
+							_ = saveBaseBranch(existingPath, detectDefaultBranch(workDir))
+						}
+						return FetchPRDoneMsg{AlreadyLocal: true, Branch: branch}
+					}
+					return FetchPRDoneMsg{Err: fmt.Errorf("git worktree add: %s", outStr2)}
+				}
+				// Worktree created from existing local branch
+				_ = savePRURL(wtPath, pr.URL)
+				baseBranch := detectDefaultBranch(workDir)
+				_ = saveBaseBranch(wtPath, baseBranch)
+
+				wt := &Worktree{
+					Name:       dirName,
+					Path:       wtPath,
+					Branch:     branch,
+					BaseBranch: baseBranch,
+					PRURL:      pr.URL,
+					Status:     StatusPaused,
+					CreatedAt:  time.Now(),
+					UpdatedAt:  time.Now(),
+				}
+				return FetchPRDoneMsg{Worktree: wt, AlreadyLocal: true}
 			}
 			return FetchPRDoneMsg{Err: fmt.Errorf("git worktree add: %s", outStr)}
 		}
@@ -102,6 +132,27 @@ func (p *Plugin) fetchAndCreateWorktree(pr PRListItem) tea.Cmd {
 
 		return FetchPRDoneMsg{Worktree: wt}
 	}
+}
+
+// findWorktreePathForBranch returns the worktree path for a branch, or "" if not found.
+func findWorktreePathForBranch(workDir, branch string) string {
+	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+	cmd.Dir = workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	var currentPath string
+	for line := range strings.SplitSeq(string(output), "\n") {
+		if p, ok := strings.CutPrefix(line, "worktree "); ok {
+			currentPath = p
+		} else if b, ok := strings.CutPrefix(line, "branch refs/heads/"); ok {
+			if b == branch {
+				return currentPath
+			}
+		}
+	}
+	return ""
 }
 
 // filteredFetchPRItems returns PR items matching the current filter.

@@ -264,6 +264,30 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		p.fetchPRLoading = false
 		if msg.Err != nil {
 			p.fetchPRError = msg.Err.Error()
+		} else if msg.AlreadyLocal && msg.Worktree == nil {
+			// Worktree already exists — find and focus it
+			found := false
+			for i, wt := range p.worktrees {
+				if wt.Branch == msg.Branch {
+					p.viewMode = ViewModeList
+					p.shellSelected = false
+					p.selectedIdx = i
+					p.previewOffset = 0
+					p.autoScrollOutput = true
+					p.resetScrollBaseLineCount()
+					p.saveSelectionState()
+					p.ensureVisible()
+					p.clearFetchPRState()
+					p.toastMessage = "Already local — switched to workspace"
+					p.toastTime = time.Now()
+					cmds = append(cmds, p.loadSelectedContent())
+					found = true
+					break
+				}
+			}
+			if !found {
+				p.fetchPRError = "Branch exists locally but worktree not found"
+			}
 		} else {
 			p.viewMode = ViewModeList
 			p.worktrees = append(p.worktrees, msg.Worktree)
@@ -276,6 +300,10 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			p.saveSelectionState()
 			p.ensureVisible()
 			p.clearFetchPRState()
+			if msg.AlreadyLocal {
+				p.toastMessage = "Already local — added to workspaces"
+				p.toastTime = time.Now()
+			}
 			cmds = append(cmds, p.loadSelectedContent())
 		}
 

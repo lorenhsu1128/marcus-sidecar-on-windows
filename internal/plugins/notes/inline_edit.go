@@ -178,6 +178,9 @@ func (p *Plugin) handleInlineEditExited(exitMsg InlineEditExitedMsg) tea.Cmd {
 		return p.loadNotes()
 	}
 
+	// Inline editor writes bypass textarea state; sync buffers on the next reload.
+	p.pendingEditorSyncID = noteID
+
 	epoch := p.ctx.Epoch
 
 	return func() tea.Msg {
@@ -709,6 +712,9 @@ func (p *Plugin) saveNoteAfterInlineExit(noteID, notePath string) tea.Cmd {
 		return p.loadNotes()
 	}
 
+	// Inline editor writes bypass textarea state; sync buffers on the next reload.
+	p.pendingEditorSyncID = noteID
+
 	epoch := p.ctx.Epoch
 
 	return func() tea.Msg {
@@ -743,6 +749,9 @@ func (p *Plugin) saveAndExitInlineEditMode() tea.Cmd {
 	if noteID == "" || notePath == "" || p.store == nil {
 		return nil
 	}
+
+	// Inline editor writes bypass textarea state; sync buffers on the next reload.
+	p.pendingEditorSyncID = noteID
 
 	return func() tea.Msg {
 		// Read content from temp file
