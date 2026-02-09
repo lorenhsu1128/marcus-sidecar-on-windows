@@ -301,6 +301,8 @@ func renderSessionHeader(sr SessionSearchResult, selected bool, maxWidth int) st
 			adapterBadge = "C"
 		case "gemini-cli":
 			adapterBadge = "G"
+		case "amp":
+			adapterBadge = "\u26a1"
 		default:
 			if len(sr.Session.AdapterID) > 0 {
 				adapterBadge = string([]rune(sr.Session.AdapterID)[0])

@@ -153,6 +153,9 @@ func renderAdapterIcon(session adapter.Session) string {
 	case "cursor-cli":
 		// Cursor purple
 		return lipgloss.NewStyle().Foreground(styles.Primary).Render(icon)
+	case "amp":
+		// Sourcegraph orange
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5543")).Render(icon)
 	default:
 		return styles.Muted.Render(icon)
 	}
@@ -168,6 +171,8 @@ func adapterAbbrev(session adapter.Session) string {
 		return "OC"
 	case "gemini-cli":
 		return "GC"
+	case "amp":
+		return "AM"
 	default:
 		name := session.AdapterName
 		if name == "" {
@@ -202,6 +207,8 @@ func adapterShortName(session *adapter.Session) string {
 		return "gemini"
 	case "warp":
 		return "warp"
+	case "amp":
+		return "amp"
 	default:
 		if session.AdapterName != "" {
 			return strings.ToLower(session.AdapterName)
@@ -306,6 +313,8 @@ func resumeCommand(session *adapter.Session) string {
 		return fmt.Sprintf("gemini --resume %s", session.ID)
 	case "cursor-cli":
 		return fmt.Sprintf("cursor-agent --resume %s", session.ID)
+	case "amp":
+		return fmt.Sprintf("amp --resume %s", session.ID)
 	default:
 		return ""
 	}

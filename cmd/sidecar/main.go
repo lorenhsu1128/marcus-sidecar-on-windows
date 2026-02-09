@@ -14,6 +14,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/marcus/sidecar/internal/adapter"
+	_ "github.com/marcus/sidecar/internal/adapter/amp"
 	_ "github.com/marcus/sidecar/internal/adapter/claudecode"
 	_ "github.com/marcus/sidecar/internal/adapter/codex"
 	_ "github.com/marcus/sidecar/internal/adapter/cursor"
