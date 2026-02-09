@@ -2,6 +2,16 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.69.0] - 2026-02-08
+
+### Features
+
+- **Homebrew Formula**: Install via `brew install marcus/tap/sidecar` — builds from source for native Apple Silicon performance
+
+### Improvements
+
+- Better PR fetching in git plugin
+
 ## [v0.68.0] - 2026-02-07
 
 ### Features

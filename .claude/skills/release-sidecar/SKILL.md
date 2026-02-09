@@ -1,5 +1,5 @@
 ---
-name: release
+name: release-sidecar
 description: Release new versions of sidecar. Covers version tagging with semver, td dependency updates, go.mod validation, CHANGELOG updates, GoReleaser automation, Homebrew tap updates, and verification steps. Use when preparing or executing a release.
 disable-model-invocation: true
 ---
