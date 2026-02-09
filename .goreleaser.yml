@@ -35,17 +35,5 @@ changelog:
       - "^ci:"
       - "^chore:"
 
-brews:
-  - name: sidecar
-    homepage: https://github.com/marcus/sidecar
-    description: A TUI dashboard for AI coding agents
-    license: MIT
-    directory: Formula
-    repository:
-      owner: marcus
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    install: |
-      bin.install "sidecar"
-    test: |
-      system "#{bin}/sidecar", "--version"
+# Note: Homebrew formula is manually maintained in marcus/homebrew-tap
+# to build from source (avoids Gatekeeper warnings on macOS)
