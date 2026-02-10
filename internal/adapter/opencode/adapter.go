@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -41,12 +42,60 @@ type sessionMetaCacheEntry struct {
 // New creates a new OpenCode adapter.
 func New() *Adapter {
 	home, _ := os.UserHomeDir()
+	storageDir := findOpenCodeStorageDir(home)
 	return &Adapter{
-		storageDir:   filepath.Join(home, ".local", "share", "opencode", "storage"),
+		storageDir:   storageDir,
 		projectIndex: make(map[string]*Project),
 		sessionIndex: make(map[string]string),
 		metaCache:    make(map[string]sessionMetaCacheEntry),
 	}
+}
+
+// findOpenCodeStorageDir searches candidate paths for the OpenCode storage directory.
+// Returns the first path that exists, or the primary default if none found.
+func findOpenCodeStorageDir(home string) string {
+	candidates := openCodeStorageCandidates(home)
+	for _, path := range candidates {
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return path
+		}
+	}
+	if len(candidates) > 0 {
+		return candidates[0]
+	}
+	return filepath.Join(home, ".local", "share", "opencode", "storage")
+}
+
+// openCodeStorageCandidates returns platform-ordered candidate paths for OpenCode storage.
+// Upstream bug #8235: currently uses ~/.local/share on all platforms. PR #8236 will fix
+// to use platform-native paths. We check both to handle pre- and post-fix versions.
+func openCodeStorageCandidates(home string) []string {
+	var candidates []string
+
+	switch runtime.GOOS {
+	case "darwin":
+		// Platform-native (post-PR #8236)
+		candidates = append(candidates, filepath.Join(home, "Library", "Application Support", "opencode", "storage"))
+	case "linux":
+		xdgData := os.Getenv("XDG_DATA_HOME")
+		if xdgData == "" {
+			xdgData = filepath.Join(home, ".local", "share")
+		}
+		candidates = append(candidates, filepath.Join(xdgData, "opencode", "storage"))
+	case "windows":
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			candidates = append(candidates, filepath.Join(localAppData, "opencode", "Data", "storage"))
+		}
+	}
+
+	// Current default (pre-fix): ~/.local/share/opencode/storage on all platforms
+	defaultPath := filepath.Join(home, ".local", "share", "opencode", "storage")
+	// Only add if not already in candidates (avoid duplicate on Linux with default XDG)
+	if len(candidates) == 0 || candidates[len(candidates)-1] != defaultPath {
+		candidates = append(candidates, defaultPath)
+	}
+
+	return candidates
 }
 
 // ID returns the adapter identifier.
