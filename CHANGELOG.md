@@ -2,6 +2,15 @@
 
 All notable changes to sidecar are documented here.
 
+## [v0.71.1] - 2026-02-10
+
+### Bug Fixes
+
+- Prevent refreshSessions from overwriting concurrent session list updates
+- Improve update error modal UX with actionable info
+- Detect brew upgrade false-positive "already installed" response
+- Add `brew update` before `brew upgrade` in self-update flow
+
 ## [v0.71.0] - 2026-02-09
 
 ### Features
