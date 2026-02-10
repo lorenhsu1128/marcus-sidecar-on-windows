@@ -2,6 +2,7 @@ package conversations
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -96,12 +97,7 @@ func (f *SearchFilters) ToggleCategory(cat string) {
 
 // HasCategory returns true if the category is in the filter list.
 func (f *SearchFilters) HasCategory(cat string) bool {
-	for _, c := range f.Categories {
-		if c == cat {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(f.Categories, cat)
 }
 
 // SetDateRange sets the date range preset.
