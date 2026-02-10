@@ -196,6 +196,19 @@ func (p *Plugin) toggleCategoryFilter() tea.Cmd {
 		p.hitRegionsDirty = true
 		return appmsg.ShowToast("Showing all sessions", 2*time.Second)
 	}
+
+	// Check if any sessions have a category set — if none do, the toggle is a no-op
+	hasCategorized := false
+	for _, s := range p.sessions {
+		if s.SessionCategory != "" {
+			hasCategorized = true
+			break
+		}
+	}
+	if !hasCategorized {
+		return appmsg.ShowToast("No categorized sessions", 2*time.Second)
+	}
+
 	// Currently showing all -> apply default filter
 	defaults := p.defaultCategoryFilter
 	if len(defaults) == 0 {
