@@ -115,17 +115,17 @@ func TestComputeSessionSummary_CacheRead(t *testing.T) {
 }
 
 func TestEstimateTotalCost_Opus(t *testing.T) {
-	// Opus: $15/M in, $75/M out
-	cost := estimateTotalCost("claude-opus-4-5-20251101", 1_000_000, 1_000_000, 0)
-	// Expected: 15 + 75 = 90
-	if cost < 89 || cost > 91 {
-		t.Errorf("expected cost ~90, got %f", cost)
+	// Opus 4.5: $5/M in, $25/M out
+	cost := estimateTotalCost("claude-opus-4-5-20251101", 1_000_000, 1_000_000, 0, 0)
+	// Expected: 5 + 25 = 30
+	if cost < 29 || cost > 31 {
+		t.Errorf("expected cost ~30, got %f", cost)
 	}
 }
 
 func TestEstimateTotalCost_Sonnet(t *testing.T) {
 	// Sonnet: $3/M in, $15/M out
-	cost := estimateTotalCost("claude-sonnet-4-5-20250929", 1_000_000, 1_000_000, 0)
+	cost := estimateTotalCost("claude-sonnet-4-5-20250929", 1_000_000, 1_000_000, 0, 0)
 	// Expected: 3 + 15 = 18
 	if cost < 17 || cost > 19 {
 		t.Errorf("expected cost ~18, got %f", cost)
@@ -133,28 +133,28 @@ func TestEstimateTotalCost_Sonnet(t *testing.T) {
 }
 
 func TestEstimateTotalCost_Haiku(t *testing.T) {
-	// Haiku: $0.25/M in, $1.25/M out
-	cost := estimateTotalCost("claude-3-5-haiku-latest", 1_000_000, 1_000_000, 0)
-	// Expected: 0.25 + 1.25 = 1.5
-	if cost < 1.4 || cost > 1.6 {
-		t.Errorf("expected cost ~1.5, got %f", cost)
+	// Haiku 3.5: $0.80/M in, $4/M out
+	cost := estimateTotalCost("claude-3-5-haiku-latest", 1_000_000, 1_000_000, 0, 0)
+	// Expected: 0.80 + 4.0 = 4.80
+	if cost < 4.7 || cost > 4.9 {
+		t.Errorf("expected cost ~4.80, got %f", cost)
 	}
 }
 
 func TestEstimateTotalCost_WithCache(t *testing.T) {
-	// Opus with 80% cache hit
-	// 1M input, 800k from cache (10% rate), 200k regular
-	cost := estimateTotalCost("claude-opus-4-5-20251101", 1_000_000, 0, 800_000)
-	// Cache: 800k * 15 * 0.1 / 1M = 1.2
-	// Regular: 200k * 15 / 1M = 3
-	// Total: 4.2
-	if cost < 4 || cost > 4.5 {
-		t.Errorf("expected cost ~4.2, got %f", cost)
+	// Opus 4.5 ($5/M in) with cache read and write
+	// InputTokens is already non-cache, so 1M input + 800k cache read
+	cost := estimateTotalCost("claude-opus-4-5-20251101", 1_000_000, 0, 800_000, 0)
+	// Input: 1M * 5 / 1M = 5.0
+	// Cache read: 800k * 5 * 0.1 / 1M = 0.4
+	// Total: 5.4
+	if cost < 5.3 || cost > 5.5 {
+		t.Errorf("expected cost ~5.4, got %f", cost)
 	}
 }
 
 func TestEstimateTotalCost_ZeroTokens(t *testing.T) {
-	cost := estimateTotalCost("claude-opus-4-5-20251101", 0, 0, 0)
+	cost := estimateTotalCost("claude-opus-4-5-20251101", 0, 0, 0, 0)
 	if cost != 0 {
 		t.Errorf("expected cost 0, got %f", cost)
 	}

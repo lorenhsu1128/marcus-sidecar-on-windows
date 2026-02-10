@@ -15,6 +15,7 @@ import (
 
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/adapter/cache"
+	"github.com/marcus/sidecar/internal/adapter/pricing"
 )
 
 // xmlTagRegex matches XML/HTML-like tags for stripping from session titles
@@ -877,6 +878,7 @@ func (a *Adapter) processMetadataLine(line []byte, meta *SessionMetadata, modelC
 			mt.in += usage.InputTokens
 			mt.out += usage.OutputTokens
 			mt.cache += usage.CacheReadInputTokens
+			mt.cacheWrite += usage.CacheCreationInputTokens
 			modelTokens[model] = mt
 		}
 	}
@@ -896,30 +898,18 @@ func (a *Adapter) finalizeMetadataCost(meta *SessionMetadata, modelCounts map[st
 	}
 
 	for model, mt := range modelTokens {
-		var inRate, outRate float64
-		switch {
-		case strings.Contains(model, "opus"):
-			inRate, outRate = 15.0, 75.0
-		case strings.Contains(model, "sonnet"):
-			inRate, outRate = 3.0, 15.0
-		case strings.Contains(model, "haiku"):
-			inRate, outRate = 0.25, 1.25
-		default:
-			inRate, outRate = 3.0, 15.0
-		}
-		regularIn := mt.in - mt.cache
-		if regularIn < 0 {
-			regularIn = 0
-		}
-		meta.EstCost += float64(mt.cache)*inRate*0.1/1_000_000 +
-			float64(regularIn)*inRate/1_000_000 +
-			float64(mt.out)*outRate/1_000_000
+		meta.EstCost += pricing.ModelCost(model, pricing.Usage{
+			InputTokens:  mt.in,
+			OutputTokens: mt.out,
+			CacheRead:    mt.cache,
+			CacheWrite:   mt.cacheWrite,
+		})
 	}
 }
 
 // modelTokenEntry tracks per-model token accumulation for incremental cost calculation.
 type modelTokenEntry struct {
-	in, out, cache int
+	in, out, cache, cacheWrite int
 }
 
 type sessionMetaCacheEntry struct {

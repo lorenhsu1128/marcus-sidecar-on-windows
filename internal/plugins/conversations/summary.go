@@ -6,20 +6,22 @@ import (
 	"time"
 
 	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/adapter/pricing"
 )
 
 // SessionSummary holds aggregated statistics for a session.
 type SessionSummary struct {
-	FilesTouched   []string       // Unique files from tool uses
-	FileCount      int            // Number of unique files
-	TotalTokensIn  int            // Sum of input tokens
-	TotalTokensOut int            // Sum of output tokens
-	TotalCacheRead int            // Sum of cache read tokens
-	TotalCost      float64        // Estimated cost in dollars
-	Duration       time.Duration  // Session duration
-	PrimaryModel   string         // Most used model
-	MessageCount   int            // Total messages
-	ToolCounts     map[string]int // Tool name -> count
+	FilesTouched    []string       // Unique files from tool uses
+	FileCount       int            // Number of unique files
+	TotalTokensIn   int            // Sum of input tokens
+	TotalTokensOut  int            // Sum of output tokens
+	TotalCacheRead  int            // Sum of cache read tokens
+	TotalCacheWrite int            // Sum of cache write tokens
+	TotalCost       float64        // Estimated cost in dollars
+	Duration        time.Duration  // Session duration
+	PrimaryModel    string         // Most used model
+	MessageCount    int            // Total messages
+	ToolCounts      map[string]int // Tool name -> count
 }
 
 // ComputeSessionSummary aggregates statistics from messages.
@@ -37,6 +39,7 @@ func ComputeSessionSummary(messages []adapter.Message, duration time.Duration) S
 		summary.TotalTokensIn += msg.InputTokens
 		summary.TotalTokensOut += msg.OutputTokens
 		summary.TotalCacheRead += msg.CacheRead
+		summary.TotalCacheWrite += msg.CacheWrite
 
 		if msg.Model != "" {
 			modelCounts[msg.Model]++
@@ -72,6 +75,7 @@ func ComputeSessionSummary(messages []adapter.Message, duration time.Duration) S
 		summary.TotalTokensIn,
 		summary.TotalTokensOut,
 		summary.TotalCacheRead,
+		summary.TotalCacheWrite,
 	)
 
 	return summary
@@ -101,6 +105,7 @@ func UpdateSessionSummary(summary *SessionSummary, newMessages []adapter.Message
 		summary.TotalTokensIn += msg.InputTokens
 		summary.TotalTokensOut += msg.OutputTokens
 		summary.TotalCacheRead += msg.CacheRead
+		summary.TotalCacheWrite += msg.CacheWrite
 
 		if msg.Model != "" {
 			modelCounts[msg.Model]++
@@ -134,34 +139,22 @@ func UpdateSessionSummary(summary *SessionSummary, newMessages []adapter.Message
 		summary.TotalTokensIn,
 		summary.TotalTokensOut,
 		summary.TotalCacheRead,
+		summary.TotalCacheWrite,
 	)
 }
 
 // estimateTotalCost calculates cost based on model and tokens.
-func estimateTotalCost(model string, inputTokens, outputTokens, cacheRead int) float64 {
-	var inRate, outRate float64
-	switch {
-	case strings.HasPrefix(model, "gpt-") || strings.HasPrefix(model, "o") || strings.Contains(model, "codex"):
+func estimateTotalCost(model string, inputTokens, outputTokens, cacheRead, cacheWrite int) float64 {
+	// Non-Anthropic models: no cost estimate
+	if strings.HasPrefix(model, "gpt-") || strings.HasPrefix(model, "o") || strings.Contains(model, "codex") {
 		return 0
-	case strings.Contains(model, "opus"):
-		inRate, outRate = 15.0, 75.0
-	case strings.Contains(model, "sonnet"):
-		inRate, outRate = 3.0, 15.0
-	case strings.Contains(model, "haiku"):
-		inRate, outRate = 0.25, 1.25
-	default:
-		inRate, outRate = 3.0, 15.0
 	}
-
-	regularIn := inputTokens - cacheRead
-	if regularIn < 0 {
-		regularIn = 0
-	}
-	cacheInCost := float64(cacheRead) * inRate * 0.1 / 1_000_000
-	regularInCost := float64(regularIn) * inRate / 1_000_000
-	outCost := float64(outputTokens) * outRate / 1_000_000
-
-	return cacheInCost + regularInCost + outCost
+	return pricing.ModelCost(model, pricing.Usage{
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		CacheRead:    cacheRead,
+		CacheWrite:   cacheWrite,
+	})
 }
 
 // SessionGroup represents a group of sessions by time period.

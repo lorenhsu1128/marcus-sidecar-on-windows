@@ -5,8 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
+
+	"github.com/marcus/sidecar/internal/adapter/pricing"
 )
 
 // StatsCache represents the aggregated usage stats from stats-cache.json.
@@ -144,25 +145,10 @@ func (s *StatsCache) TotalCost() float64 {
 
 // CalculateModelCost calculates cost for a specific model's usage.
 func CalculateModelCost(model string, usage ModelUsage) float64 {
-	var inRate, outRate float64
-
-	// Determine rates based on model
-	switch {
-	case strings.Contains(model, "opus"):
-		inRate, outRate = 15.0, 75.0
-	case strings.Contains(model, "sonnet"):
-		inRate, outRate = 3.0, 15.0
-	case strings.Contains(model, "haiku"):
-		inRate, outRate = 0.25, 1.25
-	default:
-		inRate, outRate = 3.0, 15.0
-	}
-
-	// Cache reads get 90% discount
-	regularIn := usage.InputTokens
-	cacheInCost := float64(usage.CacheReadInputTokens) * inRate * 0.1 / 1_000_000
-	regularInCost := float64(regularIn) * inRate / 1_000_000
-	outCost := float64(usage.OutputTokens) * outRate / 1_000_000
-
-	return cacheInCost + regularInCost + outCost
+	return pricing.ModelCost(model, pricing.Usage{
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		CacheRead:    usage.CacheReadInputTokens,
+		CacheWrite:   usage.CacheCreationInputTokens,
+	})
 }
