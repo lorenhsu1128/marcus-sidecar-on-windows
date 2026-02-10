@@ -160,14 +160,9 @@ func main() {
 		Keymap:      km,
 	}
 
-	// Detect adapters
-	adapters, err := adapter.DetectAdapters(projectRootPath)
-	if err != nil {
-		logger.Warn("adapter detection failed", "err", err)
-	}
-	if len(adapters) > 0 {
-		pluginCtx.Adapters = adapters
-	}
+	// Create all adapter instances upfront so they survive project switches.
+	// Per-project filtering happens in each plugin's Init() via Detect().
+	pluginCtx.Adapters = adapter.AllAdapters()
 
 	// Create plugin registry
 	registry := plugin.NewRegistry(pluginCtx)

@@ -21,3 +21,15 @@ func DetectAdapters(projectRoot string) (map[string]Adapter, error) {
 	}
 	return adapters, nil
 }
+
+// AllAdapters creates all registered adapter instances without filtering by Detect.
+// Use this at startup so that all adapters are available across project switches;
+// consumers (e.g. conversations plugin) call Detect() per-adapter to filter by project.
+func AllAdapters() map[string]Adapter {
+	adapters := make(map[string]Adapter, len(adapterFactories))
+	for _, factory := range adapterFactories {
+		instance := factory()
+		adapters[instance.ID()] = instance
+	}
+	return adapters
+}
