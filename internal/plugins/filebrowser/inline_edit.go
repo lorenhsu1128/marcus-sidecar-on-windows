@@ -3,9 +3,7 @@ package filebrowser
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/marcus/sidecar/internal/features"
 	"github.com/marcus/sidecar/internal/msg"
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/terminal"
 	"github.com/marcus/sidecar/internal/tty"
 	xterm "golang.org/x/term"
 )
@@ -24,6 +23,7 @@ import (
 // InlineEditStartedMsg is sent when inline edit mode starts successfully.
 type InlineEditStartedMsg struct {
 	SessionName   string
+	Session       terminal.Session
 	FilePath      string
 	OriginalMtime time.Time // File mtime before editing (to detect changes)
 	Editor        string    // Editor command used (vim, nano, emacs, etc.)
@@ -57,16 +57,9 @@ func (p *Plugin) enterInlineEditMode(path string, lineNo int) tea.Cmd {
 	// Generate a unique session name
 	sessionName := fmt.Sprintf("sidecar-edit-%d", time.Now().UnixNano())
 
-	// Get TERM for color support (inherit from parent or default to xterm-256color)
-	term := os.Getenv("TERM")
-	if term == "" {
-		term = "xterm-256color"
-	}
-
 	return func() tea.Msg {
-		// Check if tmux is available
-		if _, err := exec.LookPath("tmux"); err != nil {
-			// Fall back to external editor
+		// Check if terminal backend is available
+		if !p.ctx.Terminal.IsAvailable() {
 			return nil
 		}
 
@@ -76,17 +69,25 @@ func (p *Plugin) enterInlineEditMode(path string, lineNo int) tea.Cmd {
 			origMtime = info.ModTime()
 		}
 
-		// Create a detached tmux session with the editor
-		// Use -x and -y to set initial size (will be resized later)
-		// Pass TERM environment for proper color/theme support
-		// Include +lineNo for editors that support it (vim, nano, emacs, helix, etc.)
-		editorArgs := []string{editor}
+		// Build editor command with arguments
+		editorArgs := []string{}
 		if lineNo > 0 {
 			// Convert 0-indexed to 1-indexed for editor
 			editorArgs = append(editorArgs, fmt.Sprintf("+%d", lineNo+1))
 		}
 		editorArgs = append(editorArgs, fullPath)
 
+		// Create terminal session with the editor
+		session, err := p.ctx.Terminal.CreateSession(sessionName, "", editor, editorArgs)
+		if err != nil {
+			return msg.ToastMsg{
+				Message:  fmt.Sprintf("Failed to start editor: %v", err),
+				Duration: 3 * time.Second,
+				IsError:  true,
+			}
+		}
+
+		// Resize to match desired dimensions
 		editorW, editorH := p.width, p.height
 		if editorW <= 0 || editorH <= 0 {
 			if w, h, err := xterm.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 && h > 0 {
@@ -95,21 +96,11 @@ func (p *Plugin) enterInlineEditMode(path string, lineNo int) tea.Cmd {
 				editorW, editorH = 80, 24
 			}
 		}
-		tmuxArgs := []string{"new-session", "-d", "-s", sessionName,
-			"-x", strconv.Itoa(editorW), "-y", strconv.Itoa(editorH), "-e", "TERM=" + term}
-		tmuxArgs = append(tmuxArgs, editorArgs...)
-
-		cmd := exec.Command("tmux", tmuxArgs...)
-		if err := cmd.Run(); err != nil {
-			return msg.ToastMsg{
-				Message:  fmt.Sprintf("Failed to start editor: %v", err),
-				Duration: 3 * time.Second,
-				IsError:  true,
-			}
-		}
+		_ = session.Resize(editorW, editorH)
 
 		return InlineEditStartedMsg{
 			SessionName:   sessionName,
+			Session:       session,
 			FilePath:      path,
 			OriginalMtime: origMtime,
 			Editor:        editor,
@@ -121,6 +112,7 @@ func (p *Plugin) enterInlineEditMode(path string, lineNo int) tea.Cmd {
 func (p *Plugin) handleInlineEditStarted(msg InlineEditStartedMsg) tea.Cmd {
 	p.inlineEditMode = true
 	p.inlineEditSession = msg.SessionName
+	p.inlineEditTermSession = msg.Session
 	p.inlineEditFile = msg.FilePath
 	p.inlineEditOrigMtime = msg.OriginalMtime
 	p.inlineEditEditor = msg.Editor
@@ -141,7 +133,7 @@ func (p *Plugin) handleInlineEditStarted(msg InlineEditStartedMsg) tea.Cmd {
 	height := p.calculateInlineEditorHeight()
 	p.inlineEditor.SetDimensions(width, height)
 
-	enterCmd := p.inlineEditor.Enter(msg.SessionName, "")
+	enterCmd := p.inlineEditor.Enter(msg.Session)
 
 	// Show copy/paste hint toast on first entry
 	if !p.inlineEditCopyPasteHintShown {
@@ -221,17 +213,17 @@ func (p *Plugin) reattachInlineEditSession() tea.Cmd {
 	height := p.calculateInlineEditorHeight()
 	p.inlineEditor.SetDimensions(width, height)
 
-	return p.inlineEditor.Enter(p.inlineEditSession, "")
+	return p.inlineEditor.Enter(p.inlineEditTermSession)
 }
 
-// exitInlineEditMode cleans up inline edit state and kills the tmux session.
+// exitInlineEditMode cleans up inline edit state and kills the terminal session.
 func (p *Plugin) exitInlineEditMode() {
-	if p.inlineEditSession != "" {
-		// Kill the tmux session
-		_ = exec.Command("tmux", "kill-session", "-t", p.inlineEditSession).Run()
+	if p.inlineEditTermSession != nil {
+		_ = p.inlineEditTermSession.Kill()
 	}
 	p.inlineEditMode = false
 	p.inlineEditSession = ""
+	p.inlineEditTermSession = nil
 	p.inlineEditFile = ""
 	p.inlineEditOrigMtime = time.Time{}
 	p.inlineEditEditor = ""
@@ -239,15 +231,13 @@ func (p *Plugin) exitInlineEditMode() {
 	p.inlineEditor.Exit()
 }
 
-// isInlineEditSessionAlive checks if the tmux session for inline editing still exists.
-// Returns false if the session has ended (vim quit).
+// isInlineEditSessionAlive checks if the terminal session for inline editing still exists.
+// Returns false if the session has ended (editor quit).
 func (p *Plugin) isInlineEditSessionAlive() bool {
-	if p.inlineEditSession == "" {
+	if p.inlineEditTermSession == nil {
 		return false
 	}
-	// Check if the tmux session exists using has-session
-	err := exec.Command("tmux", "has-session", "-t", p.inlineEditSession).Run()
-	return err == nil
+	return p.inlineEditTermSession.IsAlive()
 }
 
 // attachToInlineEditSession attaches to the inline edit tmux session in full-screen mode.
@@ -308,8 +298,8 @@ func (p *Plugin) isInlineEditSupported(path string) bool {
 		return false
 	}
 
-	// Check if tmux is available
-	if _, err := exec.LookPath("tmux"); err != nil {
+	// Check if terminal backend is available
+	if p.ctx == nil || p.ctx.Terminal == nil || !p.ctx.Terminal.IsAvailable() {
 		return false
 	}
 
@@ -429,12 +419,15 @@ func normalizeEditorName(editor string) string {
 
 // sendEditorSaveAndQuit sends the appropriate save-and-quit key sequence for the editor.
 // Returns true if a known editor sequence was sent, false for unknown editors.
-func sendEditorSaveAndQuit(target, editor string) bool {
+func sendEditorSaveAndQuit(session terminal.Session, editor string) bool {
 	normalized := normalizeEditorName(editor)
 
 	send := func(keys ...string) {
+		if session == nil {
+			return
+		}
 		for _, k := range keys {
-			_ = exec.Command("tmux", "send-keys", "-t", target, k).Run()
+			_ = session.SendKey(k)
 		}
 	}
 
@@ -496,12 +489,11 @@ func (p *Plugin) handleExitConfirmationChoice() (*Plugin, tea.Cmd) {
 
 	switch p.exitConfirmSelection {
 	case 0: // Save & Exit
-		target := p.inlineEditSession
 		editor := p.inlineEditEditor
 
 		// Try to send editor-specific save-and-quit commands
 		// If unknown editor, we still proceed but skip the save attempt
-		sendEditorSaveAndQuit(target, editor)
+		sendEditorSaveAndQuit(p.inlineEditTermSession, editor)
 
 		// Give editor a moment to process, then kill session
 		// (Session may already be dead from quit command, kill-session will fail silently)
@@ -640,15 +632,15 @@ func (p *Plugin) forwardMousePressToInlineEditor(col, row int) tea.Cmd {
 	if p.inlineEditor == nil || !p.inlineEditor.IsActive() {
 		return nil
 	}
-	if p.inlineEditSession == "" {
+	if p.inlineEditTermSession == nil {
 		return nil
 	}
 
-	sessionName := p.inlineEditSession
+	session := p.inlineEditTermSession
 	return func() tea.Msg {
 		// Send SGR mouse press (button 0 = left button)
-		if err := tty.SendSGRMouse(sessionName, 0, col, row, false); err != nil {
-			if tty.IsSessionDeadError(err) {
+		if err := session.SendSGRMouse(0, col, row, false); err != nil {
+			if !session.IsAlive() {
 				return tty.SessionDeadMsg{}
 			}
 		}
@@ -662,15 +654,15 @@ func (p *Plugin) forwardMouseDragToInlineEditor(col, row int) tea.Cmd {
 	if p.inlineEditor == nil || !p.inlineEditor.IsActive() {
 		return nil
 	}
-	if p.inlineEditSession == "" {
+	if p.inlineEditTermSession == nil {
 		return nil
 	}
 
-	sessionName := p.inlineEditSession
+	session := p.inlineEditTermSession
 	return func() tea.Msg {
 		// Send SGR mouse motion with button held (button 32 = motion + left button)
-		if err := tty.SendSGRMouse(sessionName, 32, col, row, false); err != nil {
-			if tty.IsSessionDeadError(err) {
+		if err := session.SendSGRMouse(32, col, row, false); err != nil {
+			if !session.IsAlive() {
 				return tty.SessionDeadMsg{}
 			}
 		}
@@ -684,37 +676,20 @@ func (p *Plugin) forwardMouseReleaseToInlineEditor(col, row int) tea.Cmd {
 	if p.inlineEditor == nil || !p.inlineEditor.IsActive() {
 		return nil
 	}
-	if p.inlineEditSession == "" {
+	if p.inlineEditTermSession == nil {
 		return nil
 	}
 
-	sessionName := p.inlineEditSession
+	session := p.inlineEditTermSession
 	return func() tea.Msg {
 		// Send SGR mouse release (button 0 = left button, release=true)
-		if err := tty.SendSGRMouse(sessionName, 0, col, row, true); err != nil {
-			if tty.IsSessionDeadError(err) {
+		if err := session.SendSGRMouse(0, col, row, true); err != nil {
+			if !session.IsAlive() {
 				return tty.SessionDeadMsg{}
 			}
 		}
 		return nil
 	}
-}
-
-// isSessionAlive checks if a tmux session exists.
-func isSessionAlive(sessionName string) bool {
-	if sessionName == "" {
-		return false
-	}
-	err := exec.Command("tmux", "has-session", "-t", sessionName).Run()
-	return err == nil
-}
-
-// killSession kills a tmux session by name.
-func killSession(sessionName string) {
-	if sessionName == "" {
-		return
-	}
-	_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
 }
 
 // selectTreeItem selects the given tree item and loads its preview.

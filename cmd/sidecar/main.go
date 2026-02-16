@@ -37,6 +37,7 @@ import (
 	"github.com/marcus/sidecar/internal/plugins/workspace"
 	"github.com/marcus/sidecar/internal/state"
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/terminal"
 	"github.com/marcus/sidecar/internal/theme"
 	"golang.org/x/term"
 )
@@ -158,6 +159,7 @@ func main() {
 		EventBus:    dispatcher,
 		Logger:      logger,
 		Keymap:      km,
+		Terminal:    terminal.NewManager(),
 	}
 
 	// Create all adapter instances upfront so they survive project switches.

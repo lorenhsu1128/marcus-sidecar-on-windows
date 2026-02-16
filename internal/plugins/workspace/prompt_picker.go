@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/marcus/sidecar/internal/config"
 	"github.com/marcus/sidecar/internal/styles"
 )
 
@@ -194,7 +195,7 @@ func (pp *PromptPicker) View() string {
 		sb.WriteString("No prompts configured.\n\n")
 		sb.WriteString(dimText("Add prompts to one of these config files:"))
 		sb.WriteString("\n")
-		sb.WriteString(dimText("  Global:  ~/.config/sidecar/config.json"))
+		sb.WriteString(dimText("  Global:  " + config.ConfigPath()))
 		sb.WriteString("\n")
 		sb.WriteString(dimText("  Project: .sidecar/config.json"))
 		sb.WriteString("\n\n")

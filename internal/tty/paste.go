@@ -6,6 +6,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/marcus/sidecar/internal/terminal"
 )
 
 // IsPasteInput detects if the input is a paste operation.
@@ -94,6 +95,46 @@ func SendPasteInputCmd(sessionName, text string, bracketed bool) tea.Cmd {
 			err = SendPasteToTmux(sessionName, text)
 		}
 		if err != nil && IsSessionDeadError(err) {
+			return SessionDeadMsg{}
+		}
+		return nil
+	}
+}
+
+// pasteClipboardViaSession returns a tea.Cmd that pastes clipboard content via a terminal session.
+func pasteClipboardViaSession(session terminal.Session, bracketed bool) tea.Cmd {
+	return func() tea.Msg {
+		text, err := clipboard.ReadAll()
+		if err != nil {
+			return PasteResultMsg{Err: err}
+		}
+		if text == "" {
+			return PasteResultMsg{Empty: true}
+		}
+
+		if bracketed {
+			err = session.SendBracketedPaste(text)
+		} else {
+			err = session.SendPaste(text)
+		}
+		if err != nil {
+			return PasteResultMsg{Err: err, SessionDead: !session.IsAlive()}
+		}
+
+		return PasteResultMsg{}
+	}
+}
+
+// sendPasteViaSession sends paste text via a terminal session asynchronously.
+func sendPasteViaSession(session terminal.Session, text string, bracketed bool) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		if bracketed {
+			err = session.SendBracketedPaste(text)
+		} else {
+			err = session.SendPaste(text)
+		}
+		if err != nil && !session.IsAlive() {
 			return SessionDeadMsg{}
 		}
 		return nil

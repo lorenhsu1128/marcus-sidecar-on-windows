@@ -72,11 +72,16 @@ var (
 
 // Init loads state from the default location.
 func Init() error {
-	home, err := os.UserHomeDir()
+	dir, err := os.UserConfigDir()
 	if err != nil {
-		return err
+		// Fallback to ~/.config
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		dir = filepath.Join(home, ".config")
 	}
-	return InitWithDir(filepath.Join(home, ".config", "sidecar"))
+	return InitWithDir(filepath.Join(dir, "sidecar"))
 }
 
 // InitWithDir loads state from a specified directory.

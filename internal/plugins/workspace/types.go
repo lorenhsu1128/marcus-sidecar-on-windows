@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/marcus/sidecar/internal/terminal"
 )
 
 // mouseEscapeRegex matches SGR mouse escape sequences like \x1b[<35;192;47M or \x1b[<0;50;20m
@@ -228,9 +230,10 @@ type Worktree struct {
 
 // ShellSession represents a tmux shell session (not tied to a git worktree).
 type ShellSession struct {
-	Name        string    // Display name (e.g., "Shell 1")
-	TmuxName    string    // tmux session name (e.g., "sidecar-sh-project-1")
-	Agent       *Agent    // Reuses Agent struct for tmux state
+	Name        string           // Display name (e.g., "Shell 1")
+	TmuxName    string           // tmux session name (e.g., "sidecar-sh-project-1")
+	TermSession terminal.Session // Cross-platform terminal session handle
+	Agent       *Agent           // Reuses Agent struct for tmux state
 	CreatedAt   time.Time
 	ChosenAgent AgentType // td-317b64: Agent type selected at creation (AgentNone for plain shell)
 	SkipPerms   bool      // td-317b64: Whether skip permissions was enabled
@@ -239,10 +242,11 @@ type ShellSession struct {
 
 // Agent represents an AI coding agent process.
 type Agent struct {
-	Type        AgentType // claude, codex, aider, gemini
-	TmuxSession string    // tmux session name
-	TmuxPane    string    // Pane identifier (e.g., "%12" - globally unique)
-	PID         int       // Process ID (if available)
+	Type        AgentType        // claude, codex, aider, gemini
+	TmuxSession string           // tmux session name
+	TmuxPane    string           // Pane identifier (e.g., "%12" - globally unique)
+	TermSession terminal.Session // Cross-platform terminal session (set by terminal.Manager)
+	PID         int              // Process ID (if available)
 	StartedAt   time.Time
 	LastOutput  time.Time     // Last time output was detected
 	OutputBuf   *OutputBuffer // Last N lines of output
@@ -267,6 +271,10 @@ type InteractiveState struct {
 
 	// TargetSession is the tmux session name for the active pane.
 	TargetSession string
+
+	// Session is the terminal.Session for the active pane.
+	// Used for cross-platform terminal input (SendKey, SendLiteral, etc.).
+	Session terminal.Session
 
 	// LastKeyTime tracks when the last key was sent for polling decay.
 	LastKeyTime time.Time

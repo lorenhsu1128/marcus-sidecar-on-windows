@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -847,21 +849,21 @@ func TestWriteAgentLauncher(t *testing.T) {
 			agentType: AgentClaude,
 			baseCmd:   "claude",
 			prompt:    "Task: fix bug",
-			wantCmd:   "bash '" + tmpDir + "/.sidecar-start.sh'",
+			wantCmd:   "bash '" + filepath.Join(tmpDir, ".sidecar-start.sh") + "'",
 		},
 		{
 			name:      "claude with complex markdown",
 			agentType: AgentClaude,
 			baseCmd:   "claude",
 			prompt:    "Task: implement feature\n\n```go\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n```\n\nDon't break the user's code!",
-			wantCmd:   "bash '" + tmpDir + "/.sidecar-start.sh'",
+			wantCmd:   "bash '" + filepath.Join(tmpDir, ".sidecar-start.sh") + "'",
 		},
 		{
 			name:      "aider uses --message flag",
 			agentType: AgentAider,
 			baseCmd:   "aider --yes",
 			prompt:    "Task: fix bug",
-			wantCmd:   "bash '" + tmpDir + "/.sidecar-start.sh'",
+			wantCmd:   "bash '" + filepath.Join(tmpDir, ".sidecar-start.sh") + "'",
 		},
 	}
 
@@ -877,16 +879,17 @@ func TestWriteAgentLauncher(t *testing.T) {
 			}
 
 			// Verify launcher script exists and is executable
-			launcherInfo, err := os.Stat(tmpDir + "/.sidecar-start.sh")
+			launcherInfo, err := os.Stat(filepath.Join(tmpDir, ".sidecar-start.sh"))
 			if err != nil {
 				t.Fatalf("launcher script not created: %v", err)
 			}
-			if launcherInfo.Mode()&0100 == 0 {
+			// Windows does not have Unix executable permission bits
+			if runtime.GOOS != "windows" && launcherInfo.Mode()&0100 == 0 {
 				t.Error("launcher script is not executable")
 			}
 
 			// Verify the script contains the prompt embedded in a heredoc
-			scriptContent, err := os.ReadFile(tmpDir + "/.sidecar-start.sh")
+			scriptContent, err := os.ReadFile(filepath.Join(tmpDir, ".sidecar-start.sh"))
 			if err != nil {
 				t.Fatalf("failed to read launcher script: %v", err)
 			}
@@ -908,7 +911,7 @@ func TestWriteAgentLauncher(t *testing.T) {
 			}
 
 			// Cleanup for next test
-			_ = os.Remove(tmpDir + "/.sidecar-start.sh")
+			_ = os.Remove(filepath.Join(tmpDir, ".sidecar-start.sh"))
 		})
 	}
 }

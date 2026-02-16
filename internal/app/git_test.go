@@ -1,6 +1,9 @@
 package app
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestParseWorktreeList(t *testing.T) {
 	tests := []struct {
@@ -131,8 +134,9 @@ branch refs/heads/main
 			}
 
 			for i, expected := range tt.expected {
-				if result[i].Path != expected.Path {
-					t.Errorf("worktree[%d].Path = %q, want %q", i, result[i].Path, expected.Path)
+				wantPath := filepath.FromSlash(expected.Path)
+				if result[i].Path != wantPath {
+					t.Errorf("worktree[%d].Path = %q, want %q", i, result[i].Path, wantPath)
 				}
 				if result[i].Branch != expected.Branch {
 					t.Errorf("worktree[%d].Branch = %q, want %q", i, result[i].Branch, expected.Branch)

@@ -15,7 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/marcus/sidecar/internal/features"
 	"github.com/marcus/sidecar/internal/state"
-	"github.com/marcus/sidecar/internal/tty"
+	"github.com/marcus/sidecar/internal/terminal"
 )
 
 // Shell session constants
@@ -55,7 +55,7 @@ func getTmuxPrefix() string {
 	tmuxPrefixOnce.Do(func() {
 		tmuxPrefixCached = "Ctrl-b" // default fallback
 
-		if !isTmuxInstalled() {
+		if runtime.GOOS == "windows" || !isTmuxInstalled() {
 			return
 		}
 
@@ -256,7 +256,7 @@ func (p *Plugin) shellFromDefinition(def ShellDefinition, isRunning bool) *Shell
 	}
 
 	if isRunning {
-		paneID := getPaneID(def.TmuxName)
+		paneID := getTermPaneID(p.ctx.Terminal, def.TmuxName)
 		displayType := AgentShell
 		if shell.ChosenAgent != AgentNone {
 			displayType = shell.ChosenAgent
@@ -276,7 +276,7 @@ func (p *Plugin) shellFromDefinition(def ShellDefinition, isRunning bool) *Shell
 
 // shellFromTmux creates a ShellSession from a discovered tmux session.
 func (p *Plugin) shellFromTmux(tmuxName string) *ShellSession {
-	paneID := getPaneID(tmuxName)
+	paneID := getTermPaneID(p.ctx.Terminal, tmuxName)
 	displayName := p.deriveDisplayName(tmuxName)
 
 	return &ShellSession{
@@ -314,22 +314,18 @@ func (p *Plugin) discoverTmuxSessionNames() []string {
 	projectName := filepath.Base(p.ctx.WorkDir)
 	basePrefix := shellSessionPrefix + sanitizeName(projectName)
 
-	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
-	output, err := cmd.Output()
+	sessions, err := p.ctx.Terminal.ListSessions(basePrefix)
 	if err != nil {
 		return nil
 	}
 
+	// ListSessions returns all sessions with the prefix; further filter to exact pattern
 	var result []string
 	indexPattern := regexp.MustCompile(`^` + regexp.QuoteMeta(basePrefix) + `(?:-(\d+))?$`)
 
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if indexPattern.MatchString(line) {
-			result = append(result, line)
+	for _, name := range sessions {
+		if indexPattern.MatchString(name) {
+			result = append(result, name)
 		}
 	}
 
@@ -502,9 +498,9 @@ func (p *Plugin) generateShellSessionName() string {
 // createNewShell creates a new shell session. If customName is non-empty, it is
 // used as the display name instead of the auto-generated "Shell N".
 func (p *Plugin) createNewShell(customName string) tea.Cmd {
-	if !isTmuxInstalled() {
+	if !p.ctx.Terminal.IsAvailable() {
 		return func() tea.Msg {
-			return ShellCreatedMsg{Err: fmt.Errorf("tmux not installed: %s", getTmuxInstallInstructions())}
+			return ShellCreatedMsg{Err: fmt.Errorf("terminal not available: %s", p.ctx.Terminal.InstallInstructions())}
 		}
 	}
 
@@ -514,23 +510,18 @@ func (p *Plugin) createNewShell(customName string) tea.Cmd {
 		displayName = p.nextShellDisplayName()
 	}
 	workDir := p.ctx.WorkDir
+	mgr := p.ctx.Terminal
 
 	return func() tea.Msg {
 		// Check if session already exists (shouldn't happen with unique names)
-		if sessionExists(sessionName) {
-			paneID := getPaneID(sessionName)
+		if mgr.HasSession(sessionName) {
+			paneID := getTermPaneID(mgr, sessionName)
 			return ShellCreatedMsg{SessionName: sessionName, DisplayName: displayName, PaneID: paneID}
 		}
 
 		// Create new detached session in project directory
-		args := []string{
-			"new-session",
-			"-d",              // Detached
-			"-s", sessionName, // Session name
-			"-c", workDir, // Working directory
-		}
-		cmd := exec.Command("tmux", args...)
-		if err := cmd.Run(); err != nil {
+		session, err := mgr.CreateSession(sessionName, workDir, "", nil)
+		if err != nil {
 			return ShellCreatedMsg{
 				SessionName: sessionName,
 				DisplayName: displayName,
@@ -539,7 +530,8 @@ func (p *Plugin) createNewShell(customName string) tea.Cmd {
 		}
 
 		// Capture pane ID for interactive mode support
-		paneID := getPaneID(sessionName)
+		paneID := getTermPaneID(mgr, sessionName)
+		_ = session // session stored on ShellSession by caller
 
 		return ShellCreatedMsg{SessionName: sessionName, DisplayName: displayName, PaneID: paneID}
 	}
@@ -554,9 +546,9 @@ func (p *Plugin) createShellWithAgent() tea.Cmd {
 	agentType := p.typeSelectorAgentType
 	skipPerms := p.typeSelectorSkipPerms
 
-	if !isTmuxInstalled() {
+	if !p.ctx.Terminal.IsAvailable() {
 		return func() tea.Msg {
-			return ShellCreatedMsg{Err: fmt.Errorf("tmux not installed: %s", getTmuxInstallInstructions())}
+			return ShellCreatedMsg{Err: fmt.Errorf("terminal not available: %s", p.ctx.Terminal.InstallInstructions())}
 		}
 	}
 
@@ -566,11 +558,12 @@ func (p *Plugin) createShellWithAgent() tea.Cmd {
 		displayName = p.nextShellDisplayName()
 	}
 	workDir := p.ctx.WorkDir
+	mgr := p.ctx.Terminal
 
 	return func() tea.Msg {
 		// Check if session already exists (shouldn't happen with unique names)
-		if sessionExists(sessionName) {
-			paneID := getPaneID(sessionName)
+		if mgr.HasSession(sessionName) {
+			paneID := getTermPaneID(mgr, sessionName)
 			return ShellCreatedMsg{
 				SessionName: sessionName,
 				DisplayName: displayName,
@@ -581,14 +574,8 @@ func (p *Plugin) createShellWithAgent() tea.Cmd {
 		}
 
 		// Create new detached session in project directory
-		args := []string{
-			"new-session",
-			"-d",              // Detached
-			"-s", sessionName, // Session name
-			"-c", workDir, // Working directory
-		}
-		cmd := exec.Command("tmux", args...)
-		if err := cmd.Run(); err != nil {
+		session, err := mgr.CreateSession(sessionName, workDir, "", nil)
+		if err != nil {
 			return ShellCreatedMsg{
 				SessionName: sessionName,
 				DisplayName: displayName,
@@ -597,7 +584,8 @@ func (p *Plugin) createShellWithAgent() tea.Cmd {
 		}
 
 		// Capture pane ID for interactive mode support
-		paneID := getPaneID(sessionName)
+		paneID := getTermPaneID(mgr, sessionName)
+		_ = session // session stored on ShellSession by caller
 
 		return ShellCreatedMsg{
 			SessionName: sessionName,
@@ -625,14 +613,12 @@ func (p *Plugin) recreateOrphanedShell(idx int) tea.Cmd {
 	workDir := p.ctx.WorkDir
 	previewWidth, previewHeight := p.calculatePreviewDimensions()
 
+	mgr := p.ctx.Terminal
+
 	return func() tea.Msg {
 		// Create new detached session
-		args := []string{"new-session", "-d", "-s", sessionName, "-c", workDir}
-		if previewWidth > 0 && previewHeight > 0 {
-			args = append(args, "-x", strconv.Itoa(previewWidth), "-y", strconv.Itoa(previewHeight))
-		}
-		cmd := exec.Command("tmux", args...)
-		if err := cmd.Run(); err != nil {
+		session, err := mgr.CreateSession(sessionName, workDir, "", nil)
+		if err != nil {
 			return ShellCreatedMsg{
 				SessionName: sessionName,
 				DisplayName: shell.Name,
@@ -640,10 +626,13 @@ func (p *Plugin) recreateOrphanedShell(idx int) tea.Cmd {
 			}
 		}
 
-		tty.SetWindowSizeManual(sessionName)
+		// Resize to preview dimensions if available
+		if previewWidth > 0 && previewHeight > 0 {
+			_ = session.Resize(previewWidth, previewHeight)
+		}
 
 		// Capture pane ID
-		paneID := getPaneID(sessionName)
+		paneID := getTermPaneID(mgr, sessionName)
 
 		return ShellCreatedMsg{
 			SessionName: sessionName,
@@ -658,6 +647,8 @@ func (p *Plugin) recreateOrphanedShell(idx int) tea.Cmd {
 // startAgentInShell sends an agent command to an existing shell's tmux session.
 // td-21a2d8: Called after shell is created when an agent was selected.
 func (p *Plugin) startAgentInShell(tmuxName string, agentType AgentType, skipPerms bool) tea.Cmd {
+	mgr := p.ctx.Terminal
+
 	return func() tea.Msg {
 		// Get the base command for this agent type
 		baseCmd := AgentCommands[agentType]
@@ -675,9 +666,21 @@ func (p *Plugin) startAgentInShell(tmuxName string, agentType AgentType, skipPer
 			}
 		}
 
-		// Send the command to the shell's tmux session
-		cmd := exec.Command("tmux", "send-keys", "-t", tmuxName, baseCmd, "Enter")
-		if err := cmd.Run(); err != nil {
+		// Send the command to the shell's terminal session
+		session := mgr.GetSession(tmuxName)
+		if session == nil {
+			return ShellAgentErrorMsg{
+				TmuxName: tmuxName,
+				Err:      fmt.Errorf("failed to start agent: session not found"),
+			}
+		}
+		if err := session.SendLiteral(baseCmd); err != nil {
+			return ShellAgentErrorMsg{
+				TmuxName: tmuxName,
+				Err:      fmt.Errorf("failed to start agent: %w", err),
+			}
+		}
+		if err := session.SendKey("Enter"); err != nil {
 			return ShellAgentErrorMsg{
 				TmuxName: tmuxName,
 				Err:      fmt.Errorf("failed to start agent: %w", err),
@@ -723,9 +726,10 @@ func (p *Plugin) ensureShellAndAttachByIndex(idx int) tea.Cmd {
 
 	shell := p.shells[idx]
 	sessionName := shell.TmuxName
+	mgr := p.ctx.Terminal
 
 	// If session already exists, attach directly
-	if sessionExists(sessionName) {
+	if mgr.HasSession(sessionName) {
 		return p.attachToShellByIndex(idx)
 	}
 
@@ -734,25 +738,24 @@ func (p *Plugin) ensureShellAndAttachByIndex(idx int) tea.Cmd {
 	previewWidth, previewHeight := p.calculatePreviewDimensions()
 	return tea.Sequence(
 		func() tea.Msg {
-			args := []string{"new-session", "-d", "-s", sessionName, "-c", workDir}
-			if previewWidth > 0 && previewHeight > 0 {
-				args = append(args, "-x", strconv.Itoa(previewWidth), "-y", strconv.Itoa(previewHeight))
-			}
-			cmd := exec.Command("tmux", args...)
-			if err := cmd.Run(); err != nil {
+			session, err := mgr.CreateSession(sessionName, workDir, "", nil)
+			if err != nil {
 				return ShellCreatedMsg{
 					SessionName: sessionName,
 					DisplayName: shell.Name,
 					Err:         fmt.Errorf("recreate shell session: %w", err),
 				}
 			}
-			tty.SetWindowSizeManual(sessionName)
+			// Resize to preview dimensions if available
+			if previewWidth > 0 && previewHeight > 0 {
+				_ = session.Resize(previewWidth, previewHeight)
+			}
 			// Capture pane ID for interactive mode support
-			paneID := getPaneID(sessionName)
+			paneID := getTermPaneID(mgr, sessionName)
 			return ShellCreatedMsg{SessionName: sessionName, DisplayName: shell.Name, PaneID: paneID}
 		},
 		func() tea.Msg {
-			if !waitForSession(sessionName) {
+			if !waitForSession(sessionName, mgr) {
 				return ShellCreatedMsg{
 					SessionName: sessionName,
 					DisplayName: shell.Name,
@@ -764,14 +767,14 @@ func (p *Plugin) ensureShellAndAttachByIndex(idx int) tea.Cmd {
 	)
 }
 
-// waitForSession waits for a tmux session to become available using exponential backoff.
+// waitForSession waits for a terminal session to become available using exponential backoff.
 // Returns true if session exists, false if max attempts exceeded.
-func waitForSession(sessionName string) bool {
+func waitForSession(sessionName string, mgr terminal.Manager) bool {
 	const maxAttempts = 10
 	delay := 10 * time.Millisecond
 
 	for range maxAttempts {
-		if sessionExists(sessionName) {
+		if mgr.HasSession(sessionName) {
 			return true
 		}
 		time.Sleep(delay)
@@ -789,10 +792,11 @@ func (p *Plugin) killShellSessionByName(sessionName string) tea.Cmd {
 		return nil
 	}
 
+	mgr := p.ctx.Terminal
+
 	return func() tea.Msg {
 		// Kill the session
-		cmd := exec.Command("tmux", "kill-session", "-t", sessionName)
-		_ = cmd.Run() // Ignore errors (session may already be dead)
+		_ = mgr.KillSession(sessionName) // Ignore errors (session may already be dead)
 
 		// Clean up pane cache
 		globalPaneCache.remove(sessionName)
@@ -849,10 +853,13 @@ func (p *Plugin) pollShellSessionByName(tmuxName string) tea.Cmd {
 		}
 	}
 
+	// Capture terminal manager before closure for goroutine safety
+	termMgr := p.ctx.Terminal
+
 	return func() tea.Msg {
 		// Ensure pane is at preview width before capturing (avoids race with async resize)
 		if directCapture && resizeTarget != "" {
-			if w, h, ok := queryPaneSize(resizeTarget); !ok || w != previewWidth || h != previewHeight {
+			if w, h, ok := queryPaneSize(resizeTarget, termMgr); !ok || w != previewWidth || h != previewHeight {
 				p.resizeTmuxPane(resizeTarget, previewWidth, previewHeight)
 			}
 		}
@@ -879,7 +886,11 @@ func (p *Plugin) pollShellSessionByName(tmuxName string) tea.Cmd {
 		var cursorRow, cursorCol, paneHeight, paneWidth int
 		var cursorVisible, hasCursor bool
 		if interactiveCapture && cursorTarget != "" {
-			cursorRow, cursorCol, paneHeight, paneWidth, cursorVisible, hasCursor = queryCursorPositionSync(cursorTarget)
+			var cursorSess terminal.Session
+			if termMgr != nil {
+				cursorSess = termMgr.GetSession(cursorTarget)
+			}
+			cursorRow, cursorCol, paneHeight, paneWidth, cursorVisible, hasCursor = queryCursorPositionSync(cursorTarget, cursorSess)
 		}
 
 		// Trim to max bytes
@@ -955,15 +966,19 @@ func (p *Plugin) createShellWithResume(resumeCmd string) tea.Cmd {
 
 // sendResumeCommandToShell injects a command into the shell without executing it.
 func (p *Plugin) sendResumeCommandToShell(tmuxSession string, resumeCmd string) tea.Cmd {
-	if !isTmuxInstalled() {
+	mgr := p.ctx.Terminal
+	if !mgr.IsAvailable() {
 		return nil
 	}
 
 	return func() tea.Msg {
-		// Use tmux send-keys to type the command without pressing Enter
+		// Use SendLiteral to type the command without pressing Enter
 		// This lets the user review before executing
-		cmd := exec.Command("tmux", "send-keys", "-t", tmuxSession, resumeCmd)
-		if err := cmd.Run(); err != nil {
+		session := mgr.GetSession(tmuxSession)
+		if session == nil {
+			return shellResumeErrorMsg{Err: fmt.Errorf("session not found: %s", tmuxSession)}
+		}
+		if err := session.SendLiteral(resumeCmd); err != nil {
 			return shellResumeErrorMsg{Err: err}
 		}
 		return shellResumeInjectedMsg{TmuxSession: tmuxSession}
@@ -1022,14 +1037,15 @@ func (p *Plugin) createWorktreeWithResume(msg ResumeConversationMsg) tea.Cmd {
 // startAgentWithResumeCmd starts an agent in a worktree with a resume command instead of normal startup.
 func (p *Plugin) startAgentWithResumeCmd(wt *Worktree, agentType AgentType, skipPerms bool, resumeCmd string) tea.Cmd {
 	epoch := p.ctx.Epoch // Capture epoch for stale detection
+	mgr := p.ctx.Terminal
+
 	return func() tea.Msg {
 		sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
 
 		// Check if session already exists
-		checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
-		if checkCmd.Run() == nil {
+		if mgr.HasSession(sessionName) {
 			// Session exists - should not happen for new resume worktree
-			paneID := getPaneID(sessionName)
+			paneID := getTermPaneID(mgr, sessionName)
 			return AgentStartedMsg{
 				Epoch:         epoch,
 				WorkspaceName: wt.Name,
@@ -1041,45 +1057,42 @@ func (p *Plugin) startAgentWithResumeCmd(wt *Worktree, agentType AgentType, skip
 		}
 
 		// Create new detached session with working directory
-		args := []string{
-			"new-session",
-			"-d",              // Detached
-			"-s", sessionName, // Session name
-			"-c", wt.Path, // Working directory
-		}
-
-		cmd := exec.Command("tmux", args...)
-		if err := cmd.Run(); err != nil {
+		session, err := mgr.CreateSession(sessionName, wt.Path, "", nil)
+		if err != nil {
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("create session: %w", err)}
 		}
 
 		// Set history limit for scrollback capture
-		_ = exec.Command("tmux", "set-option", "-t", sessionName, "history-limit",
-			strconv.Itoa(tmuxHistoryLimit)).Run()
+		_ = mgr.SetHistoryLimit(sessionName, tmuxHistoryLimit)
 
 		// Set TD_SESSION_ID environment variable for td session tracking
 		tdEnvCmd := fmt.Sprintf("export TD_SESSION_ID=%s", shellQuote(sessionName))
-		_ = exec.Command("tmux", "send-keys", "-t", sessionName, tdEnvCmd, "Enter").Run()
+		_ = session.SendLiteral(tdEnvCmd)
+		_ = session.SendKey("Enter")
 
 		// Apply environment isolation
 		envOverrides := BuildEnvOverrides(p.ctx.WorkDir)
 		if envCmd := GenerateSingleEnvCommand(envOverrides); envCmd != "" {
-			_ = exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
+			_ = session.SendLiteral(envCmd)
+			_ = session.SendKey("Enter")
 		}
 
 		// Small delay to ensure env is set
 		time.Sleep(100 * time.Millisecond)
 
 		// Send the resume command instead of the normal agent command
-		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName, resumeCmd, "Enter")
-		if err := sendCmd.Run(); err != nil {
+		if err := session.SendLiteral(resumeCmd); err != nil {
 			// Try to kill the session if we failed to start the agent
-			_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+			_ = mgr.KillSession(sessionName)
+			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("start agent with resume: %w", err)}
+		}
+		if err := session.SendKey("Enter"); err != nil {
+			_ = mgr.KillSession(sessionName)
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("start agent with resume: %w", err)}
 		}
 
 		// Capture pane ID for interactive mode support
-		paneID := getPaneID(sessionName)
+		paneID := getTermPaneID(mgr, sessionName)
 
 		return AgentStartedMsg{
 			Epoch:         epoch,

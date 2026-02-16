@@ -185,7 +185,8 @@ func parseWorktreeList(output, mainWorkdir string) ([]*Worktree, error) {
 			name := filepath.Base(path)
 			if !isMain {
 				if relPath, err := filepath.Rel(parentDir, path); err == nil && relPath != "" {
-					name = relPath
+					// Normalize to forward slashes for consistent display across platforms
+					name = filepath.ToSlash(relPath)
 				}
 			}
 			current = &Worktree{

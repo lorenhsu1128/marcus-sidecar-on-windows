@@ -19,8 +19,9 @@ func TestMessagesAndUsage(t *testing.T) {
 		t.Fatalf("mkdir sessions: %v", err)
 	}
 
+	jsonDir := filepath.ToSlash(projectDir)
 	lines := []string{
-		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-1","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + projectDir + `"}}`,
+		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-1","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + jsonDir + `"}}`,
 		`{"timestamp":"2025-11-21T04:13:56.000Z","type":"turn_context","payload":{"model":"gpt-4.1"}}`,
 		`{"timestamp":"2025-11-21T04:14:00.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}}`,
 		`{"timestamp":"2025-11-21T04:14:01.000Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\":\"ls\"}","call_id":"call-1"}}`,

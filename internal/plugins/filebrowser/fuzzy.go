@@ -125,7 +125,7 @@ func FuzzyFilter(files []string, query string, maxResults int) []QuickOpenMatch 
 				break
 			}
 			name := f
-			if idx := strings.LastIndex(f, "/"); idx != -1 {
+			if idx := strings.LastIndexAny(f, "/\\"); idx != -1 {
 				name = f[idx+1:]
 			}
 			matches = append(matches, QuickOpenMatch{
@@ -143,7 +143,7 @@ func FuzzyFilter(files []string, query string, maxResults int) []QuickOpenMatch 
 		score, ranges := FuzzyMatch(query, f)
 		if score > 0 {
 			name := f
-			if idx := strings.LastIndex(f, "/"); idx != -1 {
+			if idx := strings.LastIndexAny(f, "/\\"); idx != -1 {
 				name = f[idx+1:]
 			}
 			matches = append(matches, QuickOpenMatch{

@@ -37,8 +37,10 @@ func TestResolveTDRoot_ValidFile(t *testing.T) {
 	}
 
 	result := ResolveTDRoot(tmpDir)
-	if result != targetRoot {
-		t.Errorf("expected %q, got %q", targetRoot, result)
+	// filepath.Clean normalizes separators per platform
+	expected := filepath.FromSlash(targetRoot)
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
 	}
 }
 
@@ -76,8 +78,10 @@ func TestResolveTDRoot_WhitespaceHandling(t *testing.T) {
 	}
 
 	result := ResolveTDRoot(tmpDir)
-	if result != targetRoot {
-		t.Errorf("expected %q, got %q", targetRoot, result)
+	// filepath.Clean normalizes separators per platform
+	expected := filepath.FromSlash(targetRoot)
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
 	}
 }
 
@@ -160,8 +164,10 @@ func TestCreateTDRoot_Overwrite(t *testing.T) {
 
 	// Verify new content
 	result := ResolveTDRoot(tmpDir)
-	if result != newTarget {
-		t.Errorf("expected %q, got %q", newTarget, result)
+	// filepath.Clean normalizes separators per platform
+	expected := filepath.FromSlash(newTarget)
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
 	}
 }
 

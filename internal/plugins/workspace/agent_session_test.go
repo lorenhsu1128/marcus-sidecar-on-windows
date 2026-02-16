@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -13,8 +14,14 @@ func setupClaudeTestDir(t *testing.T, worktreePath string) (tmpHome, projectDir 
 	t.Helper()
 	tmpHome = t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	if runtime.GOOS == "windows" {
+		// On Windows, os.UserHomeDir() checks USERPROFILE, not HOME
+		t.Setenv("USERPROFILE", tmpHome)
+	}
 
-	projectDirName := claudeProjectDirName(worktreePath)
+	// Match detectClaudeSessionStatus which calls filepath.Abs before claudeProjectDirName.
+	absWorktree, _ := filepath.Abs(worktreePath)
+	projectDirName := claudeProjectDirName(absWorktree)
 	projectDir = filepath.Join(tmpHome, ".claude", "projects", projectDirName)
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		t.Fatalf("failed to create project dir: %v", err)
@@ -432,6 +439,15 @@ func TestFindCodexSessionForPath_NoMatch(t *testing.T) {
 func TestDetectCodexSessionStatus_MtimeActive(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", tmpDir)
+	}
+
+	// Use a real path for the project so filepath.Abs is a no-op
+	projectPath := filepath.Join(tmpDir, "test", "project")
+	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create Codex session directory with date hierarchy
 	sessionsDir := filepath.Join(tmpDir, ".codex", "sessions", "2026", "02", "10")
@@ -440,11 +456,11 @@ func TestDetectCodexSessionStatus_MtimeActive(t *testing.T) {
 	}
 
 	// Fresh session file (mtime is now) → active via mtime fast path
-	content := `{"type":"session_meta","payload":{"cwd":"/test/project"}}
+	content := `{"type":"session_meta","payload":{"cwd":"` + filepath.ToSlash(projectPath) + `"}}
 {"type":"response_item","payload":{"type":"message","role":"assistant"}}`
 	writeSessionFile(t, sessionsDir, "rollout-test.jsonl", content, 0)
 
-	status, ok := detectCodexSessionStatus("/test/project")
+	status, ok := detectCodexSessionStatus(projectPath)
 	if !ok {
 		t.Fatal("expected ok=true")
 	}
@@ -456,6 +472,14 @@ func TestDetectCodexSessionStatus_MtimeActive(t *testing.T) {
 func TestDetectCodexSessionStatus_StaleAssistant(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", tmpDir)
+	}
+
+	projectPath := filepath.Join(tmpDir, "test", "project")
+	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	sessionsDir := filepath.Join(tmpDir, ".codex", "sessions", "2026", "02", "10")
 	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
@@ -463,12 +487,12 @@ func TestDetectCodexSessionStatus_StaleAssistant(t *testing.T) {
 	}
 
 	// Old session file, last message from assistant → waiting via JSONL fallback
-	content := `{"type":"session_meta","payload":{"cwd":"/test/project"}}
+	content := `{"type":"session_meta","payload":{"cwd":"` + filepath.ToSlash(projectPath) + `"}}
 {"type":"response_item","payload":{"type":"message","role":"user"}}
 {"type":"response_item","payload":{"type":"message","role":"assistant"}}`
 	writeSessionFile(t, sessionsDir, "rollout-test.jsonl", content, 2*time.Minute)
 
-	status, ok := detectCodexSessionStatus("/test/project")
+	status, ok := detectCodexSessionStatus(projectPath)
 	if !ok {
 		t.Fatal("expected ok=true")
 	}
@@ -480,6 +504,14 @@ func TestDetectCodexSessionStatus_StaleAssistant(t *testing.T) {
 func TestDetectCodexSessionStatus_StaleUser(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
+	if runtime.GOOS == "windows" {
+		t.Setenv("USERPROFILE", tmpDir)
+	}
+
+	projectPath := filepath.Join(tmpDir, "test", "project")
+	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	sessionsDir := filepath.Join(tmpDir, ".codex", "sessions", "2026", "02", "10")
 	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
@@ -487,12 +519,12 @@ func TestDetectCodexSessionStatus_StaleUser(t *testing.T) {
 	}
 
 	// Old session file, last message from user → active (agent thinking) via JSONL fallback
-	content := `{"type":"session_meta","payload":{"cwd":"/test/project"}}
+	content := `{"type":"session_meta","payload":{"cwd":"` + filepath.ToSlash(projectPath) + `"}}
 {"type":"response_item","payload":{"type":"message","role":"assistant"}}
 {"type":"response_item","payload":{"type":"message","role":"user"}}`
 	writeSessionFile(t, sessionsDir, "rollout-test.jsonl", content, 2*time.Minute)
 
-	status, ok := detectCodexSessionStatus("/test/project")
+	status, ok := detectCodexSessionStatus(projectPath)
 	if !ok {
 		t.Fatal("expected ok=true")
 	}

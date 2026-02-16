@@ -2,6 +2,8 @@ package claudecode
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/marcus/sidecar/internal/adapter"
@@ -430,9 +432,10 @@ func TestSlugExtraction_SessionsIntegration(t *testing.T) {
 	tmpDir := t.TempDir()
 	a := &Adapter{projectsDir: tmpDir, sessionIndex: make(map[string]string), metaCache: make(map[string]sessionMetaCacheEntry)}
 
-	// Create project hash dir that matches what projectDirPath would generate
-	// For path "/test/project", the hash is "-test-project"
-	projectDir := tmpDir + "/-test-project"
+	// Use projectDirPath to compute the hash directory that Sessions() will look for.
+	// On Unix "/test/project" hashes to "-test-project"; on Windows it includes the
+	// drive letter (e.g., "C--test-project") so we must not hard-code the name.
+	projectDir := a.projectDirPath("/test/project")
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		t.Fatalf("failed to create project dir: %v", err)
 	}
@@ -637,20 +640,24 @@ func TestDiscoverRelatedProjectDirs(t *testing.T) {
 	tmpDir := t.TempDir()
 	a := &Adapter{projectsDir: tmpDir}
 
-	// Create test directories
-	// Claude Code encoding: /Users/test/code/myrepo -> -Users-test-code-myrepo
+	// Use projectDirPath to derive the platform-correct encoded directory names.
+	// On Unix  /Users/test/code/myrepo encodes to -Users-test-code-myrepo.
+	// On Windows it includes the drive letter (e.g., C--Users-test-code-myrepo).
+	// We use filepath.Base of projectDirPath to get just the encoded name.
+	mainEncoded := filepath.Base(a.projectDirPath("/Users/test/code/myrepo"))
+
 	// KNOWN LIMITATION: Decoding is lossy - hyphens in original paths become slashes.
-	// E.g., worktree at /Users/test/code/myrepo-feature encodes to -Users-test-code-myrepo-feature
-	// but decodes to /Users/test/code/myrepo/feature (incorrect, but acceptable for discovery purposes)
+	// E.g., worktree at /Users/test/code/myrepo-feature encodes to ...-myrepo-feature
+	// but decodes to .../myrepo/feature (incorrect, but acceptable for discovery purposes)
 	dirs := []string{
-		"-Users-test-code-myrepo",         // main repo
-		"-Users-test-code-myrepo-feature", // worktree (decodes with slash, not hyphen)
-		"-Users-test-code-myrepo-bugfix",  // worktree (decodes with slash, not hyphen)
-		"-Users-test-other",               // unrelated project
-		"-Users-test-code-myrepo2",        // different repo (myrepo2, not myrepo)
+		mainEncoded,              // main repo
+		mainEncoded + "-feature", // worktree (decodes with slash, not hyphen)
+		mainEncoded + "-bugfix",  // worktree (decodes with slash, not hyphen)
+		filepath.Base(a.projectDirPath("/Users/test/other")),        // unrelated project
+		filepath.Base(a.projectDirPath("/Users/test/code/myrepo2")), // different repo (myrepo2, not myrepo)
 	}
 	for _, d := range dirs {
-		if err := os.MkdirAll(tmpDir+"/"+d, 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(tmpDir, d), 0755); err != nil {
 			t.Fatalf("failed to create dir: %v", err)
 		}
 	}
@@ -658,18 +665,14 @@ func TestDiscoverRelatedProjectDirs(t *testing.T) {
 	tests := []struct {
 		name     string
 		mainPath string
-		want     []string
 	}{
 		{
 			name:     "finds related paths",
 			mainPath: "/Users/test/code/myrepo",
-			// Note: decoded paths have slashes where original had hyphens (known limitation)
-			want: []string{"/Users/test/code/myrepo", "/Users/test/code/myrepo/feature", "/Users/test/code/myrepo/bugfix"},
 		},
 		{
 			name:     "empty for invalid main path",
 			mainPath: "",
-			want:     nil,
 		},
 	}
 
@@ -679,14 +682,16 @@ func TestDiscoverRelatedProjectDirs(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			// Check we got expected paths (order may vary)
 			if tt.name == "finds related paths" {
 				if len(got) != 3 {
 					t.Errorf("expected 3 paths, got %d: %v", len(got), got)
 				}
-				// Verify myrepo2 and other are not included
+				// Verify unrelated paths are not included by checking
+				// none of the returned paths decode to an unrelated project.
 				for _, p := range got {
-					if p == "/Users/test/other" || p == "/Users/test/code/myrepo2" {
+					// The decoded path replaces all dashes with slashes, so
+					// check that no returned entry ends with the unrelated suffixes.
+					if strings.HasSuffix(p, "/other") && !strings.Contains(p, "myrepo") {
 						t.Errorf("should not include unrelated path: %s", p)
 					}
 				}

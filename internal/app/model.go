@@ -852,25 +852,7 @@ func (m *Model) saveTheme(tc config.ThemeConfig, scope string) error {
 
 // copyProjectSetupPrompt copies an LLM-friendly prompt for configuring projects.
 func (m *Model) copyProjectSetupPrompt() tea.Cmd {
-	prompt := `Configure sidecar projects for me.
-
-Add my code projects to ~/.config/sidecar/config.json using this format:
-
-{
-  "projects": {
-    "list": [
-      {"name": "short-name", "path": "~/code/project-path"}
-    ]
-  }
-}
-
-Rules:
-- Use short, memorable names (1-2 words, lowercase, hyphens ok)
-- Expand ~ to full home path if needed
-- Only add directories that exist and contain code
-- Merge with existing config if present
-
-My code is located at: [TELL ME WHERE YOUR CODE DIRECTORIES ARE]`
+	prompt := fmt.Sprintf("Configure sidecar projects for me.\n\nAdd my code projects to %s using this format:\n\n{\n  \"projects\": {\n    \"list\": [\n      {\"name\": \"short-name\", \"path\": \"~/code/project-path\"}\n    ]\n  }\n}\n\nRules:\n- Use short, memorable names (1-2 words, lowercase, hyphens ok)\n- Expand ~ to full home path if needed\n- Only add directories that exist and contain code\n- Merge with existing config if present\n\nMy code is located at: [TELL ME WHERE YOUR CODE DIRECTORIES ARE]", config.ConfigPath())
 
 	if err := clipboard.WriteAll(prompt); err != nil {
 		return func() tea.Msg {

@@ -627,7 +627,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		}
 		if shell := p.getSelectedShell(); shell != nil {
 			// Check liveness before polling - if user typed exit, session is already dead (td-8e3324)
-			if sessionExists(shell.TmuxName) {
+			if p.ctx.Terminal.HasSession(shell.TmuxName) {
 				cmds = append(cmds, p.scheduleShellPollByName(shell.TmuxName, 0))
 			} else {
 				cmds = append(cmds, func() tea.Msg { return ShellSessionDeadMsg{TmuxName: shell.TmuxName} })

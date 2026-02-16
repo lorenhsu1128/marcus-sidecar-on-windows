@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -123,10 +124,12 @@ func TestLoadFrom_ProjectsList(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Use json.Marshal to properly escape Windows backslashes in paths
+	pathJSON, _ := json.Marshal(testProjectDir)
 	content := []byte(`{
 		"projects": {
 			"list": [
-				{"name": "My Project", "path": "` + testProjectDir + `"},
+				{"name": "My Project", "path": ` + string(pathJSON) + `},
 				{"name": "Tilde Project", "path": "~/code/test"}
 			]
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/marcus/sidecar/internal/msg"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/state"
+	"github.com/marcus/sidecar/internal/terminal"
 	"github.com/marcus/sidecar/internal/styles"
 	"github.com/marcus/sidecar/internal/tty"
 	"github.com/marcus/sidecar/internal/ui"
@@ -144,7 +145,8 @@ type Plugin struct {
 	// Inline tty editor state (for true inline editing)
 	inlineEditor      *tty.Model
 	inlineEditMode    bool
-	inlineEditSession string
+	inlineEditSession     string
+	inlineEditTermSession terminal.Session // Terminal session for inline editor
 	inlineEditNoteID  string
 	inlineEditPath    string
 	inlineEditEditor  string

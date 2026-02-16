@@ -99,6 +99,8 @@ build-all:
 	GOOS=darwin GOARCH=arm64 go build -o bin/sidecar-darwin-arm64 ./cmd/sidecar
 	GOOS=linux GOARCH=amd64 go build -o bin/sidecar-linux-amd64 ./cmd/sidecar
 	GOOS=linux GOARCH=arm64 go build -o bin/sidecar-linux-arm64 ./cmd/sidecar
+	GOOS=windows GOARCH=amd64 go build -o bin/sidecar-windows-amd64.exe ./cmd/sidecar
+	GOOS=windows GOARCH=arm64 go build -o bin/sidecar-windows-arm64.exe ./cmd/sidecar
 
 # Test GoReleaser locally (creates snapshot build without publishing)
 goreleaser-snapshot:

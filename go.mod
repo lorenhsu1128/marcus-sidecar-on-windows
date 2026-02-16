@@ -17,6 +17,7 @@ require (
 	github.com/marcus/td v0.37.0
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/mattn/go-sqlite3 v1.14.33
+	golang.org/x/sys v0.40.0
 	golang.org/x/term v0.39.0
 	modernc.org/sqlite v1.41.0
 )
@@ -65,9 +66,10 @@ require (
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/image v0.32.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+replace github.com/marcus/td => ../td

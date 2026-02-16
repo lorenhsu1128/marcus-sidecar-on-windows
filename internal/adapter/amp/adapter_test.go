@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,15 @@ func ts(base int64, offsetSec int) int64 {
 	return base + int64(offsetSec)*1000
 }
 
+// pathToFileURI converts a filesystem path to a file:// URI.
+func pathToFileURI(p string) string {
+	p = filepath.ToSlash(p)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // Windows: C:/path -> /C:/path for file:///C:/path
+	}
+	return "file://" + p
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -82,7 +92,7 @@ const (
 )
 
 func fixtureSimpleThread(projectDir string) Thread {
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 	return makeThread("T-test-thread-001", projectURI, []Message{
 		{
 			Role:      "user",
@@ -113,7 +123,7 @@ func fixtureSimpleThread(projectDir string) Thread {
 }
 
 func fixtureToolUseThread(projectDir string) Thread {
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 	return makeThread("T-test-thread-002", projectURI, []Message{
 		{
 			Role:      "user",
@@ -175,7 +185,7 @@ func fixtureToolUseThread(projectDir string) Thread {
 }
 
 func fixtureMultipleToolsThread(projectDir string) Thread {
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 	return makeThread("T-test-thread-003", projectURI, []Message{
 		{
 			Role:      "user",
@@ -248,7 +258,7 @@ func fixtureMultipleToolsThread(projectDir string) Thread {
 }
 
 func fixtureErrorToolThread(projectDir string) Thread {
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 	return makeThread("T-test-thread-004", projectURI, []Message{
 		{
 			Role:      "user",
@@ -551,7 +561,7 @@ func TestSessions_ExcludesNonMatching(t *testing.T) {
 func TestSessions_ExcludesEmptyThreads(t *testing.T) {
 	projectDir := t.TempDir()
 	threadsDir := t.TempDir()
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 
 	// Thread with no messages
 	empty := makeThread("T-empty-001", projectURI, nil, baseTime)
@@ -571,7 +581,7 @@ func TestSessions_ExcludesEmptyThreads(t *testing.T) {
 func TestSessions_TitleTruncation(t *testing.T) {
 	projectDir := t.TempDir()
 	threadsDir := t.TempDir()
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 
 	// Thread with very long first user message
 	longMsg := strings.Repeat("word ", 100)
@@ -1154,7 +1164,7 @@ func TestMetaCache_HitOnUnchangedFile(t *testing.T) {
 func TestProjectMatching_ExactMatch(t *testing.T) {
 	projectDir := t.TempDir()
 	threadsDir := t.TempDir()
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 
 	thread := makeThread("T-match-001", projectURI, []Message{
 		{Role: "user", MessageID: 0, Content: []ContentBlock{{Type: "text", Text: "test"}}, Meta: &MessageMeta{SentAt: baseTime}},
@@ -1180,7 +1190,7 @@ func TestProjectMatching_SubdirectoryMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	threadsDir := t.TempDir()
-	subURI := "file://" + subDir
+	subURI := pathToFileURI(subDir)
 
 	thread := makeThread("T-sub-001", subURI, []Message{
 		{Role: "user", MessageID: 0, Content: []ContentBlock{{Type: "text", Text: "test"}}, Meta: &MessageMeta{SentAt: baseTime}},
@@ -1203,7 +1213,7 @@ func TestProjectMatching_NoMatchDifferentProject(t *testing.T) {
 	projectDir := t.TempDir()
 	otherDir := t.TempDir()
 	threadsDir := t.TempDir()
-	otherURI := "file://" + otherDir
+	otherURI := pathToFileURI(otherDir)
 
 	thread := makeThread("T-other-001", otherURI, []Message{
 		{Role: "user", MessageID: 0, Content: []ContentBlock{{Type: "text", Text: "test"}}, Meta: &MessageMeta{SentAt: baseTime}},
@@ -1239,8 +1249,8 @@ func TestProjectMatching_MultipleTrees(t *testing.T) {
 		Env: &Env{
 			Initial: &EnvInitial{
 				Trees: []Tree{
-					{DisplayName: "other", URI: "file://" + otherDir},
-					{DisplayName: "project", URI: "file://" + projectDir},
+					{DisplayName: "other", URI: pathToFileURI(otherDir)},
+					{DisplayName: "project", URI: pathToFileURI(projectDir)},
 				},
 			},
 		},
@@ -1424,11 +1434,19 @@ func TestUriToPath(t *testing.T) {
 		uri  string
 		want string
 	}{
-		{"file:///Users/test/project", "/Users/test/project"},
-		{"file:///tmp/dir", "/tmp/dir"},
+		{"file:///Users/test/project", filepath.FromSlash("/Users/test/project")},
+		{"file:///tmp/dir", filepath.FromSlash("/tmp/dir")},
 		{"https://example.com", ""},
 		{"", ""},
 		{"not-a-uri", ""},
+	}
+
+	// On Windows, add a test for drive-letter URIs.
+	if runtime.GOOS == "windows" {
+		tests = append(tests, struct {
+			uri  string
+			want string
+		}{"file:///C:/Users/test", "C:\\Users\\test"})
 	}
 
 	for _, tt := range tests {
@@ -1788,6 +1806,9 @@ func TestFindAmpThreadsDir(t *testing.T) {
 		tmpDir := t.TempDir()
 		t.Setenv("AMP_DATA_HOME", "")
 		t.Setenv("XDG_DATA_HOME", "")
+		if runtime.GOOS == "windows" {
+			t.Setenv("LOCALAPPDATA", "")
+		}
 
 		result := findAmpThreadsDir(tmpDir)
 		// Should return first candidate (default path) even though it doesn't exist
@@ -1801,7 +1822,7 @@ func TestFindAmpThreadsDir(t *testing.T) {
 func TestSessions_OrderedByUpdateTime(t *testing.T) {
 	projectDir := t.TempDir()
 	threadsDir := t.TempDir()
-	projectURI := "file://" + projectDir
+	projectURI := pathToFileURI(projectDir)
 
 	// Create threads with different timestamps
 	for i, offset := range []int{0, 3600, 1800} { // 0s, 1h, 30m offsets

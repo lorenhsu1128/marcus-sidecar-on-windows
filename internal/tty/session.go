@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/marcus/sidecar/internal/terminal"
 )
 
 // IsSessionDeadError checks if an error indicates the tmux session/pane is gone.
@@ -155,4 +156,23 @@ func CapturePaneOutput(target string, scrollback int) (string, error) {
 		return "", err
 	}
 	return string(output), nil
+}
+
+// sendSessionKeys sends keys to a terminal session asynchronously.
+// Keys are sent in order within a single goroutine to prevent reordering.
+func sendSessionKeys(session terminal.Session, keys ...KeySpec) tea.Cmd {
+	return func() tea.Msg {
+		for _, k := range keys {
+			var err error
+			if k.Literal {
+				err = session.SendLiteral(k.Value)
+			} else {
+				err = session.SendKey(k.Value)
+			}
+			if err != nil && !session.IsAlive() {
+				return SessionDeadMsg{}
+			}
+		}
+		return nil
+	}
 }

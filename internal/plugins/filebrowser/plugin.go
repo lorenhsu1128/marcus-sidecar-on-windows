@@ -15,6 +15,7 @@ import (
 	"github.com/marcus/sidecar/internal/mouse"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/state"
+	"github.com/marcus/sidecar/internal/terminal"
 	"github.com/marcus/sidecar/internal/tty"
 	"github.com/marcus/sidecar/internal/ui"
 )
@@ -234,14 +235,15 @@ type Plugin struct {
 	stateRestored bool
 
 	// Inline editor state (tmux-based editing)
-	inlineEditor         *tty.Model // Embeddable tty model for inline editing
-	inlineEditMode       bool       // True when inline editing is active
-	inlineEditSession    string     // Tmux session name for editor
-	inlineEditFile       string     // Path of file being edited
-	inlineEditOrigMtime  time.Time  // Original file mtime (to detect changes)
-	inlineEditEditor     string     // Editor command used (vim, nano, emacs, etc.)
-	inlineEditorDragging bool       // True when mouse is being dragged in editor (for text selection)
-	lastDragForwardTime  time.Time  // Throttle: last time a drag event was forwarded to tmux
+	inlineEditor          *tty.Model       // Embeddable tty model for inline editing
+	inlineEditMode        bool             // True when inline editing is active
+	inlineEditSession     string           // Tmux session name for editor
+	inlineEditTermSession terminal.Session // Terminal session for inline editor
+	inlineEditFile        string           // Path of file being edited
+	inlineEditOrigMtime   time.Time        // Original file mtime (to detect changes)
+	inlineEditEditor      string           // Editor command used (vim, nano, emacs, etc.)
+	inlineEditorDragging  bool             // True when mouse is being dragged in editor (for text selection)
+	lastDragForwardTime   time.Time        // Throttle: last time a drag event was forwarded to tmux
 
 	// Exit confirmation state (when clicking away from editor)
 	showExitConfirmation bool        // True when confirmation dialog is shown

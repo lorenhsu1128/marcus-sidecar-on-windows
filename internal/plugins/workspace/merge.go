@@ -778,7 +778,7 @@ func (p *Plugin) performSelectedCleanup(wt *Worktree, state *MergeWorkflowState)
 		branch := wt.Branch
 
 		// Stop agent if running and clean up tracking (always do this)
-		_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+		_ = p.ctx.Terminal.KillSession(sessionName)
 		delete(p.managedSessions, sessionName)
 		globalPaneCache.remove(sessionName)
 

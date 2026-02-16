@@ -20,8 +20,9 @@ func TestDetect(t *testing.T) {
 		t.Fatalf("mkdir sessions: %v", err)
 	}
 
+	jsonDir := filepath.ToSlash(projectDir)
 	lines := []string{
-		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-1","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + projectDir + `"}}`,
+		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-1","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + jsonDir + `"}}`,
 	}
 	if err := writeSessionFile(filepath.Join(path, "rollout-1.jsonl"), lines); err != nil {
 		t.Fatalf("write session file: %v", err)
@@ -56,12 +57,13 @@ func TestSessionsOrdering(t *testing.T) {
 		t.Fatalf("mkdir sessions: %v", err)
 	}
 
+	jsonDir := filepath.ToSlash(projectDir)
 	linesA := []string{
-		`{"timestamp":"2025-11-20T04:13:55.791Z","type":"session_meta","payload":{"id":"id-a","timestamp":"2025-11-20T04:13:55.777Z","cwd":"` + projectDir + `"}}`,
+		`{"timestamp":"2025-11-20T04:13:55.791Z","type":"session_meta","payload":{"id":"id-a","timestamp":"2025-11-20T04:13:55.777Z","cwd":"` + jsonDir + `"}}`,
 		`{"timestamp":"2025-11-20T04:15:16.710Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}}`,
 	}
 	linesB := []string{
-		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-b","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + projectDir + `"}}`,
+		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-b","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + jsonDir + `"}}`,
 		`{"timestamp":"2025-11-21T04:16:16.710Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"later"}]}}`,
 	}
 	if err := writeSessionFile(filepath.Join(first, "rollout-a.jsonl"), linesA); err != nil {
@@ -99,8 +101,9 @@ func TestSessionsRelativePath(t *testing.T) {
 		t.Fatalf("mkdir sessions: %v", err)
 	}
 
+	jsonDir := filepath.ToSlash(projectDir)
 	lines := []string{
-		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-1","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + projectDir + `"}}`,
+		`{"timestamp":"2025-11-21T04:13:55.791Z","type":"session_meta","payload":{"id":"id-1","timestamp":"2025-11-21T04:13:55.777Z","cwd":"` + jsonDir + `"}}`,
 		`{"timestamp":"2025-11-21T04:15:16.710Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}}`,
 		`{"timestamp":"2025-11-21T04:15:17.710Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":5,"cached_input_tokens":1,"output_tokens":2,"reasoning_output_tokens":0,"total_tokens":7}}}}`,
 	}

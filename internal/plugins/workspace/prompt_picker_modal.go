@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/marcus/sidecar/internal/config"
 	"github.com/marcus/sidecar/internal/modal"
 	"github.com/marcus/sidecar/internal/styles"
 )
@@ -122,7 +123,7 @@ func (p *Plugin) promptPickerEmptySection() modal.Section {
 		sb.WriteString("No prompts configured.\n\n")
 		sb.WriteString(styles.Muted.Render("Add prompts to one of these config files:"))
 		sb.WriteString("\n")
-		sb.WriteString(styles.Muted.Render("  Global:  ~/.config/sidecar/config.json"))
+		sb.WriteString(styles.Muted.Render("  Global:  " + config.ConfigPath()))
 		sb.WriteString("\n")
 		sb.WriteString(styles.Muted.Render("  Project: .sidecar/config.json"))
 		sb.WriteString("\n\n")

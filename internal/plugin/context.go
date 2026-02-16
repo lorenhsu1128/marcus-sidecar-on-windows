@@ -6,6 +6,7 @@ import (
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/config"
 	"github.com/marcus/sidecar/internal/event"
+	"github.com/marcus/sidecar/internal/terminal"
 )
 
 // BindingRegistrar allows plugins to register key bindings dynamically.
@@ -24,5 +25,6 @@ type Context struct {
 	EventBus  *event.Dispatcher
 	Logger    *slog.Logger
 	Keymap    BindingRegistrar // For plugins to register dynamic bindings
+	Terminal  terminal.Manager // Cross-platform terminal session manager
 	Epoch     uint64           // Incremented on project switch to invalidate stale async messages
 }

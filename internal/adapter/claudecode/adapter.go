@@ -637,11 +637,15 @@ func (a *Adapter) projectDirPath(projectRoot string) string {
 	if err != nil {
 		absPath = projectRoot
 	}
+	// Normalize to forward slashes so hashing is consistent across platforms.
+	// On Windows, C:\Users\foo becomes C:/Users/foo before replacement.
+	absPath = filepath.ToSlash(absPath)
 	// Convert /Users/foo/code/github.com/my_project to -Users-foo-code-github-com-my-project
-	// Claude Code replaces "/", ".", and "_" with "-"
+	// Claude Code replaces "/", ".", "_", and ":" with "-"
 	hash := strings.ReplaceAll(absPath, "/", "-")
 	hash = strings.ReplaceAll(hash, ".", "-")
 	hash = strings.ReplaceAll(hash, "_", "-")
+	hash = strings.ReplaceAll(hash, ":", "-")
 	return filepath.Join(a.projectsDir, hash)
 }
 
@@ -672,20 +676,20 @@ func (a *Adapter) DiscoverRelatedProjectDirs(mainWorktreePath string) ([]string,
 	var related []string
 	// Encode the main path to find its pattern in directory names
 	// e.g., /Users/foo/code/github.com/my_repo -> -Users-foo-code-github-com-my-repo
-	// Claude Code replaces "/", ".", and "_" with "-"
+	// Claude Code replaces "/", ".", "_", and ":" with "-"
 	// See: https://github.com/anthropics/claude-code/issues/19972
-	encodedMain := strings.ReplaceAll(absMain, "/", "-")
+	// Normalize to forward slashes for consistent encoding across platforms.
+	absMainSlash := filepath.ToSlash(absMain)
+	encodedMain := strings.ReplaceAll(absMainSlash, "/", "-")
 	encodedMain = strings.ReplaceAll(encodedMain, ".", "-")
 	encodedMain = strings.ReplaceAll(encodedMain, "_", "-")
+	encodedMain = strings.ReplaceAll(encodedMain, ":", "-")
 
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
 		name := e.Name()
-		if !strings.HasPrefix(name, "-") {
-			continue
-		}
 
 		// Match directories that:
 		// 1. Exactly match the main repo encoded path

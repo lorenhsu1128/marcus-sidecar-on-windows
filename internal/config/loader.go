@@ -9,10 +9,26 @@ import (
 	"time"
 )
 
-const (
-	configDir  = ".config/sidecar"
-	configFile = "config.json"
-)
+const configFile = "config.json"
+
+// configBaseDir returns the platform-appropriate base config directory.
+// Windows: %APPDATA%, macOS: ~/Library/Application Support, Linux: ~/.config.
+// Falls back to ~/.config if os.UserConfigDir fails.
+func configBaseDir() string {
+	if dir, err := os.UserConfigDir(); err == nil {
+		return dir
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config")
+}
+
+// configDirPath returns the full path to the sidecar config directory.
+func configDirPath() string {
+	return filepath.Join(configBaseDir(), "sidecar")
+}
 
 // testConfigPath overrides the config path for testing.
 var testConfigPath string
@@ -98,11 +114,10 @@ func LoadFrom(path string) (*Config, error) {
 	cfg := Default()
 
 	if path == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return cfg, nil // Return defaults on error
+		path = filepath.Join(configDirPath(), configFile)
+		if path == configFile {
+			return cfg, nil // Return defaults if config dir unavailable
 		}
-		path = filepath.Join(home, configDir, configFile)
 	}
 
 	data, err := os.ReadFile(path)
@@ -268,9 +283,5 @@ func ConfigPath() string {
 	if testConfigPath != "" {
 		return testConfigPath
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, configDir, configFile)
+	return filepath.Join(configDirPath(), configFile)
 }

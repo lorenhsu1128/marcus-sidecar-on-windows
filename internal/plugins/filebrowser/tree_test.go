@@ -242,7 +242,7 @@ func TestFileTree_RefreshPreservesExpandedState(t *testing.T) {
 	if !expandedPaths["dir1"] {
 		t.Error("Expected dir1 to be in expanded paths")
 	}
-	if !expandedPaths["dir1/nested"] {
+	if !expandedPaths[filepath.Join("dir1", "nested")] {
 		t.Error("Expected dir1/nested to be in expanded paths")
 	}
 

@@ -78,7 +78,7 @@ func TestDetect_WithTestdata(t *testing.T) {
 	// Create a modified project file pointing to temp dir
 	modifiedJSON := `{
   "id": "test_project",
-  "worktree": "` + projectPath + `",
+  "worktree": "` + filepath.ToSlash(projectPath) + `",
   "vcs": "git",
   "time": { "created": 1767000000000, "updated": 1767100000000 }
 }`
@@ -142,7 +142,7 @@ func TestSessions_WithTestdata(t *testing.T) {
 	}
 	modifiedJSON := `{
   "id": "test_project",
-  "worktree": "` + projectPath + `",
+  "worktree": "` + filepath.ToSlash(projectPath) + `",
   "vcs": "git",
   "time": { "created": 1767000000000, "updated": 1767100000000 }
 }`
@@ -601,7 +601,7 @@ func TestMalformedProjectJSON(t *testing.T) {
 		t.Errorf("expected 1 project in index, got %d", len(a.projectIndex))
 	}
 
-	if _, ok := a.projectIndex["/tmp/valid-project"]; !ok {
+	if _, ok := a.projectIndex[filepath.Clean("/tmp/valid-project")]; !ok {
 		t.Error("expected valid project to be in index")
 	}
 }
@@ -617,7 +617,7 @@ func TestMalformedSessionJSON(t *testing.T) {
 	if err := os.MkdirAll(projectDir, 0755); err != nil {
 		t.Fatalf("failed to create project dir: %v", err)
 	}
-	projectJSON := fmt.Sprintf(`{"id":"proj1","worktree":"%s","vcs":"git","time":{"created":1767000000000,"updated":1767100000000}}`, projectPath)
+	projectJSON := fmt.Sprintf(`{"id":"proj1","worktree":"%s","vcs":"git","time":{"created":1767000000000,"updated":1767100000000}}`, filepath.ToSlash(projectPath))
 	if err := os.WriteFile(filepath.Join(projectDir, "proj1.json"), []byte(projectJSON), 0644); err != nil {
 		t.Fatalf("failed to write project file: %v", err)
 	}

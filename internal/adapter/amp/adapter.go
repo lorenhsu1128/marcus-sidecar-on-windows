@@ -91,7 +91,14 @@ func ampThreadsDirCandidates(home string) []string {
 		}
 	}
 
-	// 3. Default: ~/.local/share/amp/threads (all platforms)
+	// 3. Windows: %LOCALAPPDATA%\amp\threads
+	if runtime.GOOS == "windows" {
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			candidates = append(candidates, filepath.Join(localAppData, "amp", "threads"))
+		}
+	}
+
+	// 4. Default: ~/.local/share/amp/threads (all platforms)
 	candidates = append(candidates, filepath.Join(home, ".local", "share", "amp", "threads"))
 
 	return candidates
@@ -740,7 +747,13 @@ func uriToPath(uri string) string {
 	if err != nil {
 		return ""
 	}
-	return filepath.FromSlash(parsed.Path)
+	p := filepath.FromSlash(parsed.Path)
+	// On Windows, file:///C:/path -> parsed.Path="/C:/path" -> FromSlash="\C:\path".
+	// Strip the leading separator before the drive letter.
+	if runtime.GOOS == "windows" && len(p) >= 3 && os.IsPathSeparator(p[0]) && p[2] == ':' {
+		p = p[1:]
+	}
+	return p
 }
 
 // pathMatchesProject checks if a tree path matches or is under the project root.

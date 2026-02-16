@@ -33,7 +33,11 @@ func (p *Plugin) openFileAtLine(path string, lineNo int) tea.Cmd {
 			editor = os.Getenv("VISUAL")
 		}
 		if editor == "" {
-			editor = "vim"
+			if runtime.GOOS == "windows" {
+				editor = "notepad"
+			} else {
+				editor = "vim"
+			}
 		}
 		fullPath := filepath.Join(p.ctx.WorkDir, path)
 		return plugin.OpenFileMsg{Editor: editor, Path: fullPath, LineNo: lineNo}

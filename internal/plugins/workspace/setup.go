@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -195,8 +196,27 @@ func (p *Plugin) runSetupScript(worktreePath, branchName string) error {
 		return nil // No script, that's fine
 	}
 
-	// Run the script with the worktree as working directory
-	cmd := exec.Command("bash", scriptPath)
+	// Run the script with the worktree as working directory.
+	// On Windows, try bash first; fall back to PowerShell (.ps1) or cmd (.bat).
+	var cmd *exec.Cmd
+	if _, err := exec.LookPath("bash"); err == nil {
+		cmd = exec.Command("bash", scriptPath)
+	} else if runtime.GOOS == "windows" {
+		// Try PowerShell script
+		ps1Path := filepath.Join(p.ctx.WorkDir, ".worktree-setup.ps1")
+		batPath := filepath.Join(p.ctx.WorkDir, ".worktree-setup.bat")
+		if _, err := os.Stat(ps1Path); err == nil {
+			cmd = exec.Command("powershell", "-ExecutionPolicy", "Bypass", "-File", ps1Path)
+		} else if _, err := os.Stat(batPath); err == nil {
+			cmd = exec.Command("cmd", "/c", batPath)
+		} else {
+			// No bash and no alternative scripts
+			p.ctx.Logger.Debug("setup script skipped: bash not available and no .ps1/.bat alternative found")
+			return nil
+		}
+	} else {
+		cmd = exec.Command("bash", scriptPath)
+	}
 	cmd.Dir = worktreePath
 
 	// Build isolated environment with overrides applied

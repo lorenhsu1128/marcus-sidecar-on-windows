@@ -112,6 +112,8 @@ func detectAgentSessionStatus(agentType AgentType, worktreePath string) (Worktre
 // Claude Code replaces slashes, underscores, and other non-alphanumeric characters with dashes.
 // e.g., /Users/foo/my_project becomes -Users-foo-my-project
 func claudeProjectDirName(absPath string) string {
+	// Normalize to forward slashes so encoding is consistent across platforms.
+	absPath = filepath.ToSlash(absPath)
 	var b strings.Builder
 	b.Grow(len(absPath))
 	for _, r := range absPath {

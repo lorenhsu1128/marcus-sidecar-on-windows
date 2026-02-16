@@ -154,6 +154,7 @@ func BenchmarkSessions(b *testing.B) {
 				b.Fatalf("mkdir project: %v", err)
 			}
 
+			jsonDir := filepath.ToSlash(projectDir)
 			// Create sessions
 			for i := 0; i < numSessions; i++ {
 				day := (i % 28) + 1
@@ -164,7 +165,7 @@ func BenchmarkSessions(b *testing.B) {
 				}
 
 				lines := []string{
-					fmt.Sprintf(`{"timestamp":"2025-%02d-%02dT00:00:00Z","type":"session_meta","payload":{"id":"sess-%d","cwd":"%s"}}`, month, day, i, projectDir),
+					fmt.Sprintf(`{"timestamp":"2025-%02d-%02dT00:00:00Z","type":"session_meta","payload":{"id":"sess-%d","cwd":"%s"}}`, month, day, i, jsonDir),
 					fmt.Sprintf(`{"timestamp":"2025-%02d-%02dT00:01:00Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}}`, month, day),
 					fmt.Sprintf(`{"timestamp":"2025-%02d-%02dT00:02:00Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}}`, month, day),
 				}

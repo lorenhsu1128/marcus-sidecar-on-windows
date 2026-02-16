@@ -3,7 +3,6 @@ package workspace
 import (
 	"fmt"
 	"math"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -353,8 +352,8 @@ func (p *Plugin) executeDelete() tea.Cmd {
 
 	// Kill tmux session if it exists (before deleting worktree)
 	sessionName := tmuxSessionPrefix + sanitizeName(name)
-	if sessionExists(sessionName) {
-		_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+	if p.ctx.Terminal.HasSession(sessionName) {
+		_ = p.ctx.Terminal.KillSession(sessionName)
 	}
 	delete(p.managedSessions, sessionName)
 	globalPaneCache.remove(sessionName)

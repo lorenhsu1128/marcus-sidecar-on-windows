@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	app "github.com/marcus/sidecar/internal/app"
 	"github.com/marcus/sidecar/internal/features"
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/terminal"
 	"github.com/marcus/sidecar/internal/tty"
 	"golang.org/x/term"
 )
@@ -161,86 +163,51 @@ func MapKeyToTmux(msg tea.KeyMsg) (key string, useLiteral bool) {
 	return tty.MapKeyToTmux(msg)
 }
 
-// sendKeyToTmux sends a key to a tmux pane using send-keys.
-// Uses the tmux key name syntax (e.g., "Enter", "C-c", "Up").
-func sendKeyToTmux(sessionName, key string) error {
-	cmd := exec.Command("tmux", "send-keys", "-t", sessionName, key)
-	return cmd.Run()
-}
-
-// sendLiteralToTmux sends literal text to a tmux pane using send-keys -l.
-// This prevents tmux from interpreting special key names.
-func sendLiteralToTmux(sessionName, text string) error {
-	// tmux treats bare ; in argv as a command separator, so a literal
-	// semicolon never reaches send-keys. Fall back to hex encoding (-H)
-	// which bypasses tmux's command parser entirely.
-	if strings.Contains(text, ";") {
-		args := []string{"send-keys", "-t", sessionName, "-H"}
-		for _, b := range []byte(text) {
-			args = append(args, fmt.Sprintf("%02x", b))
-		}
-		return exec.Command("tmux", args...).Run()
-	}
-	cmd := exec.Command("tmux", "send-keys", "-l", "-t", sessionName, text)
-	return cmd.Run()
-}
-
-// keySpec describes a key to send to tmux with ordering preserved.
+// keySpec describes a key to send to the terminal session with ordering preserved.
 type keySpec struct {
 	value   string
 	literal bool
 }
 
-// sendInteractiveKeysCmd sends keys to tmux asynchronously (td-c2961e).
+// sendInteractiveKeysCmd sends keys to the terminal session asynchronously (td-c2961e).
 // Keys are sent in order within a single goroutine to prevent reordering.
 // Returns InteractiveSessionDeadMsg if the session has ended.
-func sendInteractiveKeysCmd(sessionName string, keys ...keySpec) tea.Cmd {
+func sendInteractiveKeysCmd(session terminal.Session, keys ...keySpec) tea.Cmd {
 	return func() tea.Msg {
 		for _, k := range keys {
 			var err error
 			if k.literal {
-				err = sendLiteralToTmux(sessionName, k.value)
+				err = session.SendLiteral(k.value)
 			} else {
-				err = sendKeyToTmux(sessionName, k.value)
+				err = session.SendKey(k.value)
 			}
-			if err != nil && isSessionDeadError(err) {
+			if err != nil {
+				if !session.IsAlive() {
+					return InteractiveSessionDeadMsg{}
+				}
+			}
+		}
+		return nil
+	}
+}
+
+// sendInteractivePasteInputCmd sends paste text to the terminal session asynchronously (td-c2961e).
+// Used for multi-character terminal input (not clipboard paste which is already async).
+func sendInteractivePasteInputCmd(session terminal.Session, text string, bracketed bool) tea.Cmd {
+	return func() tea.Msg {
+		var err error
+		if bracketed {
+			err = session.SendBracketedPaste(text)
+		} else {
+			err = session.SendPaste(text)
+		}
+		if err != nil {
+			if !session.IsAlive() {
 				return InteractiveSessionDeadMsg{}
 			}
 		}
 		return nil
 	}
-}
-
-// sendInteractivePasteInputCmd sends paste text to tmux asynchronously (td-c2961e).
-// Used for multi-character terminal input (not clipboard paste which is already async).
-func sendInteractivePasteInputCmd(sessionName, text string, bracketed bool) tea.Cmd {
-	return func() tea.Msg {
-		var err error
-		if bracketed {
-			err = sendBracketedPasteToTmux(sessionName, text)
-		} else {
-			err = sendPasteToTmux(sessionName, text)
-		}
-		if err != nil && isSessionDeadError(err) {
-			return InteractiveSessionDeadMsg{}
-		}
-		return nil
-	}
-}
-
-// sendPasteToTmux pastes multi-line text via tmux buffer.
-// Uses load-buffer + paste-buffer which works regardless of app paste mode state.
-func sendPasteToTmux(sessionName, text string) error {
-	// Load text into tmux default buffer via stdin
-	loadCmd := exec.Command("tmux", "load-buffer", "-")
-	loadCmd.Stdin = strings.NewReader(text)
-	if err := loadCmd.Run(); err != nil {
-		return err
-	}
-
-	// Paste buffer into target pane
-	pasteCmd := exec.Command("tmux", "paste-buffer", "-t", sessionName)
-	return pasteCmd.Run()
 }
 
 // Bracketed paste escape sequences
@@ -271,30 +238,13 @@ func detectBracketedPasteMode(output string) bool {
 	return enableIdx > disableIdx
 }
 
-// sendBracketedPasteToTmux sends text wrapped in bracketed paste sequences.
-// Used when the target app has enabled bracketed paste mode.
-func sendBracketedPasteToTmux(sessionName, text string) error {
-	// Send bracketed paste start sequence
-	if err := sendLiteralToTmux(sessionName, bracketedPasteStart); err != nil {
-		return err
-	}
-
-	// Send the actual text
-	if err := sendLiteralToTmux(sessionName, text); err != nil {
-		return err
-	}
-
-	// Send bracketed paste end sequence
-	return sendLiteralToTmux(sessionName, bracketedPasteEnd)
-}
-
 func (p *Plugin) pasteClipboardToTmuxCmd() tea.Cmd {
 	if p.interactiveState == nil || !p.interactiveState.Active {
 		return nil
 	}
 
-	sessionName := p.interactiveState.TargetSession
-	if sessionName == "" {
+	session := p.interactiveState.Session
+	if session == nil {
 		return nil
 	}
 	bracketed := p.interactiveState.BracketedPasteEnabled
@@ -309,12 +259,12 @@ func (p *Plugin) pasteClipboardToTmuxCmd() tea.Cmd {
 		}
 
 		if bracketed {
-			err = sendBracketedPasteToTmux(sessionName, text)
+			err = session.SendBracketedPaste(text)
 		} else {
-			err = sendPasteToTmux(sessionName, text)
+			err = session.SendPaste(text)
 		}
 		if err != nil {
-			return InteractivePasteResultMsg{Err: err, SessionDead: isSessionDeadError(err)}
+			return InteractivePasteResultMsg{Err: err, SessionDead: !session.IsAlive()}
 		}
 
 		return InteractivePasteResultMsg{}
@@ -453,13 +403,32 @@ func (p *Plugin) enterInteractiveMode() tea.Cmd {
 	if target == "" {
 		target = sessionName // Fall back to session name if pane ID not available
 	}
+
+	// Get the terminal session from the Manager for cross-platform input
+	var session terminal.Session
+	if p.ctx != nil && p.ctx.Terminal != nil && target != "" {
+		session = p.ctx.Terminal.GetSession(target)
+		// Fall back to session name if pane ID lookup failed
+		if session == nil && target != sessionName {
+			session = p.ctx.Terminal.GetSession(sessionName)
+		}
+	}
+
 	if target != "" {
 		previewWidth, previewHeight := p.calculatePreviewDimensions()
-		tty.SetWindowSizeManual(sessionName)
-		p.resizeTmuxPane(target, previewWidth, previewHeight)
-		// Verify and retry once if resize didn't take effect
-		if w, h, ok := queryPaneSize(target); ok && (w != previewWidth || h != previewHeight) {
+		if session != nil {
+			_ = session.Resize(previewWidth, previewHeight)
+			// Verify and retry once if resize didn't take effect
+			if w, h, ok := p.ctx.Terminal.QueryPaneSize(target); ok && (w != previewWidth || h != previewHeight) {
+				_ = session.Resize(previewWidth, previewHeight)
+			}
+		} else {
+			// Fallback to direct tmux resize if session not available
+			tty.SetWindowSizeManual(sessionName)
 			p.resizeTmuxPane(target, previewWidth, previewHeight)
+			if w, h, ok := queryPaneSize(target, p.ctx.Terminal); ok && (w != previewWidth || h != previewHeight) {
+				p.resizeTmuxPane(target, previewWidth, previewHeight)
+			}
 		}
 	}
 	// Initialize interactive state
@@ -467,6 +436,7 @@ func (p *Plugin) enterInteractiveMode() tea.Cmd {
 		Active:        true,
 		TargetPane:    paneID,
 		TargetSession: sessionName,
+		Session:       session,
 		LastKeyTime:   time.Now(),
 		CursorVisible: true, // Assume visible until we get first cursor query result
 	}
@@ -581,14 +551,43 @@ func (p *Plugin) resizeTmuxTargetCmd(target string) tea.Cmd {
 	}
 
 	previewWidth, previewHeight := p.calculatePreviewDimensions()
+
+	// Use terminal session if available (cross-platform)
+	if p.interactiveState != nil && p.interactiveState.Session != nil {
+		session := p.interactiveState.Session
+		return func() tea.Msg {
+			if p.ctx != nil && p.ctx.Terminal != nil {
+				if actualWidth, actualHeight, ok := p.ctx.Terminal.QueryPaneSize(target); ok {
+					if actualWidth == previewWidth && actualHeight == previewHeight {
+						return nil
+					}
+				}
+			}
+			_ = session.Resize(previewWidth, previewHeight)
+			if p.ctx != nil && p.ctx.Terminal != nil {
+				if actualWidth, actualHeight, ok := p.ctx.Terminal.QueryPaneSize(target); ok {
+					if actualWidth != previewWidth || actualHeight != previewHeight {
+						_ = session.Resize(previewWidth, previewHeight)
+					}
+				}
+			}
+			return paneResizedMsg{}
+		}
+	}
+
+	// Fallback to direct tmux commands
+	var mgr terminal.Manager // capture before closure for goroutine safety
+	if p.ctx != nil {
+		mgr = p.ctx.Terminal
+	}
 	return func() tea.Msg {
-		if actualWidth, actualHeight, ok := queryPaneSize(target); ok {
+		if actualWidth, actualHeight, ok := queryPaneSize(target, mgr); ok {
 			if actualWidth == previewWidth && actualHeight == previewHeight {
 				return nil
 			}
 		}
 		p.resizeTmuxPane(target, previewWidth, previewHeight)
-		if actualWidth, actualHeight, ok := queryPaneSize(target); ok {
+		if actualWidth, actualHeight, ok := queryPaneSize(target, mgr); ok {
 			if actualWidth != previewWidth || actualHeight != previewHeight {
 				p.resizeTmuxPane(target, previewWidth, previewHeight)
 			}
@@ -618,12 +617,22 @@ func (p *Plugin) maybeResizeInteractivePane(paneWidth, paneHeight int) tea.Cmd {
 }
 
 // resizeTmuxPane resizes a tmux window/pane to the specified dimensions.
-// resize-window works for detached sessions; resize-pane is a fallback.
+// resizeTmuxPane resizes the target pane using the terminal.Manager if available,
+// falling back to direct tmux commands on Unix.
 func (p *Plugin) resizeTmuxPane(paneID string, width, height int) {
 	if width <= 0 && height <= 0 {
 		return
 	}
 
+	// Use terminal.Manager if available
+	if p.ctx != nil && p.ctx.Terminal != nil {
+		if session := p.ctx.Terminal.GetSession(paneID); session != nil {
+			_ = session.Resize(width, height)
+			return
+		}
+	}
+
+	// Fallback to direct tmux commands (Unix only)
 	args := []string{"resize-window", "-t", paneID}
 	if width > 0 {
 		args = append(args, "-x", strconv.Itoa(width))
@@ -636,7 +645,6 @@ func (p *Plugin) resizeTmuxPane(paneID string, width, height int) {
 		return
 	}
 
-	// Fallback for older tmux or attached clients that reject resize-window.
 	args = []string{"resize-pane", "-t", paneID}
 	if width > 0 {
 		args = append(args, "-x", strconv.Itoa(width))
@@ -647,11 +655,19 @@ func (p *Plugin) resizeTmuxPane(paneID string, width, height int) {
 	_ = exec.Command("tmux", args...).Run()
 }
 
-func queryPaneSize(target string) (width, height int, ok bool) {
+// queryPaneSize queries the pane size via terminal.Manager if available,
+// falling back to a direct tmux command (Unix only).
+func queryPaneSize(target string, mgr terminal.Manager) (width, height int, ok bool) {
 	if target == "" {
 		return 0, 0, false
 	}
 
+	// Use Manager if available (cross-platform)
+	if mgr != nil {
+		return mgr.QueryPaneSize(target)
+	}
+
+	// Fallback to direct tmux command (Unix only)
 	cmd := exec.Command("tmux", "display-message", "-t", target, "-p", "#{pane_width},#{pane_height}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -693,6 +709,13 @@ func (p *Plugin) resizeForAttachCmd(target string) tea.Cmd {
 		if w <= 0 || h <= 0 {
 			return nil
 		}
+		// Use terminal session if available (cross-platform)
+		if p.ctx != nil && p.ctx.Terminal != nil {
+			if session := p.ctx.Terminal.GetSession(target); session != nil {
+				_ = session.Resize(w, h)
+				return nil
+			}
+		}
 		p.resizeTmuxPane(target, w, h)
 		return nil
 	}
@@ -701,6 +724,14 @@ func (p *Plugin) resizeForAttachCmd(target string) tea.Cmd {
 // attachWithResize resizes the tmux pane to full terminal, waits briefly for
 // tmux to process, then attaches. Centralizes resize-before-attach logic.
 func (p *Plugin) attachWithResize(target, sessionName, displayName string, onComplete func(error) tea.Msg) tea.Cmd {
+	// tmux attach-session is not available on Windows (ConPTY backend).
+	// On Windows, interactive mode provides equivalent functionality.
+	if runtime.GOOS == "windows" {
+		return func() tea.Msg {
+			return onComplete(fmt.Errorf("attach not supported on Windows — use interactive mode instead"))
+		}
+	}
+
 	c := exec.Command("tmux", "attach-session", "-t", sessionName)
 	termState, _ := term.GetState(int(os.Stdout.Fd()))
 	wrappedOnComplete := func(err error) tea.Msg {
@@ -908,7 +939,7 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 		p.resetScrollBaseLineCount() // td-f7c8be: clear snapshot
 	}
 
-	sessionName := p.interactiveState.TargetSession
+	session := p.interactiveState.Session
 
 	// Check for paste (multi-character input with newlines or long text)
 	if isPasteInput(msg) {
@@ -917,22 +948,26 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 		// Send paste async (td-c2961e): escape + paste in order if pending
 		if pendingEscape {
 			cmds = append(cmds, func() tea.Msg {
-				if err := sendKeyToTmux(sessionName, "Escape"); err != nil && isSessionDeadError(err) {
-					return InteractiveSessionDeadMsg{}
+				if err := session.SendKey("Escape"); err != nil {
+					if !session.IsAlive() {
+						return InteractiveSessionDeadMsg{}
+					}
 				}
 				var err error
 				if bracketed {
-					err = sendBracketedPasteToTmux(sessionName, text)
+					err = session.SendBracketedPaste(text)
 				} else {
-					err = sendPasteToTmux(sessionName, text)
+					err = session.SendPaste(text)
 				}
-				if err != nil && isSessionDeadError(err) {
-					return InteractiveSessionDeadMsg{}
+				if err != nil {
+					if !session.IsAlive() {
+						return InteractiveSessionDeadMsg{}
+					}
 				}
 				return nil
 			})
 		} else {
-			cmds = append(cmds, sendInteractivePasteInputCmd(sessionName, text, bracketed))
+			cmds = append(cmds, sendInteractivePasteInputCmd(session, text, bracketed))
 		}
 		cmds = append(cmds, p.pollInteractivePane())
 		return tea.Batch(cmds...)
@@ -943,7 +978,7 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 	if key == "" {
 		// Still send pending escape if nothing else to send
 		if pendingEscape {
-			cmds = append(cmds, sendInteractiveKeysCmd(sessionName, keySpec{"Escape", false}))
+			cmds = append(cmds, sendInteractiveKeysCmd(session, keySpec{"Escape", false}))
 			cmds = append(cmds, p.scheduleDebouncedPoll(keystrokeDebounce))
 		}
 		return tea.Batch(cmds...)
@@ -951,12 +986,12 @@ func (p *Plugin) handleInteractiveKeys(msg tea.KeyMsg) tea.Cmd {
 
 	// Send keys async (td-c2961e): pending escape + key in order within single goroutine
 	if pendingEscape {
-		cmds = append(cmds, sendInteractiveKeysCmd(sessionName,
+		cmds = append(cmds, sendInteractiveKeysCmd(session,
 			keySpec{"Escape", false},
 			keySpec{key, useLiteral},
 		))
 	} else {
-		cmds = append(cmds, sendInteractiveKeysCmd(sessionName, keySpec{key, useLiteral}))
+		cmds = append(cmds, sendInteractiveKeysCmd(session, keySpec{key, useLiteral}))
 	}
 
 	// Schedule debounced poll to batch rapid keystrokes (td-8a0978)
@@ -986,8 +1021,7 @@ func (p *Plugin) handleUnknownSequence(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 
-	sessionName := p.interactiveState.TargetSession
-	return sendInteractiveKeysCmd(sessionName, keySpec{csiu, true})
+	return sendInteractiveKeysCmd(p.interactiveState.Session, keySpec{csiu, true})
 }
 
 // handleEscapeTimer processes the escape delay timer firing.
@@ -1005,13 +1039,13 @@ func (p *Plugin) handleEscapeTimer() tea.Cmd {
 		return nil
 	}
 
-	// Timer fired with pending Escape: forward the single Escape to tmux async (td-c2961e)
+	// Timer fired with pending Escape: forward the single Escape async (td-c2961e)
 	p.interactiveState.EscapePressed = false
 
 	// Update last key time and poll immediately for better responsiveness (td-babfd9)
 	p.interactiveState.LastKeyTime = time.Now()
 	return tea.Batch(
-		sendInteractiveKeysCmd(p.interactiveState.TargetSession, keySpec{"Escape", false}),
+		sendInteractiveKeysCmd(p.interactiveState.Session, keySpec{"Escape", false}),
 		p.pollInteractivePaneImmediate(),
 	)
 }
@@ -1071,23 +1105,26 @@ func (p *Plugin) forwardClickToTmux(x, y int) tea.Cmd {
 	if !p.interactiveState.MouseReportingEnabled {
 		return nil
 	}
-	sessionName := p.interactiveState.TargetSession
+	session := p.interactiveState.Session
+	if session == nil {
+		return nil
+	}
 	col, row, ok := p.interactiveMouseCoords(x, y)
 	if !ok {
 		return nil
 	}
 
 	return func() tea.Msg {
-		if err := sendSGRMouse(sessionName, 0, col, row, false); err != nil {
+		if err := session.SendSGRMouse(0, col, row, false); err != nil {
 			p.exitInteractiveMode()
-			if isSessionDeadError(err) {
+			if !session.IsAlive() {
 				return InteractiveSessionDeadMsg{}
 			}
 			return nil
 		}
-		if err := sendSGRMouse(sessionName, 0, col, row, true); err != nil {
+		if err := session.SendSGRMouse(0, col, row, true); err != nil {
 			p.exitInteractiveMode()
-			if isSessionDeadError(err) {
+			if !session.IsAlive() {
 				return InteractiveSessionDeadMsg{}
 			}
 			return nil
@@ -1095,18 +1132,6 @@ func (p *Plugin) forwardClickToTmux(x, y int) tea.Cmd {
 		p.interactiveState.LastKeyTime = time.Now()
 		return nil
 	}
-}
-
-func sendSGRMouse(sessionName string, button, col, row int, release bool) error {
-	if col <= 0 || row <= 0 {
-		return nil
-	}
-	suffix := "M"
-	if release {
-		suffix = "m"
-	}
-	seq := fmt.Sprintf("\x1b[<%d;%d;%d%s", button, col, row, suffix)
-	return sendLiteralToTmux(sessionName, seq)
 }
 
 func (p *Plugin) interactiveMouseCoords(x, y int) (col, row int, ok bool) {
@@ -1284,14 +1309,21 @@ func (p *Plugin) getCursorPosition() (row, col, paneHeight, paneWidth int, visib
 }
 
 // queryCursorPositionSync synchronously queries cursor position for the given target.
-// Used to capture cursor position atomically with output in poll goroutines.
-// Returns row, col (0-indexed), paneHeight, visible, and ok (false if query failed).
+// Uses the terminal.Session if available (cross-platform), falling back to a direct
+// tmux command (Unix only).
+// Returns row, col (0-indexed), paneHeight, paneWidth, visible, and ok (false if query failed).
 // paneHeight is needed to calculate cursor offset when display height differs from pane height.
-func queryCursorPositionSync(target string) (row, col, paneHeight, paneWidth int, visible, ok bool) {
+func queryCursorPositionSync(target string, session terminal.Session) (row, col, paneHeight, paneWidth int, visible, ok bool) {
 	if target == "" {
 		return 0, 0, 0, 0, false, false
 	}
 
+	// Use terminal.Session if available (cross-platform)
+	if session != nil {
+		return session.QueryCursor()
+	}
+
+	// Fallback to direct tmux command (Unix only)
 	cmd := exec.Command("tmux", "display-message", "-t", target,
 		"-p", "#{cursor_x},#{cursor_y},#{cursor_flag},#{pane_height},#{pane_width}")
 	output, err := cmd.Output()

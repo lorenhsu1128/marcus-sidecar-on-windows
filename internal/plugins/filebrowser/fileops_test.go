@@ -225,8 +225,13 @@ func TestExecuteFileOp_MoveValidation(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "invalid - absolute path",
-			input:       "/etc/passwd",
+			name: "invalid - absolute path",
+			input: func() string {
+				if runtime.GOOS == "windows" {
+					return `C:\Windows\System32\config`
+				}
+				return "/etc/passwd"
+			}(),
 			wantErr:     true,
 			errContains: "absolute paths not allowed",
 		},

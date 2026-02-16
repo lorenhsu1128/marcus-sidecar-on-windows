@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/terminal"
 )
 
 type TabOpenMode int
@@ -26,9 +27,10 @@ type FileTab struct {
 	IsPreview bool // Ephemeral preview tab, replaced on next j/k navigation
 
 	// Edit state (persisted when switching away from inline editor)
-	EditSession   string    // Tmux session name (empty if not in edit mode)
-	EditOrigMtime time.Time // Original file mtime when editing started
-	EditEditor    string    // Editor command used (vim, nano, etc.)
+	EditSession     string           // Tmux session name (empty if not in edit mode)
+	EditTermSession terminal.Session // Terminal session for inline editor
+	EditOrigMtime   time.Time        // Original file mtime when editing started
+	EditEditor      string           // Editor command used (vim, nano, etc.)
 }
 
 type tabHit struct {
@@ -526,7 +528,8 @@ func (p *Plugin) tabLabels(width int) []string {
 		label := base
 		if counts[base] > 1 {
 			parent := filepath.Base(filepath.Dir(tab.Path))
-			label = filepath.Join(parent, base)
+			// Use forward slash for display regardless of platform
+			label = parent + "/" + base
 		}
 		labels = append(labels, truncatePath(label, maxLabelWidth))
 	}
@@ -545,15 +548,17 @@ func (p *Plugin) saveEditStateToTab() {
 	}
 	tab := &p.tabs[p.activeTab]
 	tab.EditSession = p.inlineEditSession
+	tab.EditTermSession = p.inlineEditTermSession
 	tab.EditOrigMtime = p.inlineEditOrigMtime
 	tab.EditEditor = p.inlineEditEditor
 }
 
-// clearPluginEditState clears plugin-level edit state without killing the tmux session.
+// clearPluginEditState clears plugin-level edit state without killing the terminal session.
 // Used when detaching from editor (session keeps running in background).
 func (p *Plugin) clearPluginEditState() {
 	p.inlineEditMode = false
 	p.inlineEditSession = ""
+	p.inlineEditTermSession = nil
 	p.inlineEditFile = ""
 	p.inlineEditOrigMtime = time.Time{}
 	p.inlineEditEditor = ""
@@ -568,13 +573,14 @@ func (p *Plugin) restoreEditStateFromTab() bool {
 		return false
 	}
 	tab := &p.tabs[p.activeTab]
-	if tab.EditSession == "" {
+	if tab.EditTermSession == nil {
 		return false
 	}
 	// Check if session is still alive
-	if !isSessionAlive(tab.EditSession) {
+	if !tab.EditTermSession.IsAlive() {
 		// Session died while away - clear tab edit state
 		tab.EditSession = ""
+		tab.EditTermSession = nil
 		tab.EditOrigMtime = time.Time{}
 		tab.EditEditor = ""
 		return false
@@ -582,21 +588,23 @@ func (p *Plugin) restoreEditStateFromTab() bool {
 	// Restore to plugin-level state
 	p.inlineEditMode = true
 	p.inlineEditSession = tab.EditSession
+	p.inlineEditTermSession = tab.EditTermSession
 	p.inlineEditFile = tab.Path
 	p.inlineEditOrigMtime = tab.EditOrigMtime
 	p.inlineEditEditor = tab.EditEditor
 	return true
 }
 
-// killTabEditSession kills the tmux session for a tab if it has one.
+// killTabEditSession kills the terminal session for a tab if it has one.
 func (p *Plugin) killTabEditSession(index int) {
 	if index < 0 || index >= len(p.tabs) {
 		return
 	}
 	tab := &p.tabs[index]
-	if tab.EditSession != "" {
-		killSession(tab.EditSession)
+	if tab.EditTermSession != nil {
+		_ = tab.EditTermSession.Kill()
 		tab.EditSession = ""
+		tab.EditTermSession = nil
 		tab.EditOrigMtime = time.Time{}
 		tab.EditEditor = ""
 	}
@@ -625,19 +633,20 @@ func (p *Plugin) closeTabsForPath(deletedPath string) {
 	}
 }
 
-// cleanupAllEditSessions kills all tmux edit sessions for all tabs.
-// Called on plugin exit to ensure no orphan tmux sessions remain.
+// cleanupAllEditSessions kills all terminal edit sessions for all tabs.
+// Called on plugin exit to ensure no orphan terminal sessions remain.
 func (p *Plugin) cleanupAllEditSessions() {
 	// Clean up current plugin-level edit state
-	if p.inlineEditMode && p.inlineEditSession != "" {
-		killSession(p.inlineEditSession)
+	if p.inlineEditMode && p.inlineEditTermSession != nil {
+		_ = p.inlineEditTermSession.Kill()
 		p.clearPluginEditState()
 	}
 	// Clean up any backgrounded sessions in tabs
 	for i := range p.tabs {
-		if p.tabs[i].EditSession != "" {
-			killSession(p.tabs[i].EditSession)
+		if p.tabs[i].EditTermSession != nil {
+			_ = p.tabs[i].EditTermSession.Kill()
 			p.tabs[i].EditSession = ""
+			p.tabs[i].EditTermSession = nil
 			p.tabs[i].EditOrigMtime = time.Time{}
 			p.tabs[i].EditEditor = ""
 		}
