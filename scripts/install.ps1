@@ -128,7 +128,7 @@ Write-Success "系統架構 / Architecture: $Arch"
 # 去除版本號前綴 v，組合符合 GoReleaser name_template 的檔名
 # Strip leading 'v' from version tag to match GoReleaser name_template
 $VersionClean = $Version -replace '^v', ''
-$AssetName = "sidecar_${Version}_windows_${Arch}.zip"
+$AssetName = "sidecar_${VersionClean}_windows_${Arch}.zip"
 
 # 從 release assets 中尋找下載連結 / Find the download URL from release assets
 $DownloadUrl = $null
