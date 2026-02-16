@@ -12,15 +12,15 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/community"
-	"github.com/marcus/sidecar/internal/config"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/palette"
-	"github.com/marcus/sidecar/internal/plugin"
-	"github.com/marcus/sidecar/internal/state"
-	"github.com/marcus/sidecar/internal/styles"
-	"github.com/marcus/sidecar/internal/theme"
-	"github.com/marcus/sidecar/internal/version"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/community"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/config"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/palette"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/state"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/theme"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/version"
 )
 
 // isMouseEscapeSequence returns true if the key message appears to be

@@ -5,8 +5,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/state"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/state"
 )
 
 // isModalViewMode returns true when a modal overlay is active (not List, Kanban, or Interactive).

@@ -1,8 +1,8 @@
 package workspace
 
 import (
-	"github.com/marcus/sidecar/internal/features"
-	"github.com/marcus/sidecar/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/features"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
 )
 
 // Commands returns the available commands.

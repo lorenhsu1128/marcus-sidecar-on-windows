@@ -2,8 +2,8 @@ package gitstatus
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/state"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/state"
 )
 
 // Hit region IDs

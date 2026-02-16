@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/marcus/sidecar/internal/adapter/pricing"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter/pricing"
 )
 
 // StatsCache represents the aggregated usage stats from stats-cache.json.

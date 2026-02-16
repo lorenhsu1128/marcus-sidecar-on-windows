@@ -6,7 +6,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/terminal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/terminal"
 )
 
 // IsPasteInput detects if the input is a paste operation.

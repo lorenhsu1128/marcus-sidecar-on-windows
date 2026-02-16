@@ -10,15 +10,15 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/marcus/sidecar/internal/markdown"
-	"github.com/marcus/sidecar/internal/modal"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/styles"
-	"github.com/marcus/sidecar/internal/ui"
-	"github.com/marcus/sidecar/internal/version"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/markdown"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/version"
 )
 
-const changelogURL = "https://raw.githubusercontent.com/marcus/sidecar/main/CHANGELOG.md"
+const changelogURL = "https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/CHANGELOG.md"
 
 // changelogViewState holds mutable state shared between the model and the
 // modal's Custom section closure. Using a heap-allocated struct avoids
@@ -152,7 +152,7 @@ func (m *Model) ensureUpdatePreviewModal() {
 			modal.Btn(" Later ", "cancel"),
 		}
 	case version.InstallMethodBinary:
-		downloadURL := fmt.Sprintf("https://github.com/marcus/sidecar/releases/tag/%s",
+		downloadURL := fmt.Sprintf("https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases/tag/%s",
 			m.updateAvailable.LatestVersion)
 		methodHint = styles.Muted.Render("Download: " + downloadURL)
 		buttons = []modal.ButtonDef{
@@ -447,10 +447,10 @@ func (m *Model) ensureUpdateErrorModal() {
 		manualFix = "brew update && brew upgrade sidecar"
 	case version.InstallMethodGo:
 		methodName = "go install"
-		manualFix = "go install github.com/marcus/sidecar/cmd/sidecar@latest"
+		manualFix = "go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest"
 	default:
 		methodName = "binary"
-		manualFix = "github.com/marcus/sidecar/releases"
+		manualFix = "github.com/lorenhsu1128/marcus-sidecar-on-windows/releases"
 	}
 
 	infoLine := styles.Muted.Render(fmt.Sprintf(
@@ -461,7 +461,7 @@ func (m *Model) ensureUpdateErrorModal() {
 	errorText := errorStyle.Render("  " + errorMsg)
 
 	fixHint := styles.Muted.Render("Manual fix: " + manualFix)
-	reportHint := styles.Muted.Render("Report: github.com/marcus/sidecar/issues")
+	reportHint := styles.Muted.Render("Report: github.com/lorenhsu1128/marcus-sidecar-on-windows/issues")
 
 	m.updateErrorModal = modal.New("Update Failed",
 		modal.WithWidth(modalW),

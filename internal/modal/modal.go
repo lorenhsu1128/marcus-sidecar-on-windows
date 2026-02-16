@@ -2,7 +2,7 @@ package modal
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 )
 
 // Modal represents a declarative modal dialog with automatic hit region management.

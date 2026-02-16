@@ -33,10 +33,10 @@ func updateCommand(version string, method InstallMethod) string {
 	case InstallMethodHomebrew:
 		return "brew upgrade sidecar"
 	case InstallMethodBinary:
-		return fmt.Sprintf("https://github.com/marcus/sidecar/releases/tag/%s", version)
+		return fmt.Sprintf("https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases/tag/%s", version)
 	default:
 		return fmt.Sprintf(
-			"go install -ldflags \"-X main.Version=%s\" github.com/marcus/sidecar/cmd/sidecar@%s",
+			"go install -ldflags \"-X main.Version=%s\" github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@%s",
 			version, version,
 		)
 	}

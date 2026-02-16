@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 // DimStyle applies a dim gray color to background content behind modals.

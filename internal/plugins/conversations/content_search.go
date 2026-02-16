@@ -3,8 +3,8 @@
 package conversations
 
 import (
-	"github.com/marcus/sidecar/internal/adapter"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // ContentSearchState holds cross-conversation search state.

@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcus/sidecar/internal/adapter"
-	"github.com/marcus/sidecar/internal/adapter/cache"
-	"github.com/marcus/sidecar/internal/adapter/pricing"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter/cache"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter/pricing"
 )
 
 // xmlTagRegex matches XML/HTML-like tags for stripping from session titles

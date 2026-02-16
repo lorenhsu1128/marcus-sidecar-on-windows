@@ -17,7 +17,7 @@ This guide covers how to add drag-to-resize support for two-pane plugin layouts.
 ### 1. Add Mouse Handler to Plugin Struct
 
 ```go
-import "github.com/marcus/sidecar/internal/mouse"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 
 type Plugin struct {
     // ... other fields
@@ -86,8 +86,8 @@ package myplugin
 
 import (
     tea "github.com/charmbracelet/bubbletea"
-    "github.com/marcus/sidecar/internal/mouse"
-    "github.com/marcus/sidecar/internal/state"
+    "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+    "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/state"
 )
 
 func (p *Plugin) handleMouse(msg tea.MouseMsg) (*Plugin, tea.Cmd) {

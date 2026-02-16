@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/modal"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // ensureDeleteModal builds the delete modal if needed.

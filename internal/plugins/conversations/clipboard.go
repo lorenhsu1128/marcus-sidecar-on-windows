@@ -7,8 +7,8 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/adapter"
-	"github.com/marcus/sidecar/internal/app"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/app"
 )
 
 // yankSessionDetails copies session summary to clipboard.

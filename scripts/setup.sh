@@ -68,13 +68,13 @@ Options:
 
 Examples:
   # Interactive install
-  curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 
   # Headless install (both tools)
-  curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes
+  curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes
 
   # Headless install (sidecar only)
-  curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes --sidecar-only
+  curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes --sidecar-only
 EOF
 }
 
@@ -681,12 +681,12 @@ main() {
                     style_success "sidecar installed: $SIDECAR_VERSION"
                 elif command -v go &> /dev/null; then
                     echo "Installing from source..."
-                    go install -ldflags "-X main.Version=${sc_version}" "github.com/marcus/sidecar/cmd/sidecar@${sc_version}"
+                    go install -ldflags "-X main.Version=${sc_version}" "github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@${sc_version}"
                     SIDECAR_VERSION=$(get_sidecar_version)
                     style_success "sidecar installed: $SIDECAR_VERSION"
                 else
                     style_error "Installation failed. Install Go or download from:"
-                    echo "  https://github.com/marcus/sidecar/releases"
+                    echo "  https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases"
                 fi
             fi
         else

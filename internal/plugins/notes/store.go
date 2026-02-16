@@ -13,7 +13,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/marcus/sidecar/internal/tdroot"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/tdroot"
 )
 
 // Note represents a single note.

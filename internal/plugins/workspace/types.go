@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcus/sidecar/internal/terminal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/terminal"
 )
 
 // mouseEscapeRegex matches SGR mouse escape sequences like \x1b[<35;192;47M or \x1b[<0;50;20m

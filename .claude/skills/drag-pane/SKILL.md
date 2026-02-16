@@ -34,7 +34,7 @@ Add drag-to-resize support for two-pane plugin layouts (sidebar + main content).
 ### Step 1: Add Mouse Handler to Plugin Struct
 
 ```go
-import "github.com/marcus/sidecar/internal/mouse"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 
 type Plugin struct {
     // ... other fields

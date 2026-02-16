@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 // CursorStyle returns the cursor style using current theme colors.

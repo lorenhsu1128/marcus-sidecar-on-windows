@@ -7,8 +7,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/cellbuf"
-	"github.com/marcus/sidecar/internal/styles"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // calculatePaneWidths sets the list and editor pane widths.

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/config"
-	"github.com/marcus/sidecar/internal/plugin"
-	"github.com/marcus/sidecar/internal/tty"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/config"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/tty"
 )
 
 // TestMapKeyToTmux_Printable tests regular character input

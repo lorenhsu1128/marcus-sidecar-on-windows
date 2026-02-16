@@ -3,7 +3,7 @@ package filebrowser
 import (
 	"strings"
 
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 // matchRange represents a highlight range in visible (ANSI-stripped) text coordinates.

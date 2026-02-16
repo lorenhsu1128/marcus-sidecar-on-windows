@@ -13,11 +13,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	app "github.com/marcus/sidecar/internal/app"
-	"github.com/marcus/sidecar/internal/features"
-	"github.com/marcus/sidecar/internal/styles"
-	"github.com/marcus/sidecar/internal/terminal"
-	"github.com/marcus/sidecar/internal/tty"
+	app "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/app"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/features"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/terminal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/tty"
 	"golang.org/x/term"
 )
 

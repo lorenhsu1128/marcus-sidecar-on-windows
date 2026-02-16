@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/modal"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/plugin"
-	"github.com/marcus/sidecar/internal/styles"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // ensureDiagnosticsModal builds/rebuilds the diagnostics modal.

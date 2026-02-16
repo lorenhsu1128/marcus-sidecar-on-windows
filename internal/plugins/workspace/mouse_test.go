@@ -3,7 +3,7 @@ package workspace
 import (
 	"testing"
 
-	"github.com/marcus/sidecar/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 )
 
 func TestIsModalViewMode(t *testing.T) {

@@ -19,7 +19,7 @@ func TestUpdateCommand(t *testing.T) {
 			name:     "go install",
 			version:  "v1.0.0",
 			method:   InstallMethodGo,
-			contains: []string{"go install", "v1.0.0", "github.com/marcus/sidecar"},
+			contains: []string{"go install", "v1.0.0", "github.com/lorenhsu1128/marcus-sidecar-on-windows"},
 		},
 		{
 			name:     "go install with ldflags",
@@ -37,7 +37,7 @@ func TestUpdateCommand(t *testing.T) {
 			name:     "binary download",
 			version:  "v1.0.0",
 			method:   InstallMethodBinary,
-			contains: []string{"https://github.com/marcus/sidecar/releases/tag/v1.0.0"},
+			contains: []string{"https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases/tag/v1.0.0"},
 		},
 	}
 
@@ -99,7 +99,7 @@ func TestCheck_APIErrors(t *testing.T) {
 		{
 			name:       "200 success",
 			statusCode: http.StatusOK,
-			body:       `{"tag_name": "v1.0.0", "html_url": "https://github.com/marcus/sidecar/releases/tag/v1.0.0"}`,
+			body:       `{"tag_name": "v1.0.0", "html_url": "https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases/tag/v1.0.0"}`,
 			wantErr:    false,
 		},
 	}
@@ -166,7 +166,7 @@ func TestCheckResult(t *testing.T) {
 	result := CheckResult{
 		CurrentVersion: "v1.0.0",
 		LatestVersion:  "v1.2.0",
-		UpdateURL:      "https://github.com/marcus/sidecar/releases/tag/v1.2.0",
+		UpdateURL:      "https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases/tag/v1.2.0",
 		HasUpdate:      true,
 		Error:          nil,
 	}
@@ -184,7 +184,7 @@ func TestRelease(t *testing.T) {
 	r := Release{
 		TagName:     "v1.0.0",
 		PublishedAt: time.Now(),
-		HTMLURL:     "https://github.com/marcus/sidecar/releases/tag/v1.0.0",
+		HTMLURL:     "https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases/tag/v1.0.0",
 	}
 
 	if r.TagName != "v1.0.0" {

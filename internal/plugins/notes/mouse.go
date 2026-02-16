@@ -8,9 +8,9 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/marcus/sidecar/internal/app"
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/state"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/app"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/state"
 )
 
 // dragForwardThrottle is the minimum interval between forwarding mouse drag

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/terminal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/terminal"
 )
 
 // IsSessionDeadError checks if an error indicates the tmux session/pane is gone.

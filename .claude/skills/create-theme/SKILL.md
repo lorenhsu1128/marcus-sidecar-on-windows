@@ -205,7 +205,7 @@ Resolution order: project theme > global `ui.theme` > `"default"`.
 ## Programmatic Theme Registration
 
 ```go
-import "github.com/marcus/sidecar/internal/styles"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 
 myTheme := styles.Theme{
     Name:        "my-theme",
@@ -234,7 +234,7 @@ styles.ApplyTheme("dracula")
 styles.ApplyThemeWithOverrides("default", map[string]string{"primary": "#FF5500"})
 
 // Resolve effective theme for a project path (project > global > default)
-import "github.com/marcus/sidecar/internal/theme"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/theme"
 resolved := theme.ResolveTheme(cfg, "/path/to/project")
 theme.ApplyResolved(resolved)
 ```

@@ -8,10 +8,10 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/modal"
-	"github.com/marcus/sidecar/internal/mouse"
-	appmsg "github.com/marcus/sidecar/internal/msg"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	appmsg "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/msg"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // Task types for the dropdown

@@ -264,8 +264,8 @@ func TestParseExistingPRURL(t *testing.T) {
 	}{
 		{
 			name:      "standard error with PR URL",
-			output:    `a pull request for branch "workspace-improvements" into branch "main" already exists: https://github.com/marcus/sidecar/pull/30: exit status 1`,
-			wantURL:   "https://github.com/marcus/sidecar/pull/30",
+			output:    `a pull request for branch "workspace-improvements" into branch "main" already exists: https://github.com/lorenhsu1128/marcus-sidecar-on-windows/pull/30: exit status 1`,
+			wantURL:   "https://github.com/lorenhsu1128/marcus-sidecar-on-windows/pull/30",
 			wantFound: true,
 		},
 		{

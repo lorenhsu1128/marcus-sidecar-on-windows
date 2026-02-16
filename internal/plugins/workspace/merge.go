@@ -9,9 +9,9 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/app"
-	"github.com/marcus/sidecar/internal/msg"
-	"github.com/marcus/sidecar/internal/plugins/gitstatus"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/app"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/msg"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugins/gitstatus"
 )
 
 // MergeWorkflowStep represents the current step in the merge workflow.

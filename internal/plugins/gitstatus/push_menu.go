@@ -1,9 +1,9 @@
 package gitstatus
 
 import (
-	"github.com/marcus/sidecar/internal/modal"
-	"github.com/marcus/sidecar/internal/styles"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 const (

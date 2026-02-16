@@ -40,7 +40,7 @@ This is required before the setup script can work, as it needs to parse td's ver
 
 ### New File: `scripts/setup.sh` (sidecar repo only)
 
-Hosted at: `https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh`
+Hosted at: `https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh`
 
 ### Platform Support
 
@@ -115,7 +115,7 @@ detect_platform() {
    else
      # SHOW command before running
      echo "Will run:"
-     echo "  go install -ldflags \"-X main.Version=$LATEST\" github.com/marcus/sidecar/cmd/sidecar@$LATEST"
+     echo "  go install -ldflags \"-X main.Version=$LATEST\" github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@$LATEST"
      # prompt, then run
    fi
    ```
@@ -238,7 +238,7 @@ Version
   sidecar: v0.1.5 → v0.1.6 available
   td:      v0.4.12 ✓
 
-Update: curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+Update: curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 ```
 
 When both up to date:
@@ -266,7 +266,7 @@ Version
 
 ## Quick Install
 
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 
 The script will ask what you want to install:
 - **Both td and sidecar** (recommended) - td provides task management for AI workflows
@@ -294,10 +294,10 @@ Run the same command - the script detects installed versions and only updates wh
 ## Headless/CI Installation
 
 # Install both (default)
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes
 
 # Install sidecar only
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes --sidecar-only
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes --sidecar-only
 
 ## Manual Installation
 
@@ -312,7 +312,7 @@ Add to ~/.zshrc or ~/.bashrc:
 export PATH="$HOME/go/bin:$PATH"
 
 ### 3. Install sidecar
-go install github.com/marcus/sidecar/cmd/sidecar@latest
+go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest
 
 ### 4. (Optional) Install td
 go install github.com/marcus/td@latest
@@ -343,7 +343,7 @@ Add "Quick Install" section at top pointing to setup script:
 ```markdown
 ## Quick Install
 
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 
 Or see [Getting Started](docs/GETTING_STARTED.md) for manual installation.
 ```

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/marcus/sidecar/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
 )
 
 // createTabTestPlugin creates a test plugin with files for tab testing.

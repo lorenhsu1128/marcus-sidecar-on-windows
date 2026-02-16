@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 // renderKanbanView renders the kanban board view.

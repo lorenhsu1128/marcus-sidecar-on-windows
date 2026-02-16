@@ -2,9 +2,9 @@
 
 You might never open your editor again.
 
-**Status: Ready for daily use.** Please [report any issues](https://github.com/marcus/sidecar/issues) you encounter.
+**Status: Ready for daily use.** Please [report any issues](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/issues) you encounter.
 
-[Documentation](https://marcus.github.io/sidecar/) · [Getting Started](https://marcus.github.io/sidecar/docs/intro)
+[Getting Started](docs/getting-started.md)
 
 ![Git Status](docs/screenshots/sidecar-git.png)
 
@@ -25,15 +25,38 @@ This builds from source and avoids macOS Gatekeeper warnings.
 ### Linux / Other
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 ```
 
-**More options:** [Binary downloads](https://github.com/marcus/sidecar/releases) · [Manual install](docs/getting-started.md)
+### Windows
+
+**Quick install (recommended):**
+
+```powershell
+irm https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/install.ps1 | iex
+```
+
+**From source:**
+
+```bash
+go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest
+```
+
+This installs `sidecar.exe` to `%GOPATH%\bin` (default: `%USERPROFILE%\go\bin`). Make sure that path is in your system PATH.
+
+**Manual install:**
+
+Download from [Releases](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases).
+
+Windows uses ConPTY as the terminal backend (replacing tmux on Unix), so no additional dependencies are required.
+
+**More options:** [Binary downloads](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases) · [Manual install](docs/getting-started.md)
 
 ## Requirements
 
-- macOS, Linux, or WSL
+- macOS, Linux, WSL, or Windows 11
 - Go 1.21+ (only if building from source)
+- tmux (macOS/Linux only, for workspace shell sessions)
 
 ## Quick Start
 
@@ -94,8 +117,7 @@ Sidecar checks for updates on startup. When a new version is available, a toast 
 
 ### Git Status
 
-View staged, modified, and untracked files with a split-pane interface. The sidebar shows files and recent commits; the main pane shows syntax-highlighted diffs. [Full documentation →](https://marcus.github.io/sidecar/docs/git-plugin)
-
+View staged, modified, and untracked files with a split-pane interface. The sidebar shows files and recent commits; the main pane shows syntax-highlighted diffs.
 ![Git Status with Diff](docs/screenshots/sidecar-git.png)
 
 **Features:**
@@ -108,8 +130,7 @@ View staged, modified, and untracked files with a split-pane interface. The side
 
 ### Conversations
 
-Browse session history from multiple AI coding agents with message content, token usage, and search. Supports Amp Code, Claude Code, Codex, Cursor CLI, Gemini CLI, Kiro, OpenCode, and Warp. [Full documentation →](https://marcus.github.io/sidecar/docs/conversations-plugin)
-
+Browse session history from multiple AI coding agents with message content, token usage, and search. Supports Amp Code, Claude Code, Codex, Cursor CLI, Gemini CLI, Kiro, OpenCode, and Warp.
 ![Conversations](docs/screenshots/sidecar-conversations.png)
 
 **Features:**
@@ -122,8 +143,7 @@ Browse session history from multiple AI coding agents with message content, toke
 
 ### TD Monitor
 
-Integration with [TD](https://github.com/marcus/td), a task management system designed for AI agents working across context windows. TD helps agents track work, log progress, and maintain context across sessions—essential for AI-assisted development where context windows reset between conversations. [Full documentation →](https://marcus.github.io/sidecar/docs/td)
-
+Integration with [TD](https://github.com/marcus/td), a task management system designed for AI agents working across context windows. TD helps agents track work, log progress, and maintain context across sessions—essential for AI-assisted development where context windows reset between conversations.
 ![TD Monitor](docs/screenshots/sidecar-td.png)
 
 **Features:**
@@ -137,8 +157,7 @@ See the [TD repository](https://github.com/marcus/td) for installation and CLI u
 
 ### File Browser
 
-Navigate project files with a tree view and syntax-highlighted preview. [Full documentation →](https://marcus.github.io/sidecar/docs/files-plugin)
-
+Navigate project files with a tree view and syntax-highlighted preview.
 ![File Browser](docs/screenshots/sidecar-files.png)
 
 **Features:**
@@ -149,8 +168,7 @@ Navigate project files with a tree view and syntax-highlighted preview. [Full do
 
 ### Workspaces
 
-Manage workspaces for parallel development with integrated agent support. Create isolated branches as sibling directories, link tasks from TD, and launch coding agents directly from sidecar. [Full documentation →](https://marcus.github.io/sidecar/docs/workspaces-plugin)
-
+Manage workspaces for parallel development with integrated agent support. Create isolated branches as sibling directories, link tasks from TD, and launch coding agents directly from sidecar.
 ![Workspaces](docs/screenshots/sidecar-workspaces.png)
 
 **Features:**
@@ -238,9 +256,24 @@ See [Theme Creation Skill](.claude/skills/create-theme/SKILL.md) for custom them
 | `p` | Push branch             |
 | `o` | Open in finder/terminal |
 
+## Platform Notes
+
+### Windows
+
+- **終端後端**：Windows 使用 ConPTY（Windows Pseudo Console），自動取代 Unix 上的 tmux，無需額外安裝
+- **設定檔位置**：`%APPDATA%\sidecar\config.json`（而非 `~/.config/sidecar/`）
+- **狀態檔位置**：`%APPDATA%\sidecar\state.json`
+- **預設編輯器**：Windows 上預設使用 `notepad`（可透過 `$EDITOR` 環境變數覆蓋）
+- **檔案鎖定**：使用 Windows 原生 `LockFileEx` / `UnlockFileEx`（而非 Unix flock）
+
+### macOS / Linux
+
+- **終端後端**：使用 tmux 管理 shell session
+- **設定檔位置**：`~/.config/sidecar/config.json`
+
 ## Configuration
 
-Config file: `~/.config/sidecar/config.json`
+Config file: `~/.config/sidecar/config.json` (macOS/Linux) or `%APPDATA%\sidecar\config.json` (Windows)
 
 ```json
 {
@@ -263,8 +296,8 @@ Config file: `~/.config/sidecar/config.json`
 
 ## Contributing
 
-- **Bug reports**: [Open an issue](https://github.com/marcus/sidecar/issues)
-- **Feature requests**: Check the [Sidecar Roadmap](https://github.com/users/marcus/projects/3) for planned features and backlog
+- **Bug reports**: [Open an issue](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/issues)
+- **Feature requests**: [Open an issue](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/issues) with your suggestion
 
 ## Development
 

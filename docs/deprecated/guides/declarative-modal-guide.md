@@ -5,7 +5,7 @@ This guide covers the `internal/modal` package for building modals in Sidecar. T
 ## Quick Start
 
 ```go
-import "github.com/marcus/sidecar/internal/modal"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
 
 // 1. Create the modal
 m := modal.New("Delete Worktree?",

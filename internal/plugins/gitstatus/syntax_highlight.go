@@ -8,7 +8,7 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/lipgloss"
-	appstyles "github.com/marcus/sidecar/internal/styles"
+	appstyles "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 // SyntaxHighlighter provides syntax highlighting for diff content using Chroma.

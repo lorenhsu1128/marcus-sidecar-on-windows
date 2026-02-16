@@ -31,7 +31,7 @@ const MINI_FEATURES = [
 // - Example: curl -fsSL sidecar.dev/install.sh | sh
 // - Or: curl -fsSL get.sidecar.dev | sh
 // Popular projects use: sh.rustup.rs, get.docker.com, brew.sh, etc.
-const INSTALL_COMMAND = 'curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash';
+const INSTALL_COMMAND = 'curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash';
 const BREW_COMMAND = 'brew install marcus/tap/sidecar';
 
 function CopyButton({ text }) {
@@ -938,7 +938,7 @@ export default function Home() {
                 <Link className="sc-btnSecondary" to="/docs/intro">
                   <i className="icon-book-open" /> Docs
                 </Link>
-                <a className="sc-btnSecondary" href={siteConfig.customFields?.githubUrl || 'https://github.com/marcus/sidecar'}>
+                <a className="sc-btnSecondary" href={siteConfig.customFields?.githubUrl || 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows'}>
                   <i className="icon-github" /> GitHub
                 </a>
               </div>
@@ -1392,7 +1392,7 @@ export default function Home() {
               <Link className="sc-btnSecondary" to="/docs/intro">
                 <i className="icon-book-open" /> Docs
               </Link>
-              <a className="sc-btnSecondary" href="https://github.com/marcus/sidecar">
+              <a className="sc-btnSecondary" href="https://github.com/lorenhsu1128/marcus-sidecar-on-windows">
                 <i className="icon-github" /> GitHub
               </a>
             </div>
@@ -1466,14 +1466,14 @@ export default function Home() {
                 </div>
                 <div className="sc-install-method">
                   <h4>Binary Download</h4>
-                  <p className="sc-install-desc">Download pre-built binaries from <a href="https://github.com/marcus/sidecar/releases">GitHub Releases</a></p>
+                  <p className="sc-install-desc">Download pre-built binaries from <a href="https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases">GitHub Releases</a></p>
                 </div>
                 <div className="sc-install-method">
                   <h4>From Source</h4>
                   <div className="sc-codeBlock sc-installBlock">
                     <div className="sc-installCommand">
                       <span className="sc-lineBlue">$ </span>
-                      <span>go install github.com/marcus/sidecar/cmd/sidecar@latest</span>
+                      <span>go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest</span>
                     </div>
                   </div>
                 </div>

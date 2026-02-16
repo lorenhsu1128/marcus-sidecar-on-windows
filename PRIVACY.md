@@ -113,7 +113,7 @@ These requests use a 5-second timeout, send no authentication, and are cached lo
 
 ### Changelog fetch (user-initiated)
 
-When you open the changelog from the update modal, sidecar fetches `raw.githubusercontent.com/marcus/sidecar/main/CHANGELOG.md` with a 10-second timeout.
+When you open the changelog from the update modal, sidecar fetches `raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/CHANGELOG.md` with a 10-second timeout.
 
 ### Self-update (user-initiated)
 

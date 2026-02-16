@@ -2,7 +2,7 @@ package gitstatus
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // Package-level cache for gitstatus rendering. Safe because Bubble Tea updates run on one goroutine.

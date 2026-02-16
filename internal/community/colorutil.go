@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 const achromaticEpsilon = 1e-6

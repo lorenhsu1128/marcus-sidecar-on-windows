@@ -3,7 +3,7 @@ package geminicli
 import (
 	"testing"
 
-	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
 )
 
 func TestSearchMessages_InterfaceCompliance(t *testing.T) {

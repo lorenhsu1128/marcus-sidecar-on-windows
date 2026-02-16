@@ -31,7 +31,7 @@ const config = {
   trailingSlash: false,
 
   customFields: {
-    githubUrl: 'https://github.com/marcus/sidecar',
+    githubUrl: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows',
   },
 
   onBrokenLinks: 'throw',
@@ -80,7 +80,7 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          editUrl: 'https://github.com/marcus/sidecar/tree/main/website/',
+          editUrl: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows/tree/main/website/',
         },
         blog: {
           showReadingTime: true,
@@ -88,7 +88,7 @@ const config = {
             type: ['rss', 'atom'],
             xslt: true,
           },
-          editUrl: 'https://github.com/marcus/sidecar/tree/main/website/',
+          editUrl: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows/tree/main/website/',
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
@@ -136,7 +136,7 @@ const config = {
             position: 'right',
           },
           {
-            href: 'https://github.com/marcus/sidecar',
+            href: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows',
             label: 'GitHub',
             position: 'right',
           },
@@ -167,15 +167,15 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/marcus/sidecar',
+                href: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows',
               },
               {
                 label: 'Issues',
-                href: 'https://github.com/marcus/sidecar/issues',
+                href: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows/issues',
               },
               {
                 label: 'Releases',
-                href: 'https://github.com/marcus/sidecar/releases',
+                href: 'https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases',
               },
             ],
           },

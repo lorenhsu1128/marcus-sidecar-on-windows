@@ -5,9 +5,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/adapter"
-	appmsg "github.com/marcus/sidecar/internal/msg"
-	"github.com/marcus/sidecar/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
+	appmsg "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/msg"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
 )
 
 // Update methods for handling key events in various views

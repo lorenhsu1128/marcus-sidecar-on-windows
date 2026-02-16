@@ -1,4 +1,4 @@
-module github.com/marcus/sidecar
+module github.com/lorenhsu1128/marcus-sidecar-on-windows
 
 go 1.25.5
 

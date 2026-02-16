@@ -11,7 +11,7 @@ Feature flags gate experimental functionality behind user-configurable settings,
 ## Checking Feature State
 
 ```go
-import "github.com/marcus/sidecar/internal/features"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/features"
 
 if features.IsEnabled("tmux_interactive_input") {
     // Feature-gated code

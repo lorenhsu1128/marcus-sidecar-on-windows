@@ -3,7 +3,7 @@
 ## Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 ```
 
 Or install via Homebrew:
@@ -16,9 +16,27 @@ The script will ask what you want to install:
 - **Both td and sidecar** (recommended) - td provides task management for AI workflows
 - **sidecar only** - works standalone without td
 
+### Windows
+
+**Quick install (recommended):**
+
+```powershell
+irm https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/install.ps1 | iex
+```
+
+**From source:**
+
+```bash
+go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest
+```
+
+This installs `sidecar.exe` to `%GOPATH%\bin` (default: `%USERPROFILE%\go\bin`). Make sure that path is in your system PATH.
+
+Windows uses ConPTY as the terminal backend (replacing tmux on Unix), so no additional dependencies are required.
+
 ## Prerequisites
 
-- macOS, Linux, or Windows (WSL)
+- macOS, Linux, WSL, or Windows 11
 - Terminal access
 - Go 1.21+ (only if building from source — Homebrew and binary installs don't require Go)
 
@@ -37,29 +55,37 @@ The script will ask what you want to install:
 Run the same command - the script detects installed versions and only updates what's needed.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 ```
 
 ## Headless/CI Installation
 
 ```bash
 # Install both (default)
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes
 
 # Install sidecar only
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes --sidecar-only
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes --sidecar-only
 
 # Force reinstall even if up-to-date
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash -s -- --yes --force
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash -s -- --yes --force
 ```
 
 ## Binary Download
 
-Download pre-built binaries directly from [GitHub Releases](https://github.com/marcus/sidecar/releases). Available for macOS and Linux (amd64 and arm64).
+Download pre-built binaries directly from [GitHub Releases](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases). Available for macOS, Linux, and Windows (amd64 and arm64).
+
+**macOS / Linux:**
 
 1. Download the archive for your platform
 2. Extract: `tar -xzf sidecar_*.tar.gz`
 3. Move to PATH: `mv sidecar /usr/local/bin/` (or `~/go/bin/`)
+
+**Windows:**
+
+1. Download the `.zip` for your architecture (amd64 or arm64)
+2. Extract the zip file
+3. Move `sidecar.exe` to a directory in your PATH (e.g., `%LOCALAPPDATA%\sidecar\`)
 
 ## Manual Installation
 
@@ -89,7 +115,7 @@ export PATH="$HOME/go/bin:$PATH"
 ### 3. Install sidecar
 
 ```bash
-go install github.com/marcus/sidecar/cmd/sidecar@latest
+go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest
 ```
 
 ### 4. (Optional) Install td
@@ -143,4 +169,35 @@ The setup script requires Go 1.21+. Update Go:
 brew upgrade go
 
 # Linux - download latest from https://go.dev/dl/
+```
+
+### Windows: "sidecar is not recognized as an internal or external command"
+
+The sidecar binary is not in your PATH. Add it:
+
+```powershell
+# If installed via go install:
+$env:Path += ";$env:USERPROFILE\go\bin"
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:USERPROFILE\go\bin", "User")
+
+# If installed manually:
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:LOCALAPPDATA\sidecar", "User")
+```
+
+Restart your terminal after updating PATH.
+
+### Windows: PowerShell execution policy
+
+If PowerShell blocks the install script, run:
+
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Windows: Windows Defender false positive
+
+If Windows Defender flags `sidecar.exe`, add an exclusion:
+
+```powershell
+Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\sidecar"
 ```

@@ -3,7 +3,7 @@ package gitstatus
 import (
 	"testing"
 
-	"github.com/marcus/sidecar/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
 )
 
 func makeCommits(prefix string, count int) []*Commit {

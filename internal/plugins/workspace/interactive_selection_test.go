@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/marcus/sidecar/internal/mouse"
-	"github.com/marcus/sidecar/internal/ui"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/ui"
 )
 
 // newSelectionTestPlugin creates a Plugin with interactive state configured for selection tests.

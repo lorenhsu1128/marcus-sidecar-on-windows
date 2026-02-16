@@ -109,7 +109,7 @@ brew install marcus/tap/sidecar
 sidecar --version
 
 # Test that users can install from source (critical!)
-GOWORK=off go install github.com/marcus/sidecar/cmd/sidecar@vX.Y.Z
+GOWORK=off go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@vX.Y.Z
 
 # Verify binary shows correct version
 sidecar --version
@@ -170,10 +170,10 @@ goreleaser release --clean
 
 Users can install sidecar in several ways:
 
-1. **Setup script**: `curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/setup.sh | bash`
+1. **Setup script**: `curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/setup.sh | bash`
 2. **Homebrew**: `brew install marcus/tap/sidecar`
-3. **Download binary**: grab the appropriate binary from the [GitHub Releases](https://github.com/marcus/sidecar/releases) page
-4. **From source**: `go install github.com/marcus/sidecar/cmd/sidecar@latest`
+3. **Download binary**: grab the appropriate binary from the [GitHub Releases](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases) page
+4. **From source**: `go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest`
 
 ## Checklist
 

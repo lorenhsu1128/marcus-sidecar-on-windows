@@ -308,7 +308,7 @@ Strategy:
 ```go
 package openclaw
 
-import "github.com/marcus/sidecar/internal/adapter"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
 
 func init() {
     adapter.RegisterFactory(func() adapter.Adapter {

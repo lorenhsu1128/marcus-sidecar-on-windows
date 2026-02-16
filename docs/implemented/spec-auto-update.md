@@ -42,7 +42,7 @@ type UpdateErrorMsg struct {
 Add import for mouse package and add to Model struct (after `tdVersionInfo`):
 
 ```go
-import "github.com/marcus/sidecar/internal/mouse"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 
 // Update feature state
 updateButtonFocus  bool
@@ -88,7 +88,7 @@ func (m *Model) doUpdate() tea.Cmd {
         if sidecarUpdate != nil {
             args := []string{"install", "-ldflags",
                 fmt.Sprintf("-X main.Version=%s", sidecarUpdate.LatestVersion),
-                fmt.Sprintf("github.com/marcus/sidecar/cmd/sidecar@%s", sidecarUpdate.LatestVersion)}
+                fmt.Sprintf("github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@%s", sidecarUpdate.LatestVersion)}
             cmd := exec.Command("go", args...)
             if output, err := cmd.CombinedOutput(); err != nil {
                 return UpdateErrorMsg{Step: "sidecar", Err: fmt.Errorf("%v: %s", err, output)}

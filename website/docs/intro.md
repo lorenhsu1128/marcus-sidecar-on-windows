@@ -27,7 +27,7 @@ AI coding agents are powerful but opaque. When Claude Code or Cursor makes chang
 ## Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash
 ```
 
 **Requirements:** macOS, Linux, or WSL.
@@ -40,11 +40,11 @@ curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.s
 brew install marcus/tap/sidecar
 ```
 
-**Binary download:** Grab a pre-built binary from [GitHub Releases](https://github.com/marcus/sidecar/releases).
+**Binary download:** Grab a pre-built binary from [GitHub Releases](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases).
 
 **From source** (requires Go 1.21+):
 ```bash
-go install github.com/marcus/sidecar/cmd/sidecar@latest
+go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest
 ```
 
 </details>
@@ -297,9 +297,9 @@ sidecar --version            # Print version and exit
 Sidecar checks for new versions on startup and shows a notification when updates are available. Press `!` to view the diagnostics modal with the update command.
 
 **Update methods:**
-- **Setup script:** `curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.sh | bash`
+- **Setup script:** `curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/scripts/setup.sh | bash`
 - **Homebrew:** `brew upgrade sidecar`
-- **Binary:** Download the latest from [GitHub Releases](https://github.com/marcus/sidecar/releases)
+- **Binary:** Download the latest from [GitHub Releases](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/releases)
 
 ## What's Next?
 
@@ -307,15 +307,15 @@ Sidecar checks for new versions on startup and shows a notification when updates
 - **[Workspaces Plugin](./workspaces-plugin)** - Parallel agent setup and management
 - **[Project Switching](./project-switching)** - Multi-repo workflow configuration
 - **[TD Integration](./td)** - Task tracking across sessions
-- **[GitHub Repository](https://github.com/marcus/sidecar)** - Source code and issues
+- **[GitHub Repository](https://github.com/lorenhsu1128/marcus-sidecar-on-windows)** - Source code and issues
 
 **Build from source:**
 
 ```bash
-git clone https://github.com/marcus/sidecar.git
+git clone https://github.com/lorenhsu1128/marcus-sidecar-on-windows.git
 cd sidecar
 make build
 make install
 ```
 
-Requires Go 1.21+. See the [GitHub README](https://github.com/marcus/sidecar#development) for development setup.
+Requires Go 1.21+. See the [GitHub README](https://github.com/lorenhsu1128/marcus-sidecar-on-windows#development) for development setup.

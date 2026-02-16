@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
 )
 
 // NewWatcher creates a watcher for Cursor CLI session changes.

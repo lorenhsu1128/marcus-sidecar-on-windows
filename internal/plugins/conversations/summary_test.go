@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
 )
 
 func TestComputeSessionSummary_Empty(t *testing.T) {

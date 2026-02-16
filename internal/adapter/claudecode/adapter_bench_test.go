@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/marcus/sidecar/internal/adapter/cache"
-	"github.com/marcus/sidecar/internal/adapter/testutil"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter/cache"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter/testutil"
 )
 
 // Benchmark targets (td-336ee0):

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 func TestConvertCatppuccinMocha(t *testing.T) {

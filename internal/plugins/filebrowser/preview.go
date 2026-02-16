@@ -11,8 +11,8 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/marcus/sidecar/internal/image"
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/image"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 const (

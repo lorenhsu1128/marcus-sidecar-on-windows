@@ -3,10 +3,10 @@ package plugin
 import (
 	"log/slog"
 
-	"github.com/marcus/sidecar/internal/adapter"
-	"github.com/marcus/sidecar/internal/config"
-	"github.com/marcus/sidecar/internal/event"
-	"github.com/marcus/sidecar/internal/terminal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/config"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/event"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/terminal"
 )
 
 // BindingRegistrar allows plugins to register key bindings dynamically.

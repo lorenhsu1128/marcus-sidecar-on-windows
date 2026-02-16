@@ -2,7 +2,7 @@ package ui
 
 import (
 	"github.com/charmbracelet/x/ansi"
-	"github.com/marcus/sidecar/internal/mouse"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 )
 
 // SelectionPoint represents a position as (line, col) in visual space.

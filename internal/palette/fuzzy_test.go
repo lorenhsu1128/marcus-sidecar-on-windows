@@ -3,7 +3,7 @@ package palette
 import (
 	"testing"
 
-	"github.com/marcus/sidecar/internal/plugin"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/plugin"
 )
 
 func TestFuzzyMatch_EmptyQuery(t *testing.T) {

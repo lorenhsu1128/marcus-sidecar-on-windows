@@ -404,7 +404,7 @@ Colors must be valid hex codes in `#RRGGBB` format. Invalid colors will be ignor
 For plugins or extensions, themes can be registered programmatically:
 
 ```go
-import "github.com/marcus/sidecar/internal/styles"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 
 myTheme := styles.Theme{
     Name:        "my-theme",
@@ -446,7 +446,7 @@ styles.ApplyThemeWithOverrides("default", map[string]string{
 })
 
 // Resolve effective theme for a project path (priority: project > global > default)
-import "github.com/marcus/sidecar/internal/theme"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/theme"
 
 resolved := theme.ResolveTheme(cfg, "/path/to/project")
 theme.ApplyResolved(resolved)

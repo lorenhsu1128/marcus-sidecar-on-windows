@@ -10,7 +10,7 @@ Use the `internal/modal` package. The library handles keyboard navigation, mouse
 ## Quick Start
 
 ```go
-import "github.com/marcus/sidecar/internal/modal"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/modal"
 
 // 1. Create the modal
 m := modal.New("Delete Worktree?",

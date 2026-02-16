@@ -17,7 +17,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
 )
 
 // sqlitePoolSettings configures connection pool to prevent FD leaks (td-649ba4).

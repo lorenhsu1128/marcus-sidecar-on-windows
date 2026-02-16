@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/marcus/sidecar/internal/config"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/config"
 )
 
 // ErrNotInitialized is returned when the feature manager is not initialized.

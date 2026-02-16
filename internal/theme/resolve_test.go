@@ -3,8 +3,8 @@ package theme
 import (
 	"testing"
 
-	"github.com/marcus/sidecar/internal/config"
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/config"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 func TestResolveTheme(t *testing.T) {

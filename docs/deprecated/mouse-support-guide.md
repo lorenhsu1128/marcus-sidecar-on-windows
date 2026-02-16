@@ -32,7 +32,7 @@ The `internal/mouse` package provides:
 ### 1. Add Handler Field
 
 ```go
-import "github.com/marcus/sidecar/internal/mouse"
+import "github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/mouse"
 
 type Plugin struct {
     // ... other fields

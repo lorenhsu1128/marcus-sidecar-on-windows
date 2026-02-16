@@ -95,11 +95,11 @@ The tap uses source-build formulas (to avoid macOS Gatekeeper warnings on pre-bu
 ### 7b. Update Homebrew Tap (REQUIRED — Manual Step)
 
 The Homebrew tap at `marcus/homebrew-tap` must be updated for every release.
-If you skip this, users will see "update available" but `brew upgrade` won't find it (see [#122](https://github.com/marcus/sidecar/issues/122)).
+If you skip this, users will see "update available" but `brew upgrade` won't find it (see [#122](https://github.com/lorenhsu1128/marcus-sidecar-on-windows/issues/122)).
 
 ```bash
 # Get the source tarball SHA256
-curl -sL "https://github.com/marcus/sidecar/archive/refs/tags/vX.Y.Z.tar.gz" | shasum -a 256
+curl -sL "https://github.com/lorenhsu1128/marcus-sidecar-on-windows/archive/refs/tags/vX.Y.Z.tar.gz" | shasum -a 256
 
 # Edit the formula (local tap is at /opt/homebrew/Library/Taps/marcus/homebrew-tap/)
 # Update: url (tag version) and sha256
@@ -128,7 +128,7 @@ brew install marcus/tap/sidecar
 sidecar --version
 
 # Test go install (critical!)
-GOWORK=off go install github.com/marcus/sidecar/cmd/sidecar@vX.Y.Z
+GOWORK=off go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@vX.Y.Z
 sidecar --version
 # Should output: sidecar version vX.Y.Z
 
@@ -165,10 +165,10 @@ On startup, sidecar checks `https://api.github.com/repos/marcus/sidecar/releases
 
 ## Install Methods
 
-1. **Setup script**: `curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/setup.sh | bash`
+1. **Setup script**: `curl -fsSL https://raw.githubusercontent.com/lorenhsu1128/marcus-sidecar-on-windows/main/setup.sh | bash`
 2. **Homebrew**: `brew install marcus/tap/sidecar`
 3. **Download binary**: from GitHub Releases page
-4. **From source**: `go install github.com/marcus/sidecar/cmd/sidecar@latest`
+4. **From source**: `go install github.com/lorenhsu1128/marcus-sidecar-on-windows/cmd/sidecar@latest`
 
 ## Checklist
 

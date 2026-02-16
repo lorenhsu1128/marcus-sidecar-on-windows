@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/marcus/sidecar/internal/styles"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/styles"
 )
 
 // Convert maps a CommunityScheme to a full Sidecar ColorPalette.

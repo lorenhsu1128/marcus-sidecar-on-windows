@@ -1,7 +1,7 @@
 # Fix #122: Self-Update Broken
 
 ## Issue
-https://github.com/marcus/sidecar/issues/122
+https://github.com/lorenhsu1128/marcus-sidecar-on-windows/issues/122
 
 Users report the built-in updater (! → u) doesn't work. Affects Homebrew users primarily, possibly go install users too.
 

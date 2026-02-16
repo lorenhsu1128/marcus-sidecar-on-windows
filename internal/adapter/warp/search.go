@@ -1,7 +1,7 @@
 package warp
 
 import (
-	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/adapter"
 )
 
 // SearchMessages searches message content within a session.

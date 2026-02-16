@@ -13,9 +13,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/marcus/sidecar/internal/features"
-	"github.com/marcus/sidecar/internal/state"
-	"github.com/marcus/sidecar/internal/terminal"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/features"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/state"
+	"github.com/lorenhsu1128/marcus-sidecar-on-windows/internal/terminal"
 )
 
 // Shell session constants
