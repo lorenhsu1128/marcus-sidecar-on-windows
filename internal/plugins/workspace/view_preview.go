@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -95,16 +96,16 @@ func (p *Plugin) renderWelcomeGuide(width, height int) string {
 	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	warningStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
 
-	// Check if tmux is installed
-	if !isTmuxInstalled() {
-		lines = append(lines, warningStyle.Render("⚠ tmux Required"))
+	// Check if terminal backend is available
+	if !p.ctx.Terminal.IsAvailable() {
+		lines = append(lines, warningStyle.Render("⚠ Terminal Backend Required"))
 		lines = append(lines, "")
-		lines = append(lines, dimText("Workspaces and shell sessions require tmux to be installed."))
+		lines = append(lines, dimText("Workspaces require a terminal backend to be available."))
 		lines = append(lines, "")
-		lines = append(lines, sectionStyle.Render("Install tmux:"))
-		lines = append(lines, dimText("  "+getTmuxInstallInstructions()))
+		lines = append(lines, sectionStyle.Render("Setup:"))
+		lines = append(lines, dimText("  "+p.ctx.Terminal.InstallInstructions()))
 		lines = append(lines, "")
-		lines = append(lines, dimText("After installing, restart sidecar to use this feature."))
+		lines = append(lines, dimText("After setup, restart sidecar to use this feature."))
 		return strings.Join(lines, "\n")
 	}
 
@@ -120,41 +121,58 @@ func (p *Plugin) renderWelcomeGuide(width, height int) string {
 	lines = append(lines, strings.Repeat("─", min(width-4, 60)))
 	lines = append(lines, "")
 
-	// Title
-	title := lipgloss.NewStyle().Bold(true).Render("tmux Quick Reference")
-	lines = append(lines, title)
-	lines = append(lines, "")
+	if runtime.GOOS == "windows" {
+		// Windows: show interactive mode reference (ConPTY backend)
+		title := lipgloss.NewStyle().Bold(true).Render("Quick Reference")
+		lines = append(lines, title)
+		lines = append(lines, "")
 
-	// Section: Attaching to agent sessions
-	prefix := getTmuxPrefix()
-	lines = append(lines, sectionStyle.Render("Agent Sessions"))
-	lines = append(lines, dimText("  Enter      Attach to selected worktree session"))
-	lines = append(lines, dimText(fmt.Sprintf("  %s d   Detach from session (return here)", prefix)))
-	lines = append(lines, "")
+		lines = append(lines, sectionStyle.Render("Agent Sessions"))
+		lines = append(lines, dimText("  Enter      Attach to selected worktree session"))
+		lines = append(lines, dimText("  Esc        Detach from session (return here)"))
+		lines = append(lines, "")
 
-	// Section: Navigation inside tmux
-	lines = append(lines, sectionStyle.Render("Scrolling (in attached session)"))
-	lines = append(lines, dimText(fmt.Sprintf("  %s [        Enter scroll mode", prefix)))
-	lines = append(lines, dimText("  PgUp/PgDn       Scroll page (fn+↑/↓ on Mac)"))
-	lines = append(lines, dimText("  ↑/↓             Scroll line by line"))
-	lines = append(lines, dimText("  q               Exit scroll mode"))
-	lines = append(lines, "")
+		lines = append(lines, sectionStyle.Render("Tips"))
+		lines = append(lines, dimText("  • Create a worktree with 'n' to start"))
+		lines = append(lines, dimText("  • Agent output streams in the Output tab"))
+		lines = append(lines, dimText("  • Attach to interact with the agent directly"))
+	} else {
+		// Unix: tmux Quick Reference
+		title := lipgloss.NewStyle().Bold(true).Render("tmux Quick Reference")
+		lines = append(lines, title)
+		lines = append(lines, "")
 
-	// Section: Interacting with editors
-	lines = append(lines, sectionStyle.Render("Editor Navigation"))
-	lines = append(lines, dimText("  When agent opens vim/nano:"))
-	lines = append(lines, dimText("    :q!      Quit vim without saving"))
-	lines = append(lines, dimText("    :wq      Save and quit vim"))
-	lines = append(lines, dimText("    Ctrl-x   Exit nano"))
-	lines = append(lines, "")
+		// Section: Attaching to agent sessions
+		prefix := getTmuxPrefix()
+		lines = append(lines, sectionStyle.Render("Agent Sessions"))
+		lines = append(lines, dimText("  Enter      Attach to selected worktree session"))
+		lines = append(lines, dimText(fmt.Sprintf("  %s d   Detach from session (return here)", prefix)))
+		lines = append(lines, "")
 
-	// Section: Common tasks
-	lines = append(lines, sectionStyle.Render("Tips"))
-	lines = append(lines, dimText("  • Create a worktree with 'n' to start"))
-	lines = append(lines, dimText("  • Agent output streams in the Output tab"))
-	lines = append(lines, dimText("  • Attach to interact with the agent directly"))
-	lines = append(lines, "")
-	lines = append(lines, dimText("Customize tmux: ~/.tmux.conf (man tmux for options)"))
+		// Section: Navigation inside tmux
+		lines = append(lines, sectionStyle.Render("Scrolling (in attached session)"))
+		lines = append(lines, dimText(fmt.Sprintf("  %s [        Enter scroll mode", prefix)))
+		lines = append(lines, dimText("  PgUp/PgDn       Scroll page (fn+↑/↓ on Mac)"))
+		lines = append(lines, dimText("  ↑/↓             Scroll line by line"))
+		lines = append(lines, dimText("  q               Exit scroll mode"))
+		lines = append(lines, "")
+
+		// Section: Interacting with editors
+		lines = append(lines, sectionStyle.Render("Editor Navigation"))
+		lines = append(lines, dimText("  When agent opens vim/nano:"))
+		lines = append(lines, dimText("    :q!      Quit vim without saving"))
+		lines = append(lines, dimText("    :wq      Save and quit vim"))
+		lines = append(lines, dimText("    Ctrl-x   Exit nano"))
+		lines = append(lines, "")
+
+		// Section: Common tasks
+		lines = append(lines, sectionStyle.Render("Tips"))
+		lines = append(lines, dimText("  • Create a worktree with 'n' to start"))
+		lines = append(lines, dimText("  • Agent output streams in the Output tab"))
+		lines = append(lines, dimText("  • Attach to interact with the agent directly"))
+		lines = append(lines, "")
+		lines = append(lines, dimText("Customize tmux: ~/.tmux.conf (man tmux for options)"))
+	}
 
 	return strings.Join(lines, "\n")
 }
@@ -610,16 +628,16 @@ func (p *Plugin) renderShellPrimer(width, height int) string {
 	sectionStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Primary)
 	warningStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.Warning)
 
-	// Check if tmux is installed
-	if !isTmuxInstalled() {
-		lines = append(lines, warningStyle.Render("⚠ tmux Required"))
+	// Check if terminal backend is available
+	if !p.ctx.Terminal.IsAvailable() {
+		lines = append(lines, warningStyle.Render("⚠ Terminal Backend Required"))
 		lines = append(lines, "")
-		lines = append(lines, dimText("The project shell requires tmux to be installed."))
+		lines = append(lines, dimText("The project shell requires a terminal backend."))
 		lines = append(lines, "")
-		lines = append(lines, sectionStyle.Render("Install tmux:"))
-		lines = append(lines, dimText("  "+getTmuxInstallInstructions()))
+		lines = append(lines, sectionStyle.Render("Setup:"))
+		lines = append(lines, dimText("  "+p.ctx.Terminal.InstallInstructions()))
 		lines = append(lines, "")
-		lines = append(lines, dimText("After installing, restart sidecar to use this feature."))
+		lines = append(lines, dimText("After setup, restart sidecar to use this feature."))
 		return strings.Join(lines, "\n")
 	}
 
@@ -627,17 +645,27 @@ func (p *Plugin) renderShellPrimer(width, height int) string {
 	lines = append(lines, sectionStyle.Render("Project Shell"))
 	lines = append(lines, "")
 
-	// Description
-	lines = append(lines, dimText("A tmux session in your project directory for running"))
-	lines = append(lines, dimText("builds, dev servers, or quick terminal tasks."))
-	lines = append(lines, "")
+	// Description and Quick Start — platform-specific
+	if runtime.GOOS == "windows" {
+		lines = append(lines, dimText("A terminal session in your project directory for running"))
+		lines = append(lines, dimText("builds, dev servers, or quick terminal tasks."))
+		lines = append(lines, "")
 
-	// Quick start
-	prefix := getTmuxPrefix()
-	lines = append(lines, sectionStyle.Render("Quick Start"))
-	lines = append(lines, dimText("  Enter         Create and attach to shell"))
-	lines = append(lines, dimText("  K             Kill shell session"))
-	lines = append(lines, dimText(fmt.Sprintf("  %s d      Detach (return to sidecar)", prefix)))
+		lines = append(lines, sectionStyle.Render("Quick Start"))
+		lines = append(lines, dimText("  Enter         Create and attach to shell"))
+		lines = append(lines, dimText("  K             Kill shell session"))
+		lines = append(lines, dimText("  Esc           Detach (return to sidecar)"))
+	} else {
+		lines = append(lines, dimText("A tmux session in your project directory for running"))
+		lines = append(lines, dimText("builds, dev servers, or quick terminal tasks."))
+		lines = append(lines, "")
+
+		prefix := getTmuxPrefix()
+		lines = append(lines, sectionStyle.Render("Quick Start"))
+		lines = append(lines, dimText("  Enter         Create and attach to shell"))
+		lines = append(lines, dimText("  K             Kill shell session"))
+		lines = append(lines, dimText(fmt.Sprintf("  %s d      Detach (return to sidecar)", prefix)))
+	}
 	lines = append(lines, "")
 	lines = append(lines, strings.Repeat("─", min(width-4, 50)))
 	lines = append(lines, "")
